@@ -4,8 +4,10 @@ import Today from './screens/Today'
 import Money from './screens/Money'
 import Progress from './screens/Progress'
 import Review from './screens/Review'
+import Life from './screens/Life'
 import Settings from './screens/Settings'
 import {
+  IconLife,
   IconMoney,
   IconProgress,
   IconReview,
@@ -16,13 +18,14 @@ import { PROTOCOL_DAYS } from './lib/config'
 import { useStore } from './lib/store'
 import { timeline } from './lib/selectors'
 
-type TabId = 'today' | 'money' | 'progress' | 'review' | 'settings'
+type TabId = 'today' | 'money' | 'progress' | 'review' | 'life' | 'settings'
 
 const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { id: 'today', label: 'Today', Icon: IconToday },
   { id: 'money', label: 'Money', Icon: IconMoney },
   { id: 'progress', label: 'Progress', Icon: IconProgress },
   { id: 'review', label: 'Review', Icon: IconReview },
+  { id: 'life', label: 'Life', Icon: IconLife },
   { id: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
@@ -31,6 +34,7 @@ const SCREENS: Record<TabId, () => ReactElement> = {
   money: Money,
   progress: Progress,
   review: Review,
+  life: Life,
   settings: Settings,
 }
 

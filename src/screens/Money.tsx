@@ -25,9 +25,15 @@ import {
   entityTotals,
   rewardsUnlocked,
 } from '../lib/selectors'
+import { BANK_ACCOUNTS } from '../lib/types'
 import type { AccountId, LedgerKind, MoneyEntity } from '../lib/types'
 
-const SERIES_COLOR: Record<AccountId, string> = {
+/**
+ * Three categorical slots, validated all-pairs for colour-blind separation on
+ * this surface. Net worth deliberately isn't one of them — it gets its own
+ * single-series chart rather than a fourth hue that would break the set.
+ */
+const SERIES_COLOR: Record<string, string> = {
   acmrBank: 'var(--series-acmr)',
   onemediaBank: 'var(--series-1media)',
   personalBank: 'var(--series-personal)',
@@ -58,14 +64,22 @@ export default function Money() {
         ? acmr
         : media
 
-  const series: Series[] = (
-    ['acmrBank', 'onemediaBank', 'personalBank'] as AccountId[]
-  ).map((a) => ({
+  const series: Series[] = BANK_ACCOUNTS.map((a) => ({
     id: a,
     label: ACCOUNT_LABEL[a],
     color: SERIES_COLOR[a],
     points: accountHistory(state, a),
   }))
+
+  const netWorth = accountBalance(state, 'netWorth')
+  const netWorthSeries: Series[] = [
+    {
+      id: 'netWorth',
+      label: ACCOUNT_LABEL.netWorth,
+      color: 'var(--accent)',
+      points: accountHistory(state, 'netWorth'),
+    },
+  ]
 
   const ledger = state.ledger
     .filter((e) => entity === 'all' || e.entity === entity)
@@ -105,6 +119,7 @@ export default function Money() {
           sub="ACMR + 1Media"
         />
         <Stat label="Personal bank" value={euroCompact(personalBank)} sub={euro(personalBank)} />
+        <Stat label="Net worth" value={euroCompact(netWorth)} sub={euro(netWorth)} />
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
@@ -121,6 +136,20 @@ export default function Money() {
       <SectionTitle title="Balances over time" />
       <Card className="card-pad">
         <BalanceChart series={series} />
+      </Card>
+
+      <SectionTitle title="Net worth" />
+      <Card className="card-pad">
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
+          <span className="t-title">{euro(netWorth)}</span>
+          <span className="t-foot muted">of {euroCompact(state.targets.netWorth)}</span>
+        </div>
+        <Meter pct={pct(netWorth, state.targets.netWorth)} />
+        <p className="t-foot muted" style={{ margin: '10px 0 14px' }}>
+          Everything you own less what you owe — property and investments included, so it
+          isn't the three accounts added up. Set it in Update balances.
+        </p>
+        <BalanceChart series={netWorthSeries} />
       </Card>
 
       <SectionTitle title="Personal payout" />
@@ -304,6 +333,7 @@ function BalanceSheet({ onClose }: { onClose: () => void }) {
     acmrBank: accountBalance(state, 'acmrBank'),
     onemediaBank: accountBalance(state, 'onemediaBank'),
     personalBank: accountBalance(state, 'personalBank'),
+    netWorth: accountBalance(state, 'netWorth'),
   })
 
   const save = () => {

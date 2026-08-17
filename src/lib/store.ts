@@ -2,8 +2,10 @@ import { useSyncExternalStore } from 'react'
 import {
   CHECKLIST,
   DEFAULT_BOOKS,
+  DEFAULT_GOALS,
   DEFAULT_REWARDS,
   DEFAULT_TARGETS,
+  DEFAULT_UPKEEP,
   MORNING,
   PROTOCOL_DAYS,
 } from './config'
@@ -13,9 +15,12 @@ import type {
   AppState,
   BalanceSnapshot,
   Book,
+  Connection,
   DayEntry,
+  Goal,
   LedgerEntry,
   Targets,
+  Upkeep,
   WeekEntry,
 } from './types'
 
@@ -32,6 +37,9 @@ function initialState(): AppState {
     balances: [],
     payoutReceived: 0,
     books: DEFAULT_BOOKS.map((b) => ({ ...b })),
+    goals: DEFAULT_GOALS.map((g) => ({ ...g })),
+    connections: [],
+    upkeep: DEFAULT_UPKEEP.map((u) => ({ ...u })),
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
   }
 }
@@ -64,6 +72,9 @@ function hydrate(raw: string): AppState {
     balances: parsed.balances ?? [],
     payoutReceived: parsed.payoutReceived ?? 0,
     books: parsed.books ?? base.books,
+    goals: parsed.goals ?? base.goals,
+    connections: parsed.connections ?? base.connections,
+    upkeep: parsed.upkeep ?? base.upkeep,
     rewards: parsed.rewards ?? base.rewards,
   }
 }
@@ -210,6 +221,18 @@ export const actions = {
     set({ ...state, books })
   },
 
+  setGoals(goals: Goal[]) {
+    set({ ...state, goals })
+  },
+
+  setConnections(connections: Connection[]) {
+    set({ ...state, connections })
+  },
+
+  setUpkeep(upkeep: Upkeep[]) {
+    set({ ...state, upkeep })
+  },
+
   replaceAll(next: AppState) {
     set(hydrate(JSON.stringify(next)))
   },
@@ -242,7 +265,7 @@ export const actions = {
         waterL: 3.5,
         steps: 10400,
         sleepHours: 8,
-        readingMin: 30,
+        pagesRead: 22,
         mobilityMin: 10,
         journalMin: 10,
         goalReviewMin: 10,

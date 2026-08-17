@@ -93,6 +93,14 @@ export const IconTrash = (p: P) => (
   </svg>
 )
 
+export const IconLife = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M12 3v3.3M12 17.7V21M3 12h3.3M17.7 12H21" />
+    <path d="M5.6 5.6l2.4 2.4M16 16l2.4 2.4M18.4 5.6L16 8M8 16l-2.4 2.4" />
+  </svg>
+)
+
 export const IconFlame = (p: P) => (
   <svg {...base} {...p}>
     <path d="M12 3s5 4.2 5 9a5 5 0 0 1-10 0c0-1.6.7-3 1.5-4 .2 1.4 1 2.3 1.8 2.3 1.3 0 1.6-2.6.7-4.3-.3-.6-.7-1.4-1-2z" />

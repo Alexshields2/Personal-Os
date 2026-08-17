@@ -2,20 +2,18 @@ import { useMemo, useState } from 'react'
 import {
   Card,
   Check,
-  Empty,
   Meter,
   NumberField,
   SectionTitle,
   Stat,
   TextField,
 } from '../components/ui'
-import { IconChevron, IconPlus, IconTrash } from '../components/icons'
+import { IconChevron } from '../components/icons'
 import { INNER_CIRCLE } from '../lib/config'
 import { addDays, formatShort, todayISO, weekStartISO } from '../lib/date'
-import { euro, uid } from '../lib/format'
+import { euro } from '../lib/format'
 import { actions, emptyWeek, useStore } from '../lib/store'
 import { isLogged, scoreDay, weekRevenue } from '../lib/selectors'
-import type { Book } from '../lib/types'
 
 export default function Review() {
   const state = useStore()
@@ -247,8 +245,6 @@ export default function Review() {
         </div>
       </Card>
 
-      <Books />
-
       <SectionTitle title="Still seeing" />
       <Card className="card-pad">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -291,83 +287,4 @@ function ToggleRow({
       </span>
     </button>
   )
-}
-
-function Books() {
-  const state = useStore()
-  const [title, setTitle] = useState('')
-
-  const cycle = (b: Book): Book['status'] =>
-    b.status === 'queued' ? 'reading' : b.status === 'reading' ? 'done' : 'queued'
-
-  return (
-    <>
-      <SectionTitle title="Books" />
-      <Card>
-        {state.books.length === 0 ? (
-          <Empty>No books yet.</Empty>
-        ) : (
-          <div className="rows">
-            {state.books.map((b) => (
-              <div className="row" key={b.id}>
-                <button
-                  onClick={() =>
-                    actions.setBooks(
-                      state.books.map((x) => (x.id === b.id ? { ...x, status: cycle(x) } : x)),
-                    )
-                  }
-                  aria-label="Cycle status"
-                  style={{ display: 'flex' }}
-                >
-                  <Check on={b.status === 'done'} />
-                </button>
-                <span className="row-main">
-                  <span className="row-title" style={{ opacity: b.status === 'done' ? 0.6 : 1 }}>
-                    {b.title}
-                  </span>
-                  <span className="row-sub">
-                    {b.status === 'reading'
-                      ? 'Reading now'
-                      : b.status === 'done'
-                        ? 'Finished'
-                        : 'Queued'}
-                  </span>
-                </span>
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => actions.setBooks(state.books.filter((x) => x.id !== b.id))}
-                  aria-label="Remove book"
-                >
-                  <IconTrash style={{ width: 16, height: 16 }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 8, padding: 13, borderTop: '1px solid var(--hairline)' }}>
-          <input
-            className="input"
-            placeholder="Add a book"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') add()
-            }}
-          />
-          <button className="btn" onClick={add} disabled={!title.trim()}>
-            <IconPlus style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
-      </Card>
-    </>
-  )
-
-  function add() {
-    if (!title.trim()) return
-    actions.setBooks([
-      ...state.books,
-      { id: uid(), title: title.trim(), status: 'queued', notes: '' },
-    ])
-    setTitle('')
-  }
 }

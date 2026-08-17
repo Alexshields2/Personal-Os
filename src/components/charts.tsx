@@ -104,9 +104,13 @@ export interface Series {
   points: { date: string; amount: number }[]
 }
 
+// The SVG scales to fit its container, so a font size in viewBox units shrinks
+// with it. At ~340px wide on a phone the scale factor is ~0.53, so 19 units
+// lands near 10px on screen — anything smaller is unreadable there.
 const W = 640
-const H = 210
-const PAD = { top: 14, right: 66, bottom: 26, left: 8 }
+const H = 250
+const TICK_FS = 19
+const PAD = { top: 16, right: 104, bottom: 40, left: 8 }
 
 export function BalanceChart({ series }: { series: Series[] }) {
   const [showTable, setShowTable] = useState(false)
@@ -152,13 +156,15 @@ export function BalanceChart({ series }: { series: Series[] }) {
 
   return (
     <div>
+      {/* One series needs no legend — the card title already names it. */}
       <div className="legend" style={{ paddingTop: 0, paddingBottom: 10 }}>
-        {series.map((s) => (
-          <span className="legend-item" key={s.id}>
-            <span className="legend-key" style={{ background: s.color }} />
-            {s.label}
-          </span>
-        ))}
+        {series.length > 1 &&
+          series.map((s) => (
+            <span className="legend-item" key={s.id}>
+              <span className="legend-key" style={{ background: s.color }} />
+              {s.label}
+            </span>
+          ))}
         <button
           className="btn btn-quiet btn-sm"
           style={{ marginLeft: 'auto' }}
@@ -194,13 +200,13 @@ export function BalanceChart({ series }: { series: Series[] }) {
                   y1={model.y(t)}
                   y2={model.y(t)}
                   stroke="var(--grid)"
-                  strokeWidth="1"
+                  strokeWidth="1.8"
                 />
                 <text
                   x={W - PAD.right + 8}
-                  y={model.y(t) + 4}
+                  y={model.y(t) + TICK_FS / 3}
                   fill="var(--text-muted)"
-                  fontSize="11"
+                  fontSize={TICK_FS}
                   style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
                   {euroCompact(t)}
@@ -215,7 +221,7 @@ export function BalanceChart({ series }: { series: Series[] }) {
                 y1={PAD.top}
                 y2={H - PAD.bottom}
                 stroke="var(--hairline-strong)"
-                strokeWidth="1"
+                strokeWidth="1.8"
               />
             )}
 
@@ -231,17 +237,17 @@ export function BalanceChart({ series }: { series: Series[] }) {
                     d={d}
                     fill="none"
                     stroke={s.color}
-                    strokeWidth="2"
+                    strokeWidth="3.6"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
                   <circle
                     cx={model.x(last.date)}
                     cy={model.y(last.amount)}
-                    r="4.5"
+                    r="8"
                     fill={s.color}
                     stroke="var(--surface-1)"
-                    strokeWidth="2"
+                    strokeWidth="3.6"
                   />
                 </g>
               )
@@ -257,10 +263,10 @@ export function BalanceChart({ series }: { series: Series[] }) {
                     key={s.id}
                     cx={model.x(active)}
                     cy={model.y(p.amount)}
-                    r="4.5"
+                    r="8"
                     fill={s.color}
                     stroke="var(--surface-1)"
-                    strokeWidth="2"
+                    strokeWidth="3.6"
                   />
                 )
               })}
@@ -271,16 +277,16 @@ export function BalanceChart({ series }: { series: Series[] }) {
               y1={H - PAD.bottom}
               y2={H - PAD.bottom}
               stroke="var(--axis)"
-              strokeWidth="1"
+              strokeWidth="1.8"
             />
-            <text x={PAD.left} y={H - 8} fill="var(--text-muted)" fontSize="11">
+            <text x={PAD.left} y={H - 10} fill="var(--text-muted)" fontSize={TICK_FS}>
               {formatShort(model.dates[0])}
             </text>
             <text
               x={W - PAD.right}
-              y={H - 8}
+              y={H - 10}
               fill="var(--text-muted)"
-              fontSize="11"
+              fontSize={TICK_FS}
               textAnchor="end"
             >
               {formatShort(model.dates[model.dates.length - 1])}

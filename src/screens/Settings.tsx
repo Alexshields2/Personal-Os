@@ -87,6 +87,11 @@ export default function Settings() {
             onChange={(v) => actions.setTargets({ personalPayout: v })}
           />
           <NumberField
+            label={`Net worth target — currently ${euroCompact(state.targets.netWorth)}`}
+            value={state.targets.netWorth}
+            onChange={(v) => actions.setTargets({ netWorth: v })}
+          />
+          <NumberField
             label="Bodyweight target (kg)"
             value={state.targets.bodyweightKg}
             onChange={(v) => actions.setTargets({ bodyweightKg: v })}

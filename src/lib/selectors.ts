@@ -6,8 +6,16 @@ import {
   PROTOCOL_DAYS,
 } from './config'
 import type { ChecklistItem, PillarId } from './config'
-import { addDays, dayNumber, fromISO, isoForDay, todayISO, weekStartISO } from './date'
-import type { AccountId, AppState, DayEntry, MoneyEntity } from './types'
+import {
+  addDays,
+  dayNumber,
+  daysBetween,
+  fromISO,
+  isoForDay,
+  todayISO,
+  weekStartISO,
+} from './date'
+import type { AccountId, AppState, DayEntry, MoneyEntity, Upkeep } from './types'
 
 // ---------------------------------------------------------------------------
 // Daily scoring
@@ -321,4 +329,38 @@ export function weekRevenue(state: AppState, weekStart: string) {
 
 export function currentWeekStart(iso = todayISO()): string {
   return weekStartISO(iso)
+}
+
+// ---------------------------------------------------------------------------
+// Upkeep
+
+export interface UpkeepStatus {
+  item: Upkeep
+  /** Days until due. Negative means overdue. Null when never done. */
+  dueIn: number | null
+  nextDue: string | null
+  overdue: boolean
+}
+
+export function upkeepStatus(item: Upkeep, iso = todayISO()): UpkeepStatus {
+  if (!item.lastDone) {
+    return { item, dueIn: null, nextDue: null, overdue: true }
+  }
+  const nextDue = addDays(item.lastDone, item.intervalDays)
+  const dueIn = daysBetween(iso, nextDue)
+  return { item, dueIn, nextDue, overdue: dueIn <= 0 }
+}
+
+export function upkeepDueCount(state: AppState, iso = todayISO()): number {
+  return state.upkeep.filter((u) => upkeepStatus(u, iso).overdue).length
+}
+
+// ---------------------------------------------------------------------------
+// Goals
+
+export function goalProgress(state: AppState): { done: number; total: number } {
+  return {
+    done: state.goals.filter((g) => g.done).length,
+    total: state.goals.length,
+  }
 }

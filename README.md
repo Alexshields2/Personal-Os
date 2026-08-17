@@ -49,11 +49,14 @@ target. 80+ counts as a winning day and keeps the streak alive.
 Training and scheduled recovery are separate. A recovery day satisfies the
 10-hour and training standards without penalty — recovery is part of the plan.
 
-**Money** tracks two things that are easy to confuse:
+**Money** tracks three things that are easy to confuse:
 
 - **Bank balances** — a point-in-time reading per account (ACMR, 1Media,
   personal). The most recent reading is the current balance; the history draws
   the curve. The €10M target is measured against the ACMR bank balance.
+- **Net worth** — a separate manual figure covering property, investments and
+  anything that never touches those three accounts. It is deliberately *not*
+  the three balances added up, and gets its own chart.
 - **The ledger** — individual revenue, cash-collected, profit and payout events,
   attributed to ACMR or 1Media.
 
@@ -67,6 +70,16 @@ should be by now.
 
 **Review** is the Sunday page: weight and waist, the week's revenue pulled from
 the ledger, deals and pipeline, and the week's average score day by day.
+
+**Life** holds the things that outlast a single day:
+
+- **Upkeep** — recurring tasks with an interval. Haircut every 14 days ships by
+  default. Ticking one restarts its clock from today, and anything past its
+  interval shows as due.
+- **Goals** — what you're aiming at, with an optional target date.
+- **Books** — queued → reading → read, filterable. The daily standard is 20
+  pages; the 126-day total is 2,520.
+- **People to connect with** — target → reached out → connected.
 
 ## Adjusting it
 

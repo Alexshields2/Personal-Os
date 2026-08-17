@@ -11,7 +11,7 @@ export interface DayMetrics {
   waterL: number
   steps: number
   sleepHours: number
-  readingMin: number
+  pagesRead: number
   mobilityMin: number
   journalMin: number
   goalReviewMin: number
@@ -28,7 +28,7 @@ export const EMPTY_METRICS: DayMetrics = {
   waterL: 0,
   steps: 0,
   sleepHours: 0,
-  readingMin: 0,
+  pagesRead: 0,
   mobilityMin: 0,
   journalMin: 0,
   goalReviewMin: 0,
@@ -52,7 +52,15 @@ export interface DayEntry {
 }
 
 export type MoneyEntity = 'acmr' | 'onemedia'
-export type AccountId = 'acmrBank' | 'onemediaBank' | 'personalBank'
+
+/**
+ * `netWorth` rides the same snapshot machinery as the bank accounts but is a
+ * manual figure — it takes in property, investments and anything else that
+ * never touches these three accounts, so it is never summed with them.
+ */
+export type AccountId = 'acmrBank' | 'onemediaBank' | 'personalBank' | 'netWorth'
+
+export const BANK_ACCOUNTS: AccountId[] = ['acmrBank', 'onemediaBank', 'personalBank']
 
 export type LedgerKind = 'revenue' | 'cashCollected' | 'profit' | 'payout' | 'expense'
 
@@ -100,6 +108,34 @@ export interface Book {
   notes: string
 }
 
+export interface Goal {
+  id: string
+  title: string
+  note: string
+  /** Optional ISO deadline. */
+  due: string
+  done: boolean
+}
+
+export type ConnectionStatus = 'target' | 'reachedOut' | 'connected'
+
+/** Someone worth knowing, and where that stands. */
+export interface Connection {
+  id: string
+  name: string
+  why: string
+  status: ConnectionStatus
+}
+
+/** A recurring upkeep task — haircut every 14 days, and anything like it. */
+export interface Upkeep {
+  id: string
+  label: string
+  intervalDays: number
+  /** ISO date it was last done; empty means never. */
+  lastDone: string
+}
+
 export interface Targets {
   acmrHours: number
   calories: number
@@ -108,7 +144,7 @@ export interface Targets {
   waterL: number
   steps: number
   sleepHours: number
-  readingMin: number
+  pagesRead: number
   mobilityMin: number
   journalMin: number
   goalReviewMin: number
@@ -117,6 +153,7 @@ export interface Targets {
   bonusPool: number
   personalPayout: number
   bodyweightKg: number
+  netWorth: number
 }
 
 export interface AppState {
@@ -130,5 +167,8 @@ export interface AppState {
   /** Cash actually landed in the personal account. Gates the rewards. */
   payoutReceived: number
   books: Book[]
+  goals: Goal[]
+  connections: Connection[]
+  upkeep: Upkeep[]
   rewards: { id: string; label: string; detail: string }[]
 }

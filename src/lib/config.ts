@@ -10,7 +10,7 @@ export const DEFAULT_TARGETS: Targets = {
   waterL: 3.5,
   steps: 10000,
   sleepHours: 8,
-  readingMin: 30,
+  pagesRead: 20,
   mobilityMin: 10,
   journalMin: 10,
   goalReviewMin: 10,
@@ -18,6 +18,7 @@ export const DEFAULT_TARGETS: Targets = {
   bonusPool: 10_000_000,
   personalPayout: 1_000_000,
   bodyweightKg: 95,
+  netWorth: 5_000_000,
 }
 
 export type PillarId = 'business' | 'body' | 'mind' | 'discipline'
@@ -70,7 +71,7 @@ export const CHECKLIST: ChecklistItem[] = [
   { id: 'grooming', label: 'Skincare / grooming', pillar: 'body', points: 1 },
 
   // Mind — 20
-  { id: 'reading', label: 'Read', pillar: 'mind', points: 6, metric: 'readingMin' },
+  { id: 'reading', label: 'Read 20 pages', pillar: 'mind', points: 6, metric: 'pagesRead' },
   { id: 'journal', label: 'Journal', pillar: 'mind', points: 4, metric: 'journalMin' },
   {
     id: 'goal_review',
@@ -129,7 +130,7 @@ export const METRICS: MetricSpec[] = [
   { key: 'waterL', label: 'Water', unit: 'L', step: 0.25, dp: 2 },
   { key: 'steps', label: 'Steps', unit: '', step: 500, dp: 0 },
   { key: 'sleepHours', label: 'Sleep', unit: 'h', step: 0.25, dp: 2 },
-  { key: 'readingMin', label: 'Reading', unit: 'min', step: 5, dp: 0 },
+  { key: 'pagesRead', label: 'Pages read', unit: '', step: 5, dp: 0 },
   { key: 'mobilityMin', label: 'Mobility', unit: 'min', step: 5, dp: 0 },
   { key: 'journalMin', label: 'Journal', unit: 'min', step: 5, dp: 0 },
   { key: 'goalReviewMin', label: 'Goal review', unit: 'min', step: 5, dp: 0 },
@@ -209,10 +210,11 @@ export const COMPOUNDING: CompoundSpec[] = [
   },
   {
     id: 'reading',
-    label: 'Reading',
-    unit: 'h',
-    target: 63,
-    source: { type: 'metric', key: 'readingMin', scale: 1 / 60 },
+    label: 'Pages read',
+    unit: '',
+    target: 2520,
+    source: { type: 'metric', key: 'pagesRead' },
+    note: '20 pages × 126 days',
   },
   {
     id: 'journal',
@@ -301,7 +303,37 @@ export const ACCOUNT_LABEL: Record<string, string> = {
   acmrBank: 'ACMR bank',
   onemediaBank: '1Media bank',
   personalBank: 'Personal bank',
+  netWorth: 'Net worth',
 }
+
+export const CONNECTION_LABEL: Record<string, string> = {
+  target: 'Target',
+  reachedOut: 'Reached out',
+  connected: 'Connected',
+}
+
+export const DEFAULT_UPKEEP = [
+  { id: 'u1', label: 'Haircut', intervalDays: 14, lastDone: '' },
+  { id: 'u2', label: 'Progress photos', intervalDays: 7, lastDone: '' },
+]
+
+export const DEFAULT_GOALS = [
+  {
+    id: 'g1',
+    title: '€10M in the ACMR bank',
+    note: 'The scoreboard the 1,080 hours point at',
+    due: '',
+    done: false,
+  },
+  {
+    id: 'g2',
+    title: '€1M personal payout received',
+    note: 'Received, not invoiced. Unlocks the rewards',
+    due: '',
+    done: false,
+  },
+  { id: 'g3', title: '95kg lean and muscular', note: 'Long-term physique target', due: '', done: false },
+]
 
 export const KIND_LABEL: Record<string, string> = {
   revenue: 'Revenue',
