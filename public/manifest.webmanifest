@@ -1,0 +1,14 @@
+{
+  "name": "126 — Complete Comeback",
+  "short_name": "126",
+  "description": "Private operating system for the 126-day comeback.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
