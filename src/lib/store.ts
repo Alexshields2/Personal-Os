@@ -29,6 +29,7 @@ const KEY = 'protocol126:v1'
 function initialState(): AppState {
   return {
     version: STATE_VERSION,
+    updatedAt: new Date(0).toISOString(),
     startDate: todayISO(),
     targets: { ...DEFAULT_TARGETS },
     days: {},
@@ -64,6 +65,7 @@ function hydrate(raw: string): AppState {
     ...base,
     ...parsed,
     version: STATE_VERSION,
+    updatedAt: parsed.updatedAt ?? base.updatedAt,
     startDate: parsed.startDate ?? base.startDate,
     targets: { ...base.targets, ...(parsed.targets ?? {}) },
     days,
@@ -139,8 +141,13 @@ function persist() {
   }, 150)
 }
 
-function set(next: AppState) {
-  state = next
+/**
+ * `stamp: false` is for state arriving from the server — re-stamping it would
+ * make every pull look like a fresh local edit and the two devices would push
+ * at each other forever.
+ */
+function set(next: AppState, stamp = true) {
+  state = stamp ? { ...next, updatedAt: new Date().toISOString() } : next
   persist()
   listeners.forEach((l) => l())
 }
@@ -150,8 +157,16 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l)
 }
 
+/** Lets the sync layer react to local edits without rendering. */
+export const subscribeStore = subscribe
+
 export function getState(): AppState {
   return state
+}
+
+/** Replace local state with something already reconciled against the server. */
+export function applyRemote(next: AppState) {
+  set(hydrate(JSON.stringify(next)), false)
 }
 
 export function useStore(): AppState {

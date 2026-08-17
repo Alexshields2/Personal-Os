@@ -158,6 +158,8 @@ export interface Targets {
 
 export interface AppState {
   version: number
+  /** ISO timestamp of the last local mutation. Drives sync conflict order. */
+  updatedAt: string
   startDate: string
   targets: Targets
   days: Record<string, DayEntry>

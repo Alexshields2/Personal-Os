@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
 import { Card, Field, NumberField, SectionTitle } from '../components/ui'
+import SyncCard from '../components/SyncCard'
+import { useSync } from '../lib/sync'
 import { METRICS, PROTOCOL_DAYS } from '../lib/config'
 import { formatWithYear, isoForDay } from '../lib/date'
 import { euroCompact } from '../lib/format'
@@ -8,6 +10,7 @@ import type { AppState, Targets } from '../lib/types'
 
 export default function Settings() {
   const state = useStore()
+  const sync = useSync()
   const fileRef = useRef<HTMLInputElement>(null)
   const [note, setNote] = useState('')
 
@@ -51,8 +54,14 @@ export default function Settings() {
           </span>
         </div>
         <h1 className="t-large">Settings</h1>
-        <p className="t-sub">Everything stays on this device.</p>
+        <p className="t-sub">
+          {sync.email
+            ? `Synced to ${sync.email}. Also saved on this device.`
+            : 'Everything stays on this device.'}
+        </p>
       </header>
+
+      <SyncCard />
 
       <SectionTitle title="Protocol" />
       <Card className="card-pad">
@@ -129,8 +138,8 @@ export default function Settings() {
       <SectionTitle title="Your data" />
       <Card className="card-pad">
         <p className="t-foot" style={{ marginBottom: 14 }}>
-          Nothing leaves this device — no account, no server, no sync. That also means
-          clearing your browser data wipes it, so export a backup now and then.
+          Export writes a full copy you can restore anywhere. Worth doing now and then even
+          with sync on — it's the only thing that recovers a bad edit.
         </p>
         <div style={{ display: 'grid', gap: 10 }}>
           <button className="btn btn-block" onClick={download}>

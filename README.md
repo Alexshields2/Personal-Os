@@ -4,9 +4,9 @@ A private operating system for the 126-day protocol. Daily scorecard, weekly
 review, compounding totals, and a financial scoreboard covering ACMR, 1Media and
 personal money.
 
-Everything is stored in the browser on the device you use it on. There is no
-account, no server and no sync — which also means clearing site data wipes it, so
-export a backup from Settings now and then.
+It runs local-first: every edit is written to the device immediately and the app
+works with no network. Configure Supabase (below) and it also syncs across your
+devices; leave it unconfigured and it stays purely local.
 
 ## Run it locally
 
@@ -20,20 +20,60 @@ npm run dev
 
 Then open http://localhost:5173.
 
+## Sync across devices (optional)
+
+Sync is off until you configure it. Setting it up is four steps:
+
+1. Create a project at [supabase.com](https://supabase.com) (free tier is ample —
+   the whole dataset is one row).
+2. Open **SQL Editor**, paste in [`supabase/schema.sql`](supabase/schema.sql) and
+   run it. That creates one table and the row-level security policies that stop
+   anyone reading a row that isn't theirs.
+3. Copy `.env.example` to `.env.local` and fill in the two values from
+   **Project Settings → API**. The anon key is meant to be public and ships in
+   the client bundle — RLS is what protects the data. Never put the
+   `service_role` key here.
+4. Restart the dev server, open **Settings → Sync**, and create an account. Sign
+   in with the same account on your other device.
+
+Under **Authentication → Providers**, turning off "Confirm email" makes signup a
+single step. Leave it on if you'd rather verify the address.
+
+### How conflicts resolve
+
+Whichever device wrote last wins outright for the lists — ledger, balances,
+goals, books, connections — because merging those by id would resurrect anything
+you'd deleted elsewhere.
+
+Days and weeks merge by key instead: logging Tuesday on your phone and Wednesday
+on the Mac keeps both. Only when the *same* day was edited on both devices does
+the newer edit win. That's the case that actually comes up, and the one worth
+getting right.
+
+Export a backup occasionally regardless. Sync replicates a bad edit to every
+device; only a backup undoes one.
+
 ## Put it on your phone
 
 ```bash
 npm run build
 ```
 
-The build lands in `dist/` and works from any static host. The included GitHub
-Actions workflow publishes it to GitHub Pages on every push to `main` — enable it
-under **Settings → Pages → Source: GitHub Actions**, then open the Pages URL on
-your phone and use **Share → Add to Home Screen**. It launches full-screen with
-no browser chrome.
+The build lands in `dist/` and works from any static host.
 
-Each device keeps its own data. To move a log between phone and desktop, export a
-backup from Settings on one and restore it on the other.
+**Vercel** is the recommended host — it deploys from a private repo for free,
+which GitHub Pages does not. Import the repo at
+[vercel.com/new](https://vercel.com/new); `vercel.json` already sets the build
+command, output directory and SPA rewrites. Add `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` under **Project Settings → Environment Variables**, or
+sync stays off in the deployed build.
+
+Then open the deployment URL on your phone and use **Share → Add to Home
+Screen**. It launches full-screen with no browser chrome.
+
+A GitHub Actions workflow for GitHub Pages is also included, for the case where
+the repo is public — enable it under **Settings → Pages → Source: GitHub
+Actions**. Note that Pages will not serve a private repo on the free plan.
 
 ## How it works
 
@@ -92,9 +132,14 @@ points within each pillar must add up to that pillar's allocation.
 
 ## Stack
 
-React 19 + TypeScript + Vite, no runtime dependencies beyond React. Charts are
-hand-rolled SVG. State lives in `src/lib/store.ts` and persists to
-`localStorage` under `protocol126:v1`.
+React 19 + TypeScript + Vite. Charts are hand-rolled SVG — no charting library.
+State lives in `src/lib/store.ts` and persists to `localStorage` under
+`protocol126:v1`; `src/lib/sync.ts` mirrors it to Supabase when configured.
+
+The whole state is one versioned JSON document, so the server schema is a single
+`jsonb` column — adding a field to the app needs no migration. When the Supabase
+env vars are absent, Vite folds the client out at build time and the bundle
+drops from ~140KB gzipped to ~80KB.
 
 The chart palette (`--series-*` and the gold ramp in `src/styles.css`) was
 validated for colour-blind separation and contrast against the app's dark
