@@ -2,8 +2,11 @@ import { useSyncExternalStore } from 'react'
 import {
   CHECKLIST,
   CORE_PRIORITIES,
+  DEAL_STAGES,
   DEFAULT_BLOCKS,
+  DEFAULT_DOMAINS,
   DEFAULT_GOALS,
+  DEFAULT_LINKS,
   DEFAULT_LEARNING,
   DEFAULT_LOOPS,
   DEFAULT_REWARDS,
@@ -19,15 +22,22 @@ import { EMPTY_METRICS, STATE_VERSION } from './types'
 import type {
   AppState,
   BalanceSnapshot,
+  Client,
   Connection,
   DayEntry,
+  Deal,
+  DomainLink,
+  DomainNode,
   Goal,
+  Project,
+  Task,
   LearnItem,
   LedgerEntry,
   Lesson,
   Loop,
   Priority,
   Targets,
+  Theme,
   TimeBlock,
   Upkeep,
   WeekEntry,
@@ -38,6 +48,7 @@ const KEY = 'protocol126:v1'
 function initialState(): AppState {
   return {
     version: STATE_VERSION,
+    theme: 'dark',
     updatedAt: new Date(0).toISOString(),
     startDate: todayISO(),
     targets: { ...DEFAULT_TARGETS },
@@ -51,6 +62,12 @@ function initialState(): AppState {
     connections: [],
     upkeep: DEFAULT_UPKEEP.map((u) => ({ ...u })),
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
+    domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
+    links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    clients: [],
+    deals: [],
+    projects: [],
+    tasks: [],
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
   }
 }
@@ -109,6 +126,7 @@ function hydrate(raw: string): AppState {
     ...base,
     ...parsed,
     version: STATE_VERSION,
+    theme: parsed.theme ?? base.theme,
     updatedAt: parsed.updatedAt ?? base.updatedAt,
     startDate: parsed.startDate ?? base.startDate,
     targets: { ...base.targets, ...(parsed.targets ?? {}) },
@@ -133,6 +151,12 @@ function hydrate(raw: string): AppState {
     }),
     upkeep: parsed.upkeep ?? base.upkeep,
     loops: parsed.loops ?? base.loops,
+    domains: parsed.domains ?? base.domains,
+    links: parsed.links ?? base.links,
+    clients: parsed.clients ?? [],
+    deals: parsed.deals ?? [],
+    projects: parsed.projects ?? [],
+    tasks: parsed.tasks ?? [],
     rewards: parsed.rewards ?? base.rewards,
   }
 }
@@ -256,6 +280,10 @@ export function useStore(): AppState {
 export const actions = {
   setStartDate(iso: string) {
     set({ ...state, startDate: iso })
+  },
+
+  setTheme(theme: Theme) {
+    set({ ...state, theme })
   },
 
   setTargets(patch: Partial<Targets>) {
@@ -394,6 +422,109 @@ export const actions = {
 
   setLoops(loops: Loop[]) {
     set({ ...state, loops })
+  },
+
+  setDomains(domains: DomainNode[]) {
+    set({ ...state, domains })
+  },
+
+  updateDomain(id: string, patch: Partial<DomainNode>) {
+    set({
+      ...state,
+      domains: state.domains.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+    })
+  },
+
+  addDomain(parentId: string, label: string) {
+    set({
+      ...state,
+      domains: [
+        ...state.domains,
+        { id: uid(), parentId, label, note: '', loopIds: [], checkIds: [], metricKeys: [] },
+      ],
+    })
+  },
+
+  /** Removing a node takes its whole subtree, and any link touching it. */
+  removeDomain(id: string) {
+    const doomed = new Set<string>()
+    const collect = (nodeId: string) => {
+      doomed.add(nodeId)
+      for (const child of state.domains.filter((d) => d.parentId === nodeId)) collect(child.id)
+    }
+    collect(id)
+    set({
+      ...state,
+      domains: state.domains.filter((d) => !doomed.has(d.id)),
+      links: state.links.filter((l) => !doomed.has(l.fromId) && !doomed.has(l.toId)),
+    })
+  },
+
+  setLinks(links: DomainLink[]) {
+    set({ ...state, links })
+  },
+
+  // ---------------------------------------------------------------- work
+
+  setClients(clients: Client[]) {
+    set({ ...state, clients })
+  },
+
+  updateClient(id: string, patch: Partial<Client>) {
+    set({ ...state, clients: state.clients.map((c) => (c.id === id ? { ...c, ...patch } : c)) })
+  },
+
+  setDeals(deals: Deal[]) {
+    set({ ...state, deals })
+  },
+
+  updateDeal(id: string, patch: Partial<Deal>) {
+    set({ ...state, deals: state.deals.map((d) => (d.id === id ? { ...d, ...patch } : d)) })
+  },
+
+  /** Moving a stage restamps `moved`, which is what the stale check reads. */
+  moveDeal(id: string, stage: Deal['stage']) {
+    const deal = state.deals.find((d) => d.id === id)
+    if (!deal || deal.stage === stage) return
+    const preset = DEAL_STAGES.find((s) => s.id === stage)
+    actions.updateDeal(id, {
+      stage,
+      moved: todayISO(),
+      // Keep a hand-set probability unless the stage is terminal.
+      probability:
+        stage === 'won' || stage === 'lost' ? (preset?.probability ?? 0) : deal.probability,
+    })
+  },
+
+  setProjects(projects: Project[]) {
+    set({ ...state, projects })
+  },
+
+  updateProject(id: string, patch: Partial<Project>) {
+    set({ ...state, projects: state.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)) })
+  },
+
+  setTasks(tasks: Task[]) {
+    set({ ...state, tasks })
+  },
+
+  addTask(task: Task) {
+    set({ ...state, tasks: [task, ...state.tasks] })
+  },
+
+  updateTask(id: string, patch: Partial<Task>) {
+    set({ ...state, tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) })
+  },
+
+  toggleTask(id: string) {
+    const task = state.tasks.find((t) => t.id === id)
+    if (!task) return
+    const done = !task.done
+    actions.updateTask(id, { done, doneDate: done ? todayISO() : '' })
+  },
+
+  removeTask(id: string) {
+    set({ ...state, tasks: state.tasks.filter((t) => t.id !== id) })
   },
 
   setLearning(learning: LearnItem[]) {

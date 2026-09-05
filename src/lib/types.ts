@@ -234,8 +234,107 @@ export interface Targets {
   netWorth: number
 }
 
+// ---------------------------------------------------------------------- work
+
+export type ClientStatus = 'prospect' | 'active' | 'paused' | 'churned'
+
+/** Someone paying one of the businesses, and what they're worth per month. */
+export interface Client {
+  id: string
+  entity: MoneyEntity
+  name: string
+  status: ClientStatus
+  /** Recurring monthly value. 0 for project work. */
+  monthlyValue: number
+  since: string
+  /** ISO date the contract comes up. Empty when there isn't one. */
+  renewal: string
+  notes: string
+}
+
+export type DealStage = 'lead' | 'qualified' | 'proposal' | 'won' | 'lost'
+
+/**
+ * A deal in flight. `probability` defaults from the stage but stays editable,
+ * because the stage is a generalisation and you usually know better.
+ */
+export interface Deal {
+  id: string
+  entity: MoneyEntity
+  name: string
+  /** Optional link to an existing client. */
+  clientId: string
+  stage: DealStage
+  value: number
+  probability: number
+  expectedClose: string
+  /** The single next action. A deal with no next step is a deal going nowhere. */
+  nextStep: string
+  /** ISO date the stage last moved — drives the stale-deal warning. */
+  moved: string
+  notes: string
+}
+
+export type ProjectStatus = 'active' | 'paused' | 'done'
+
+export interface Project {
+  id: string
+  entity: PriorityTag
+  name: string
+  clientId: string
+  status: ProjectStatus
+  due: string
+  notes: string
+}
+
+/** A unit of work. `projectId` empty means it stands on its own. */
+export interface Task {
+  id: string
+  projectId: string
+  entity: PriorityTag
+  title: string
+  done: boolean
+  due: string
+  created: string
+  doneDate: string
+}
+
+export type Theme = 'dark' | 'light'
+
+/**
+ * A node in the life map. The tree is Alex at the root, then domains, then as
+ * many levels of sub-domain as are useful. Bindings are what stop it being a
+ * decorative mind-map: a node scores off the standards and metrics tied to it,
+ * so a branch can be measurably weak rather than just feel weak.
+ */
+export interface DomainNode {
+  id: string
+  /** Empty for the root. */
+  parentId: string
+  label: string
+  note: string
+  /** Loop ids that belong to this branch. */
+  loopIds: string[]
+  /** Checklist item ids whose hit rate feeds this node's score. */
+  checkIds: string[]
+  /** Metrics whose attainment against target feeds this node's score. */
+  metricKeys: MetricKey[]
+}
+
+/** A believed cause → effect between two nodes. Yours to assert, not inferred. */
+export interface DomainLink {
+  id: string
+  fromId: string
+  toId: string
+  note: string
+  /** How strongly you hold it: 1 suspected, 2 likely, 3 certain. */
+  weight: number
+}
+
 export interface AppState {
   version: number
+  /** Monochrome either way — this only decides which end is the ground. */
+  theme: Theme
   /** ISO timestamp of the last local mutation. Drives sync conflict order. */
   updatedAt: string
   startDate: string
@@ -251,5 +350,11 @@ export interface AppState {
   connections: Connection[]
   upkeep: Upkeep[]
   loops: Loop[]
+  domains: DomainNode[]
+  links: DomainLink[]
+  clients: Client[]
+  deals: Deal[]
+  projects: Project[]
+  tasks: Task[]
   rewards: { id: string; label: string; detail: string }[]
 }

@@ -101,6 +101,12 @@ export interface Series {
   id: string
   label: string
   color: string
+  /**
+   * SVG dash pattern. The palette is monochrome, so luminance alone is not
+   * enough to hold three lines apart — the dash is what actually separates
+   * them, and it survives printing and colour-blindness for free.
+   */
+  dash?: string
   points: { date: string; amount: number }[]
 }
 
@@ -161,7 +167,18 @@ export function BalanceChart({ series }: { series: Series[] }) {
         {series.length > 1 &&
           series.map((s) => (
             <span className="legend-item" key={s.id}>
-              <span className="legend-key" style={{ background: s.color }} />
+              <svg className="legend-key" viewBox="0 0 18 4" aria-hidden="true">
+                <line
+                  x1="0"
+                  y1="2"
+                  x2="18"
+                  y2="2"
+                  stroke={s.color}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeDasharray={s.dash}
+                />
+              </svg>
               {s.label}
             </span>
           ))}
@@ -240,6 +257,7 @@ export function BalanceChart({ series }: { series: Series[] }) {
                     strokeWidth="3.6"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    strokeDasharray={s.dash}
                   />
                   <circle
                     cx={model.x(last.date)}
@@ -419,6 +437,100 @@ export function Sparkline({
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ overflow: 'visible' }}>
       <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Oscillation — the build-up and the tear-down, drawn against the mean.
+//
+// The palette is monochrome, so the two phases can't be two hues. Above the
+// mean is a solid wash; below it is hatched. That reads instantly, survives
+// printing, and doesn't rely on anyone separating two greys.
+
+const SW = 640
+const SH = 190
+const SPAD = { top: 14, right: 8, bottom: 22, left: 8 }
+
+export function SwingChart({
+  points,
+  mean,
+}: {
+  points: { date: string; smooth: number; logged: boolean }[]
+  mean: number
+}) {
+  if (points.length < 2) return null
+
+  const innerW = SW - SPAD.left - SPAD.right
+  const innerH = SH - SPAD.top - SPAD.bottom
+  const x = (i: number) => SPAD.left + (i / (points.length - 1)) * innerW
+  const y = (v: number) => SPAD.top + (1 - Math.max(0, Math.min(100, v)) / 100) * innerH
+  const meanY = y(mean)
+
+  const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.smooth)}`).join(' ')
+  // Close the curve onto the mean line so the two washes meet exactly there.
+  const area = `${line} L${x(points.length - 1)},${meanY} L${x(0)},${meanY} Z`
+
+  return (
+    <svg
+      viewBox={`0 0 ${SW} ${SH}`}
+      className="swing"
+      role="img"
+      aria-label={`Rolling score against a mean of ${Math.round(mean)}. Above the mean is a building phase, below it a breaking phase.`}
+    >
+      <defs>
+        <pattern id="swing-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <line x1="0" y1="0" x2="0" y2="7" stroke="var(--text-primary)" strokeWidth="1.6" />
+        </pattern>
+        <clipPath id="swing-above">
+          <rect x="0" y="0" width={SW} height={meanY} />
+        </clipPath>
+        <clipPath id="swing-below">
+          <rect x="0" y={meanY} width={SW} height={SH - meanY} />
+        </clipPath>
+      </defs>
+
+      <path d={area} fill="var(--text-primary)" opacity="0.17" clipPath="url(#swing-above)" />
+      <path d={area} fill="url(#swing-hatch)" opacity="0.3" clipPath="url(#swing-below)" />
+
+      <line
+        x1={SPAD.left}
+        y1={meanY}
+        x2={SW - SPAD.right}
+        y2={meanY}
+        stroke="var(--axis)"
+        strokeWidth="1.4"
+        strokeDasharray="5 5"
+      />
+      <path
+        d={line}
+        fill="none"
+        stroke="var(--text-primary)"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle
+        cx={x(points.length - 1)}
+        cy={y(points[points.length - 1].smooth)}
+        r="6"
+        fill="var(--text-primary)"
+        stroke="var(--surface-1)"
+        strokeWidth="3"
+      />
+
+      <text x={SPAD.left} y={SH - 6} fill="var(--text-muted)" fontSize={TICK_FS}>
+        {formatShort(points[0].date)}
+      </text>
+      <text
+        x={SW - SPAD.right}
+        y={SH - 6}
+        fill="var(--text-muted)"
+        fontSize={TICK_FS}
+        textAnchor="end"
+      >
+        {formatShort(points[points.length - 1].date)}
+      </text>
     </svg>
   )
 }

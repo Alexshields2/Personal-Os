@@ -1,4 +1,13 @@
-import type { LearnItem, Loop, MetricKey, PriorityTag, Targets } from './types'
+import type {
+  DealStage,
+  DomainLink,
+  DomainNode,
+  LearnItem,
+  Loop,
+  MetricKey,
+  PriorityTag,
+  Targets,
+} from './types'
 
 export const PROTOCOL_DAYS = 126
 
@@ -506,3 +515,99 @@ export const ROTATING_QUESTIONS: Question[] = [
   { id: 'q_fri', q: 'What did I say I would do and not do?' },
   { id: 'q_sat', q: 'What would the version of me I am building have done differently?' },
 ]
+
+// ------------------------------------------------------------------ the map
+
+/**
+ * The life map. Four domains under one root, each broken down twice where the
+ * breakdown earns its place. `checkIds` and `metricKeys` are what give a node a
+ * score — a node with no bindings inherits from its children, and a leaf with
+ * no bindings simply has no score rather than a fake one.
+ */
+export const DEFAULT_DOMAINS: DomainNode[] = [
+  { id: 'root', parentId: '', label: 'Alex', note: 'Everything below rolls up here', loopIds: [], checkIds: [], metricKeys: [] },
+
+  // ---- Health
+  { id: 'health', parentId: 'root', label: 'Health', note: 'The base everything else runs on', loopIds: [], checkIds: [], metricKeys: [] },
+  { id: 'body', parentId: 'health', label: 'Body', note: '', loopIds: [], checkIds: [], metricKeys: [] },
+  { id: 'training', parentId: 'body', label: 'Training', note: '', loopIds: [], checkIds: ['training'], metricKeys: [] },
+  { id: 'nutrition', parentId: 'body', label: 'Nutrition', note: '', loopIds: [], checkIds: [], metricKeys: ['calories', 'protein', 'creatine', 'waterL'] },
+  { id: 'movement', parentId: 'body', label: 'Movement', note: 'Steps and mobility, outside the gym', loopIds: [], checkIds: [], metricKeys: ['steps', 'mobilityMin'] },
+  { id: 'recovery', parentId: 'health', label: 'Recovery', note: 'The one that quietly decides the rest', loopIds: ['l_latenight'], checkIds: [], metricKeys: ['sleepHours'] },
+  { id: 'appearance', parentId: 'health', label: 'Appearance', note: '', loopIds: [], checkIds: ['grooming'], metricKeys: [] },
+
+  // ---- Wealth
+  { id: 'wealth', parentId: 'root', label: 'Wealth', note: 'Both businesses and the capital they throw off', loopIds: [], checkIds: [], metricKeys: [] },
+  { id: 'acmr', parentId: 'wealth', label: 'ACMR', note: '', loopIds: [], checkIds: [], metricKeys: [] },
+  { id: 'acmr_sales', parentId: 'acmr', label: 'Sales', note: 'The only input that changes the top line', loopIds: ['l_avoid'], checkIds: ['sales_activity'], metricKeys: [] },
+  { id: 'acmr_delivery', parentId: 'acmr', label: 'Delivery', note: '', loopIds: [], checkIds: ['client_work', 'measurable'], metricKeys: ['acmrHours'] },
+  { id: 'acmr_team', parentId: 'acmr', label: 'Team', note: '', loopIds: [], checkIds: ['bottlenecks'], metricKeys: [] },
+  { id: 'onemedia', parentId: 'wealth', label: '1Media', note: '', loopIds: [], checkIds: [], metricKeys: [] },
+  { id: 'capital', parentId: 'wealth', label: 'Capital', note: 'What survives if both businesses go to zero', loopIds: [], checkIds: ['no_spending'], metricKeys: [] },
+
+  // ---- Relationships
+  { id: 'relationships', parentId: 'root', label: 'Relationships', note: '', loopIds: ['l_isolate'], checkIds: [], metricKeys: [] },
+  { id: 'inner', parentId: 'relationships', label: 'Inner circle', note: 'The few it is actually for', loopIds: [], checkIds: ['promises'], metricKeys: [] },
+  { id: 'network', parentId: 'relationships', label: 'Network', note: '', loopIds: [], checkIds: [], metricKeys: [] },
+
+  // ---- Self
+  { id: 'self', parentId: 'root', label: 'Self', note: 'The operator, not the operation', loopIds: [], checkIds: [], metricKeys: [] },
+  { id: 'discipline', parentId: 'self', label: 'Discipline', note: '', loopIds: ['l_numb', 'l_scroll'], checkIds: ['no_alcohol', 'no_drugs', 'no_porn', 'no_posting', 'disappeared'], metricKeys: ['socialMin'] },
+  { id: 'focus', parentId: 'self', label: 'Focus', note: '', loopIds: ['l_busywork', 'l_reactive', 'l_noplan', 'l_perfection'], checkIds: ['highest_first', 'phone_away'], metricKeys: [] },
+  { id: 'mind', parentId: 'self', label: 'Mind', note: '', loopIds: [], checkIds: ['notes', 'learned'], metricKeys: ['pagesRead', 'journalMin', 'goalReviewMin'] },
+  { id: 'boundaries', parentId: 'self', label: 'Boundaries', note: '', loopIds: ['l_overcommit'], checkIds: [], metricKeys: [] },
+]
+
+/** Cause → effect you actually believe. Editable; these are the obvious ones. */
+export const DEFAULT_LINKS: DomainLink[] = [
+  { id: 'k1', fromId: 'recovery', toId: 'focus', note: 'Short sleep and the day gets reactive', weight: 3 },
+  { id: 'k2', fromId: 'focus', toId: 'acmr_sales', note: 'Reactive days are the ones with no selling in them', weight: 3 },
+  { id: 'k3', fromId: 'discipline', toId: 'recovery', note: 'Late nights start as something else', weight: 2 },
+  { id: 'k4', fromId: 'acmr_sales', toId: 'capital', note: '', weight: 3 },
+  { id: 'k5', fromId: 'boundaries', toId: 'acmr_delivery', note: 'Saying yes too often is what buries the week', weight: 2 },
+  { id: 'k6', fromId: 'training', toId: 'focus', note: '', weight: 2 },
+]
+
+export const LINK_WEIGHT_LABEL: Record<number, string> = {
+  1: 'Suspected',
+  2: 'Likely',
+  3: 'Certain',
+}
+
+// ---------------------------------------------------------------------- work
+
+export const CLIENT_STATUS_LABEL: Record<string, string> = {
+  prospect: 'Prospect',
+  active: 'Active',
+  paused: 'Paused',
+  churned: 'Churned',
+}
+
+export const PROJECT_STATUS_LABEL: Record<string, string> = {
+  active: 'Active',
+  paused: 'Paused',
+  done: 'Done',
+}
+
+/**
+ * The pipeline, in order. `probability` is the default weighting for a deal at
+ * that stage — good enough to forecast with, and overridable per deal because
+ * you usually know more about one deal than its stage does.
+ */
+export const DEAL_STAGES: { id: DealStage; label: string; probability: number }[] = [
+  { id: 'lead', label: 'Lead', probability: 10 },
+  { id: 'qualified', label: 'Qualified', probability: 30 },
+  { id: 'proposal', label: 'Proposal out', probability: 60 },
+  { id: 'won', label: 'Won', probability: 100 },
+  { id: 'lost', label: 'Lost', probability: 0 },
+]
+
+export const DEAL_STAGE_LABEL: Record<string, string> = Object.fromEntries(
+  DEAL_STAGES.map((s) => [s.id, s.label]),
+)
+
+/** Open stages only — won and lost have left the pipeline. */
+export const OPEN_STAGES: DealStage[] = ['lead', 'qualified', 'proposal']
+
+/** A deal that hasn't moved in this long is drifting, whatever the stage says. */
+export const STALE_DEAL_DAYS = 14

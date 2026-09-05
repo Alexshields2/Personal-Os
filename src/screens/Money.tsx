@@ -29,14 +29,16 @@ import { BANK_ACCOUNTS } from '../lib/types'
 import type { AccountId, LedgerKind, MoneyEntity } from '../lib/types'
 
 /**
- * Three categorical slots, validated all-pairs for colour-blind separation on
- * this surface. Net worth deliberately isn't one of them — it gets its own
- * single-series chart rather than a fourth hue that would break the set.
+ * Three categorical slots. The palette is monochrome, so each one carries a
+ * luminance step *and* a dash pattern — three greys alone would not hold apart
+ * at line weight, and the dash keeps working in print and for anyone who can't
+ * separate the greys. Net worth deliberately isn't one of them: it gets its own
+ * single-series chart rather than a fourth slot that would break the set.
  */
-const SERIES_COLOR: Record<string, string> = {
-  acmrBank: 'var(--series-acmr)',
-  onemediaBank: 'var(--series-1media)',
-  personalBank: 'var(--series-personal)',
+const SERIES_STYLE: Record<string, { color: string; dash?: string }> = {
+  acmrBank: { color: 'var(--series-acmr)' },
+  onemediaBank: { color: 'var(--series-1media)', dash: '10 7' },
+  personalBank: { color: 'var(--series-personal)', dash: '2.5 6' },
 }
 
 export default function Money() {
@@ -67,7 +69,7 @@ export default function Money() {
   const series: Series[] = BANK_ACCOUNTS.map((a) => ({
     id: a,
     label: ACCOUNT_LABEL[a],
-    color: SERIES_COLOR[a],
+    ...SERIES_STYLE[a],
     points: accountHistory(state, a),
   }))
 

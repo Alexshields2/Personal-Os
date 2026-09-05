@@ -2,9 +2,13 @@ import {
   CHECKLIST,
   CLEAN_IDS,
   COMPOUNDING,
+  DEAL_STAGES,
+  METRIC_BY_KEY,
   METRICS,
+  OPEN_STAGES,
   PILLARS,
   PROTOCOL_DAYS,
+  STALE_DEAL_DAYS,
 } from './config'
 import type { ChecklistItem, PillarId } from './config'
 import {
@@ -20,8 +24,15 @@ import {
 import type {
   AccountId,
   AppState,
+  Client,
   Connection,
   DayEntry,
+  Deal,
+  DealStage,
+  DomainLink,
+  DomainNode,
+  Project,
+  Task,
   LearnItem,
   Loop,
   MoneyEntity,
@@ -810,4 +821,437 @@ export function contactsDue(state: AppState, iso = todayISO()): Connection[] {
   return state.connections
     .filter((c) => contactStatus(c, iso).due)
     .sort((a, b) => contactStatus(a, iso).dueIn - contactStatus(b, iso).dueIn)
+}
+
+// ---------------------------------------------------------------------------
+// The life map
+//
+// A node scores off the standards and metrics bound to it. A node with no
+// bindings of its own takes the mean of its children, so a domain is only ever
+// as healthy as what sits under it — and a branch nobody has bound to anything
+// reports no score rather than a flattering zero.
+
+export interface DomainScore {
+  id: string
+  /** 0-100, or null when nothing under this node is measured. */
+  score: number | null
+  /** Logged days the score was computed over. */
+  days: number
+  /** Times a loop belonging to this branch fired in the window. */
+  loopHits: number
+  /** Direct children, deepest-first traversal order. */
+  childIds: string[]
+  depth: number
+}
+
+function childrenOf(domains: DomainNode[], id: string): DomainNode[] {
+  return domains.filter((d) => d.parentId === id)
+}
+
+/** Every node's id, in depth-first order, with its depth. */
+export function domainOrder(domains: DomainNode[]): { node: DomainNode; depth: number }[] {
+  const out: { node: DomainNode; depth: number }[] = []
+  const walk = (parentId: string, depth: number) => {
+    for (const node of childrenOf(domains, parentId)) {
+      out.push({ node, depth })
+      walk(node.id, depth + 1)
+    }
+  }
+  const roots = domains.filter((d) => d.parentId === '')
+  for (const root of roots) {
+    out.push({ node: root, depth: 0 })
+    walk(root.id, 1)
+  }
+  return out
+}
+
+/**
+ * Scores every node over the trailing `window` days. Own bindings win; a node
+ * without them averages its children.
+ */
+export function domainScores(
+  state: AppState,
+  iso = todayISO(),
+  window = 28,
+): Map<string, DomainScore> {
+  const dates: string[] = []
+  for (let i = 0; i < window; i++) dates.push(addDays(iso, -i))
+  const days = dates.map((d) => state.days[d]).filter(isLogged)
+
+  const byId = new Map(state.domains.map((d) => [d.id, d]))
+  const out = new Map<string, DomainScore>()
+
+  const own = (node: DomainNode): number | null => {
+    if (days.length === 0) return null
+    const parts: number[] = []
+    for (const id of node.checkIds) {
+      const item = CHECKLIST.find((c) => c.id === id)
+      if (!item) continue
+      parts.push(
+        (days.filter((d) => isItemDone(item, d, state.targets)).length / days.length) * 100,
+      )
+    }
+    for (const key of node.metricKeys) {
+      const spec = METRIC_BY_KEY[key]
+      const target = state.targets[key as keyof AppState['targets']] as number
+      if (!spec || !target) continue
+      // An inverted metric is a ceiling, so attainment runs the other way.
+      const ratios = days.map((d) => {
+        const v = d.metrics[key]
+        return spec.invert ? (v <= target ? 1 : target / Math.max(v, 1)) : Math.min(1, v / target)
+      })
+      parts.push((ratios.reduce((a, b) => a + b, 0) / ratios.length) * 100)
+    }
+    if (parts.length === 0) return null
+    return parts.reduce((a, b) => a + b, 0) / parts.length
+  }
+
+  const loopHitsFor = (node: DomainNode): number =>
+    node.loopIds.reduce(
+      (sum, id) => sum + days.filter((d) => d.loops.includes(id)).length,
+      0,
+    )
+
+  // Depth-first so children are resolved before the parent needs their mean.
+  const resolve = (node: DomainNode, depth: number): DomainScore => {
+    const kids = childrenOf(state.domains, node.id)
+    const kidScores = kids.map((k) => resolve(k, depth + 1))
+    const mine = own(node)
+    const usable = kidScores.map((k) => k.score).filter((v): v is number => v !== null)
+    const score =
+      mine !== null ? mine : usable.length ? usable.reduce((a, b) => a + b, 0) / usable.length : null
+
+    const result: DomainScore = {
+      id: node.id,
+      score,
+      days: days.length,
+      loopHits: loopHitsFor(node) + kidScores.reduce((s, k) => s + k.loopHits, 0),
+      childIds: kids.map((k) => k.id),
+      depth,
+    }
+    out.set(node.id, result)
+    return result
+  }
+
+  for (const root of state.domains.filter((d) => d.parentId === '')) resolve(root, 0)
+  // Anything orphaned by an edit still deserves a row rather than vanishing.
+  for (const node of state.domains) {
+    if (!out.has(node.id) && byId.has(node.parentId) === false && node.parentId !== '') {
+      resolve(node, 0)
+    }
+  }
+  return out
+}
+
+/** Ancestors of a node, root first, excluding the node itself. */
+export function domainPath(domains: DomainNode[], id: string): DomainNode[] {
+  const byId = new Map(domains.map((d) => [d.id, d]))
+  const out: DomainNode[] = []
+  let cur = byId.get(id)
+  while (cur && cur.parentId) {
+    const parent = byId.get(cur.parentId)
+    if (!parent) break
+    out.unshift(parent)
+    cur = parent
+  }
+  return out
+}
+
+/** Every id at or beneath a node — the filter a Patterns view runs on. */
+export function domainSubtree(domains: DomainNode[], id: string): string[] {
+  const out = [id]
+  for (const child of childrenOf(domains, id)) out.push(...domainSubtree(domains, child.id))
+  return out
+}
+
+export interface DomainEdge {
+  link: DomainLink
+  from: DomainNode
+  to: DomainNode
+}
+
+/** Causes pointing into a node, and the effects running out of it. */
+export function domainEdges(state: AppState, id: string): { causes: DomainEdge[]; effects: DomainEdge[] } {
+  const byId = new Map(state.domains.map((d) => [d.id, d]))
+  const edges = state.links
+    .map((link) => {
+      const from = byId.get(link.fromId)
+      const to = byId.get(link.toId)
+      return from && to ? { link, from, to } : null
+    })
+    .filter((e): e is DomainEdge => e !== null)
+  return {
+    causes: edges.filter((e) => e.link.toId === id),
+    effects: edges.filter((e) => e.link.fromId === id),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Oscillation — the two versions of yourself
+//
+// The build-up and the tear-down are not moods, they are visible in the score.
+// A short rolling mean against the long mean says which one is currently
+// running; the crossings mark where one handed over to the other.
+
+/** Days in the rolling window. Long enough to ignore one bad Tuesday. */
+const SWING_WINDOW = 7
+
+export interface SwingPoint {
+  date: string
+  /** Raw daily score, 0 when unlogged. */
+  score: number
+  /** Rolling mean over the trailing week — the curve you actually read. */
+  smooth: number
+  logged: boolean
+}
+
+export type Phase = 'build' | 'break'
+
+export interface Swing {
+  kind: Phase
+  startDate: string
+  endDate: string
+  days: number
+  /** Highest point of a build, lowest of a break. */
+  extreme: number
+  meanScore: number
+}
+
+export interface Oscillation {
+  points: SwingPoint[]
+  /** The long-run average — the state you actually live at, between the two. */
+  mean: number
+  swings: Swing[]
+  current: Swing | null
+  /** Mean of the most recent third against the oldest third. */
+  drift: number
+  longestBuild: Swing | null
+  deepestBreak: Swing | null
+  enough: boolean
+}
+
+/**
+ * Reads the oscillation between the constructive and destructive version out of
+ * the logged days. Above the long mean is a build; below it is a break. The
+ * mean itself is the honest number: it is the version of you that actually
+ * shows up on average, and moving it is the whole job.
+ */
+export function oscillation(state: AppState, iso = todayISO(), window = 90): Oscillation {
+  const dates: string[] = []
+  for (let i = window - 1; i >= 0; i--) dates.push(addDays(iso, -i))
+
+  const scored = dates.map((date) => {
+    const day = state.days[date]
+    return {
+      date,
+      logged: isLogged(day),
+      score: isLogged(day) ? scoreDay(day, state.targets).score : 0,
+    }
+  })
+
+  const firstLogged = scored.findIndex((p) => p.logged)
+  const live = firstLogged === -1 ? [] : scored.slice(firstLogged)
+  const loggedOnly = live.filter((p) => p.logged)
+  const mean = loggedOnly.length
+    ? loggedOnly.reduce((s, p) => s + p.score, 0) / loggedOnly.length
+    : 0
+
+  // Carry the last known value across gaps: an unlogged day is missing data,
+  // not a zero-score day, and letting it drag the curve down would invent a
+  // crash out of a day you simply didn't open the app.
+  let carry = mean
+  const points: SwingPoint[] = live.map((p, i) => {
+    if (p.logged) carry = p.score
+    const from = Math.max(0, i - SWING_WINDOW + 1)
+    const slice = live.slice(from, i + 1)
+    const vals = slice.map((q) => (q.logged ? q.score : carry))
+    return {
+      date: p.date,
+      score: p.score,
+      logged: p.logged,
+      smooth: vals.reduce((a, b) => a + b, 0) / vals.length,
+    }
+  })
+
+  const swings: Swing[] = []
+  for (const point of points) {
+    const kind: Phase = point.smooth >= mean ? 'build' : 'break'
+    const last = swings[swings.length - 1]
+    if (last && last.kind === kind) {
+      last.endDate = point.date
+      last.days++
+      last.extreme =
+        kind === 'build' ? Math.max(last.extreme, point.smooth) : Math.min(last.extreme, point.smooth)
+      last.meanScore = last.meanScore + (point.smooth - last.meanScore) / last.days
+    } else {
+      swings.push({
+        kind,
+        startDate: point.date,
+        endDate: point.date,
+        days: 1,
+        extreme: point.smooth,
+        meanScore: point.smooth,
+      })
+    }
+  }
+
+  const third = Math.floor(loggedOnly.length / 3)
+  const drift =
+    third >= 3
+      ? loggedOnly.slice(-third).reduce((s, p) => s + p.score, 0) / third -
+        loggedOnly.slice(0, third).reduce((s, p) => s + p.score, 0) / third
+      : 0
+
+  const builds = swings.filter((s) => s.kind === 'build')
+  const breaks = swings.filter((s) => s.kind === 'break')
+
+  return {
+    points,
+    mean,
+    swings,
+    current: swings[swings.length - 1] ?? null,
+    drift,
+    longestBuild: builds.sort((a, b) => b.days - a.days)[0] ?? null,
+    deepestBreak: breaks.sort((a, b) => a.extreme - b.extreme)[0] ?? null,
+    // Two full swings is the minimum before calling anything a cycle.
+    enough: loggedOnly.length >= 14 && swings.length >= 2,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Work
+//
+// Revenue is a lagging number. Everything here exists to give it a leading one:
+// what is in the pipeline, what it is worth once weighted, and what has stopped
+// moving. A deal nobody has touched in a fortnight is not a deal.
+
+export interface PipelineStage {
+  id: DealStage
+  label: string
+  deals: Deal[]
+  value: number
+  weighted: number
+}
+
+export interface Pipeline {
+  stages: PipelineStage[]
+  open: Deal[]
+  /** Face value of everything still open. */
+  value: number
+  /** Value once each deal is weighted by its own probability. */
+  weighted: number
+  won: number
+  lost: number
+  winRate: number
+  averageDeal: number
+  stale: Deal[]
+}
+
+export function pipeline(state: AppState, entity?: MoneyEntity, iso = todayISO()): Pipeline {
+  const all = entity ? state.deals.filter((d) => d.entity === entity) : state.deals
+  const stages: PipelineStage[] = DEAL_STAGES.map((s) => {
+    const deals = all.filter((d) => d.stage === s.id)
+    return {
+      id: s.id,
+      label: s.label,
+      deals,
+      value: deals.reduce((sum, d) => sum + d.value, 0),
+      weighted: deals.reduce((sum, d) => sum + (d.value * d.probability) / 100, 0),
+    }
+  })
+
+  const open = all.filter((d) => OPEN_STAGES.includes(d.stage))
+  const won = all.filter((d) => d.stage === 'won')
+  const lost = all.filter((d) => d.stage === 'lost')
+  const closed = won.length + lost.length
+
+  return {
+    stages,
+    open,
+    value: open.reduce((s, d) => s + d.value, 0),
+    weighted: open.reduce((s, d) => s + (d.value * d.probability) / 100, 0),
+    won: won.reduce((s, d) => s + d.value, 0),
+    lost: lost.reduce((s, d) => s + d.value, 0),
+    winRate: closed ? (won.length / closed) * 100 : 0,
+    averageDeal: won.length ? won.reduce((s, d) => s + d.value, 0) / won.length : 0,
+    stale: open
+      .filter((d) => !d.moved || daysBetween(d.moved, iso) >= STALE_DEAL_DAYS)
+      .sort((a, b) => (a.moved || '').localeCompare(b.moved || '')),
+  }
+}
+
+export interface ClientBook {
+  active: Client[]
+  /** Recurring monthly revenue from active clients. */
+  mrr: number
+  /** Share of MRR sitting with the single largest client. */
+  concentration: number
+  renewalsDue: Client[]
+}
+
+export function clientBook(state: AppState, entity?: MoneyEntity, iso = todayISO()): ClientBook {
+  const all = entity ? state.clients.filter((c) => c.entity === entity) : state.clients
+  const active = all.filter((c) => c.status === 'active')
+  const mrr = active.reduce((s, c) => s + c.monthlyValue, 0)
+  const largest = active.reduce((max, c) => Math.max(max, c.monthlyValue), 0)
+  return {
+    active,
+    mrr,
+    concentration: mrr > 0 ? (largest / mrr) * 100 : 0,
+    // Anything renewing inside 30 days needs the conversation started now.
+    renewalsDue: all
+      .filter((c) => c.renewal && daysBetween(iso, c.renewal) <= 30)
+      .sort((a, b) => a.renewal.localeCompare(b.renewal)),
+  }
+}
+
+export interface TaskQueue {
+  overdue: Task[]
+  today: Task[]
+  soon: Task[]
+  someday: Task[]
+  done: Task[]
+  openCount: number
+}
+
+/** The open work, split by how late it already is. */
+export function taskQueue(state: AppState, iso = todayISO()): TaskQueue {
+  const open = state.tasks.filter((t) => !t.done)
+  const dated = (t: Task) => (t.due ? daysBetween(iso, t.due) : null)
+  return {
+    overdue: open.filter((t) => {
+      const d = dated(t)
+      return d !== null && d < 0
+    }),
+    today: open.filter((t) => dated(t) === 0),
+    soon: open.filter((t) => {
+      const d = dated(t)
+      return d !== null && d > 0 && d <= 7
+    }),
+    someday: open.filter((t) => dated(t) === null || (dated(t) ?? 0) > 7),
+    done: state.tasks.filter((t) => t.done),
+    openCount: open.length,
+  }
+}
+
+export interface ProjectProgress {
+  project: Project
+  total: number
+  done: number
+  pct: number
+  openTasks: Task[]
+}
+
+export function projectProgress(state: AppState, projectId: string): ProjectProgress | null {
+  const project = state.projects.find((p) => p.id === projectId)
+  if (!project) return null
+  const tasks = state.tasks.filter((t) => t.projectId === projectId)
+  const done = tasks.filter((t) => t.done).length
+  return {
+    project,
+    total: tasks.length,
+    done,
+    pct: tasks.length ? (done / tasks.length) * 100 : 0,
+    openTasks: tasks.filter((t) => !t.done),
+  }
 }

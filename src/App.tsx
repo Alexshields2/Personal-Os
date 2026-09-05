@@ -8,10 +8,13 @@ import Life from './screens/Life'
 import Learn from './screens/Learn'
 import Network from './screens/Network'
 import Patterns from './screens/Patterns'
+import LifeMap from './screens/Map'
+import Work from './screens/Work'
 import Settings from './screens/Settings'
 import {
   IconLearn,
   IconLife,
+  IconMap,
   IconMoney,
   IconNetwork,
   IconPatterns,
@@ -19,6 +22,7 @@ import {
   IconReview,
   IconSettings,
   IconToday,
+  IconWork,
 } from './components/icons'
 import { PROTOCOL_DAYS } from './lib/config'
 import { useStore } from './lib/store'
@@ -26,7 +30,9 @@ import { timeline } from './lib/selectors'
 
 type TabId =
   | 'today'
+  | 'work'
   | 'patterns'
+  | 'map'
   | 'money'
   | 'learn'
   | 'network'
@@ -37,7 +43,9 @@ type TabId =
 
 const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { id: 'today', label: 'Today', Icon: IconToday },
+  { id: 'work', label: 'Work', Icon: IconWork },
   { id: 'patterns', label: 'Patterns', Icon: IconPatterns },
+  { id: 'map', label: 'Map', Icon: IconMap },
   { id: 'money', label: 'Money', Icon: IconMoney },
   { id: 'learn', label: 'Learn', Icon: IconLearn },
   { id: 'network', label: 'Network', Icon: IconNetwork },
@@ -49,7 +57,9 @@ const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
 
 const SCREENS: Record<TabId, () => ReactElement> = {
   today: Today,
+  work: Work,
   patterns: Patterns,
+  map: LifeMap,
   money: Money,
   learn: Learn,
   network: Network,
@@ -69,6 +79,15 @@ export default function App() {
   useEffect(() => {
     document.querySelector('.scroll')?.scrollTo({ top: 0 })
   }, [tab])
+
+  // The stamp drives every token, so it has to land before the first paint of
+  // any screen that reads them.
+  useEffect(() => {
+    document.documentElement.dataset.theme = state.theme
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', state.theme === 'light' ? '#ffffff' : '#000000')
+  }, [state.theme])
 
   return (
     <div className="app">

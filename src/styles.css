@@ -1,53 +1,54 @@
-/* =========================================================================
-   126 — design tokens
-   Dark-only by intent: this is a night-and-early-morning tool, and a single
-   committed surface keeps the chart palette valid (it was validated against
-   --surface-1 specifically).
-   ========================================================================= */
-
 :root {
   color-scheme: dark;
 
   /* Surfaces */
-  --canvas: #08080a;
-  --surface-1: #141417;
-  --surface-2: #1c1c20;
-  --surface-3: #26262b;
-  --fill-soft: rgba(255, 255, 255, 0.045);
-  --fill-soft-hover: rgba(255, 255, 255, 0.075);
-  --hairline: rgba(255, 255, 255, 0.09);
-  --hairline-strong: rgba(255, 255, 255, 0.16);
+  --canvas: #000000;
+  --surface-1: #0c0c0c;
+  --surface-2: #151515;
+  --surface-3: #222222;
+  --fill-soft: rgba(255, 255, 255, 0.042);
+  --fill-soft-hover: rgba(255, 255, 255, 0.082);
+  --fill-strong: rgba(255, 255, 255, 0.12);
+  --hairline: rgba(255, 255, 255, 0.11);
+  --hairline-strong: rgba(255, 255, 255, 0.2);
+  /* Translucent ground for the fixed tab bar, over the canvas it sits on. */
+  --chrome-veil: rgba(0, 0, 0, 0.72);
 
   /* Ink */
   --text-primary: #ffffff;
-  --text-secondary: #a1a1a6;
-  --text-muted: #6e6e73;
+  --text-secondary: #a0a0a0;
+  --text-muted: #6a6a6a;
 
-  /* UI accent (chrome only — never encodes data) */
-  --accent: #e6b455;
-  --accent-dim: rgba(230, 180, 85, 0.16);
+  /* UI accent. Monochrome, so emphasis is contrast rather than hue. */
+  --accent: #ffffff;
+  --accent-dim: rgba(255, 255, 255, 0.11);
+  /* Ink for anything sitting on a filled accent surface. */
+  --on-accent: #000000;
 
-  /* Categorical series — validated all-pairs CVD-safe on --surface-1 */
-  --series-acmr: #b9891a;
-  --series-1media: #3987e5;
-  --series-personal: #1aa878;
+  /* Categorical series. Separated by luminance, and always paired with a dash
+     pattern and a label — luminance alone is not enough to carry a series. */
+  --series-acmr: #ffffff;
+  --series-1media: #9b9b9b;
+  --series-personal: #5d5d5d;
 
-  /* Sequential gold ramp — the 126-day grid */
-  --seq-1: #6d5218;
-  --seq-2: #946f22;
-  --seq-3: #bb8d2c;
-  --seq-4: #d9a83a;
-  --seq-5: #f0c463;
-  --seq-track: rgba(255, 255, 255, 0.06);
+  /* Sequential ramp — the 126-day grid */
+  --seq-1: rgba(255, 255, 255, 0.15);
+  --seq-2: rgba(255, 255, 255, 0.3);
+  --seq-3: rgba(255, 255, 255, 0.47);
+  --seq-4: rgba(255, 255, 255, 0.7);
+  --seq-5: #ffffff;
+  --seq-track: rgba(255, 255, 255, 0.07);
 
-  /* Status — always shipped with an icon + label, never colour alone */
-  --good: #0ca30c;
-  --warning: #fab219;
-  --critical: #d03b3b;
+  /* Status. In a monochrome system attention *is* contrast: what needs looking
+     at goes bright, what is fine recedes. Every use still ships with an icon
+     and a label, which is what actually carries the meaning. */
+  --good: #8a8a8a;
+  --warning: #ffffff;
+  --critical: #ffffff;
 
   /* Chart chrome */
-  --grid: #2c2c2a;
-  --axis: #383835;
+  --grid: rgba(255, 255, 255, 0.08);
+  --axis: rgba(255, 255, 255, 0.17);
 
   /* Geometry */
   --r-sm: 10px;
@@ -62,6 +63,48 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --tabbar-h: 62px;
+}
+
+/* Light is the same system inverted: paper, not a washed-out dark theme. */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --canvas: #ffffff;
+  --surface-1: #fafafa;
+  --surface-2: #f4f4f4;
+  --surface-3: #e9e9e9;
+  --fill-soft: rgba(0, 0, 0, 0.035);
+  --fill-soft-hover: rgba(0, 0, 0, 0.07);
+  --fill-strong: rgba(0, 0, 0, 0.1);
+  --hairline: rgba(0, 0, 0, 0.13);
+  --hairline-strong: rgba(0, 0, 0, 0.24);
+  --chrome-veil: rgba(255, 255, 255, 0.76);
+
+  --text-primary: #000000;
+  --text-secondary: #565656;
+  --text-muted: #8a8a8a;
+
+  --accent: #000000;
+  --accent-dim: rgba(0, 0, 0, 0.08);
+  --on-accent: #ffffff;
+
+  --series-acmr: #000000;
+  --series-1media: #707070;
+  --series-personal: #a6a6a6;
+
+  --seq-1: rgba(0, 0, 0, 0.13);
+  --seq-2: rgba(0, 0, 0, 0.28);
+  --seq-3: rgba(0, 0, 0, 0.45);
+  --seq-4: rgba(0, 0, 0, 0.68);
+  --seq-5: #000000;
+  --seq-track: rgba(0, 0, 0, 0.06);
+
+  --good: #6e6e6e;
+  --warning: #000000;
+  --critical: #000000;
+
+  --grid: rgba(0, 0, 0, 0.09);
+  --axis: rgba(0, 0, 0, 0.19);
 }
 
 /* ========================================================================= */
@@ -95,18 +138,6 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overscroll-behavior-y: none;
-}
-
-/* A very restrained warm bloom behind the canvas — reads as depth, not decor. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(120% 60% at 50% -12%, rgba(230, 180, 85, 0.07), transparent 62%),
-    radial-gradient(90% 50% at 12% 108%, rgba(57, 135, 229, 0.05), transparent 60%);
 }
 
 button,
@@ -233,7 +264,7 @@ button {
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   padding: 7px 6px calc(var(--safe-bottom) + 7px);
-  background: rgba(12, 12, 14, 0.72);
+  background: var(--chrome-veil);
   backdrop-filter: saturate(180%) blur(24px);
   -webkit-backdrop-filter: saturate(180%) blur(24px);
   border-top: 1px solid var(--hairline);
@@ -286,7 +317,7 @@ button {
     flex: 0 0 236px;
     padding: 26px 14px;
     border-right: 1px solid var(--hairline);
-    background: rgba(255, 255, 255, 0.015);
+    background: var(--fill-soft);
     position: sticky;
     top: 0;
     height: 100vh;
@@ -384,7 +415,7 @@ button {
 }
 
 .row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--fill-soft);
 }
 
 .row-main {
@@ -470,7 +501,7 @@ button {
 .check svg {
   width: 14px;
   height: 14px;
-  color: #0d0d0d;
+  color: var(--on-accent);
   opacity: 0;
   transform: scale(0.4);
   transition: opacity 0.2s var(--ease), transform 0.28s var(--ease-out);
@@ -511,7 +542,7 @@ button.row:active .check {
 }
 
 .btn:hover {
-  background: rgba(255, 255, 255, 0.11);
+  background: var(--fill-strong);
 }
 
 .btn:active {
@@ -521,12 +552,13 @@ button.row:active .check {
 .btn-primary {
   background: var(--accent);
   border-color: transparent;
-  color: #16130b;
+  color: var(--on-accent);
   font-weight: 650;
 }
 
 .btn-primary:hover {
-  background: #f0c463;
+  background: var(--accent);
+  opacity: 0.86;
 }
 
 .btn-quiet {
@@ -565,7 +597,7 @@ button.row:active .check {
   grid-auto-columns: 1fr;
   gap: 2px;
   padding: 2.5px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fill-soft-hover);
   border-radius: 11px;
 }
 
@@ -600,7 +632,7 @@ button.row:active .check {
 .input {
   width: 100%;
   padding: 11px 13px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--fill-soft);
   border: 1px solid var(--hairline);
   border-radius: var(--r-md);
   font-size: 16px;
@@ -609,8 +641,8 @@ button.row:active .check {
 
 .input:focus {
   outline: none;
-  border-color: rgba(230, 180, 85, 0.55);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--hairline-strong);
+  background: var(--fill-soft-hover);
 }
 
 .input::placeholder {
@@ -638,14 +670,14 @@ textarea.input {
   display: grid;
   place-items: center;
   color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fill-soft-hover);
   font-size: 18px;
   line-height: 1;
   transition: background 0.18s var(--ease), transform 0.18s var(--ease);
 }
 
 .stepper button:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fill-strong);
   color: var(--text-primary);
 }
 
@@ -666,7 +698,7 @@ textarea.input {
 
 .stepper input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--fill-soft-hover);
 }
 
 /* Pills & badges */
@@ -687,7 +719,7 @@ textarea.input {
 
 .pill-accent {
   background: var(--accent-dim);
-  border-color: rgba(230, 180, 85, 0.3);
+  border-color: var(--hairline-strong);
   color: var(--accent);
 }
 
@@ -782,10 +814,10 @@ textarea.input {
 }
 
 .legend-key {
-  width: 11px;
-  height: 3px;
-  border-radius: 2px;
+  width: 18px;
+  height: 4px;
   flex: none;
+  overflow: visible;
 }
 
 .chart-scroll {
@@ -799,12 +831,11 @@ textarea.input {
   border-radius: var(--r-lg);
   border: 1px solid var(--hairline);
   padding: 17px;
-  background:
-    linear-gradient(160deg, rgba(230, 180, 85, 0.09), rgba(255, 255, 255, 0.02) 55%);
+  background: var(--fill-soft-hover);
 }
 
 .vault[data-locked='true'] {
-  background: rgba(255, 255, 255, 0.028);
+  background: var(--fill-soft);
 }
 
 .vault[data-locked='true'] .vault-title {
@@ -944,7 +975,7 @@ textarea.input {
 
 .chip[aria-pressed='true'] {
   background: var(--accent-dim);
-  border-color: rgba(230, 180, 85, 0.35);
+  border-color: var(--hairline-strong);
   color: var(--accent);
 }
 
@@ -1063,7 +1094,7 @@ textarea.input {
 .energy button[aria-pressed='true'] {
   background: var(--accent);
   border-color: transparent;
-  color: #16130b;
+  color: var(--on-accent);
 }
 
 /* Insight — a single stated finding from the pattern engine */
@@ -1107,4 +1138,123 @@ textarea.input {
 
 .tabbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Oscillation chart */
+.swing {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The life map tree */
+.tree {
+  display: flex;
+  flex-direction: column;
+}
+
+.node {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  text-align: left;
+  border-top: 1px solid var(--hairline);
+  transition: background 0.18s var(--ease);
+}
+
+.tree > .node:first-child {
+  border-top: none;
+}
+
+.node:hover {
+  background: var(--fill-soft);
+}
+
+.node[data-selected='true'] {
+  background: var(--fill-soft-hover);
+}
+
+.node-twist {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  transition: transform 0.22s var(--ease), color 0.18s var(--ease);
+}
+
+.node-twist[data-open='true'] {
+  transform: rotate(90deg);
+  color: var(--text-secondary);
+}
+
+.node-label {
+  font-size: 15.5px;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-sub {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+  letter-spacing: 0;
+  margin-top: 1px;
+}
+
+/* Depth reads as indentation plus a rail, so a deep tree stays traceable. */
+.node-rail {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+}
+
+.node-score {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+}
+
+.node-bar {
+  width: 54px;
+}
+
+.node-num {
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  min-width: 26px;
+  text-align: right;
+}
+
+/* Cause / effect rows */
+.edge {
+  display: grid;
+  gap: 3px;
+  padding: 12px 15px;
+}
+
+.edge + .edge {
+  border-top: 1px solid var(--hairline);
+}
+
+.edge-line {
+  font-size: 14.5px;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.edge-arrow {
+  color: var(--text-muted);
+  font-size: 13px;
 }

@@ -130,3 +130,22 @@ export const IconNetwork = (p: P) => (
     <path d="M16.4 12.2a4.9 4.9 0 0 1 4.2 4.4" />
   </svg>
 )
+
+export const IconMap = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M12 3.4v4.4" />
+    <path d="M6.4 20.6v-2.4a2 2 0 0 1 2-2h7.2a2 2 0 0 1 2 2v2.4" />
+    <path d="M12 16.2v-8.4" />
+    <rect x="9.2" y="3.4" width="5.6" height="4.4" rx="1.2" />
+    <rect x="3.6" y="16.2" width="5.6" height="4.4" rx="1.2" />
+    <rect x="14.8" y="16.2" width="5.6" height="4.4" rx="1.2" />
+  </svg>
+)
+
+export const IconWork = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="7.2" width="18" height="13" rx="2" />
+    <path d="M8.6 7.2V5.6a2 2 0 0 1 2-2h2.8a2 2 0 0 1 2 2v1.6" />
+    <path d="M3 12.4h18" />
+  </svg>
+)
