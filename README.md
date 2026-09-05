@@ -28,6 +28,15 @@ npm run dev
 
 Then open http://localhost:5173.
 
+```bash
+npm test
+```
+
+The engines are covered: scoring, the plan loop, the pattern detection, the
+oscillation, the life-map roll-up, the pipeline, goal key results and the money
+selectors. They are what the app is *for* — a wrong derived number is worse than
+a missing one, because it still looks like data — so the tests gate the deploy.
+
 ## Sync across devices (optional)
 
 Sync is off until you configure it. Setting it up is four steps:
@@ -198,6 +207,25 @@ sits on. Key results underneath read themselves out of the money and the daily
 metrics wherever they can, because a hand-typed percentage is out of date the
 moment it's typed. **Upkeep** — recurring tasks with an interval — lives here
 too; ticking one restarts its clock from today.
+
+Press **⌘K** (or Ctrl-K) anywhere to search everything — sections, tasks,
+projects, clients, deals, goals, lessons, people, branches, loops, and every
+priority you've ever written. Type something that matches nothing and it offers
+to capture it as a task instead, because the worst outcome is losing the thought
+while looking for somewhere to put it.
+
+**Money** splits in two. *Accounts & ledger* is the original scoreboard.
+*Bills, sheet, invoices* adds what balances alone can't answer:
+
+- **Bills** — every recurring cost normalised to a monthly figure, whatever its
+  cadence, split by business, with what falls due this week
+- **Runway** — cash divided by monthly burn, per purse. It reports nothing
+  rather than infinity when no bills are recorded, because an unknown runway and
+  an endless one are not the same thing
+- **Balance sheet** — assets and liabilities itemised, so net worth is
+  calculated. The old manual snapshot stays as the fallback until you itemise,
+  and once you have, a disagreement between the two is called out
+- **Invoices** — outstanding, overdue, and the average days you actually get paid
 
 **Home** answers one question: what needs me right now. Today's one thing, which
 version is running, everything overdue or at risk across every section, and a

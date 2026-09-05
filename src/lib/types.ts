@@ -327,6 +327,57 @@ export interface Task {
   doneDate: string
 }
 
+// ------------------------------------------------------------------- money
+
+/** Who the money belongs to. Personal sits alongside the two businesses. */
+export type Purse = MoneyEntity | 'personal'
+
+export type BillCadence = 'weekly' | 'monthly' | 'quarterly' | 'annual'
+
+/** A recurring outgoing. Normalised to a monthly figure wherever it's summed. */
+export interface Bill {
+  id: string
+  label: string
+  amount: number
+  cadence: BillCadence
+  /** ISO date the next payment lands. Empty means unscheduled. */
+  nextDue: string
+  purse: Purse
+  category: string
+}
+
+export type HoldingKind = 'asset' | 'liability'
+
+/**
+ * A line of the balance sheet. Together these make net worth a calculated
+ * number rather than a typed one — the old manual snapshot stays as a fallback
+ * for anyone who hasn't itemised yet.
+ */
+export interface Holding {
+  id: string
+  kind: HoldingKind
+  label: string
+  value: number
+  category: string
+  /** Could you reach it this week? Drives the liquid split, not the total. */
+  liquid: boolean
+  updated: string
+}
+
+export type InvoiceStatus = 'draft' | 'sent' | 'paid'
+
+export interface Invoice {
+  id: string
+  entity: MoneyEntity
+  clientId: string
+  reference: string
+  amount: number
+  issued: string
+  due: string
+  status: InvoiceStatus
+  paidDate: string
+}
+
 export type Theme = 'dark' | 'light'
 
 /**
@@ -380,6 +431,9 @@ export interface AppState {
   loops: Loop[]
   domains: DomainNode[]
   links: DomainLink[]
+  bills: Bill[]
+  holdings: Holding[]
+  invoices: Invoice[]
   clients: Client[]
   deals: Deal[]
   projects: Project[]

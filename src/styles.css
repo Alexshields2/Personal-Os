@@ -1258,3 +1258,165 @@ textarea.input {
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* =========================================================================
+   Command palette
+   ========================================================================= */
+
+.palette-scrim {
+  align-items: flex-start;
+  justify-content: center;
+  padding: max(8vh, 48px) 16px 16px;
+}
+
+.palette {
+  width: 100%;
+  max-width: 620px;
+  background: var(--surface-2);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-lg);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: min(72vh, 620px);
+  animation: palette-in 0.22s var(--ease-out);
+}
+
+@keyframes palette-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palette {
+    animation: none;
+  }
+}
+
+.palette-input {
+  width: 100%;
+  padding: 18px 20px;
+  font-size: 17px;
+  letter-spacing: -0.012em;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.palette-input:focus {
+  outline: none;
+}
+
+.palette-input::placeholder {
+  color: var(--text-muted);
+}
+
+.palette-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 6px;
+}
+
+.palette-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  text-align: left;
+}
+
+.palette-row[data-active='true'] {
+  background: var(--fill-soft-hover);
+}
+
+.palette-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.palette-label {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-kind {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.palette-empty {
+  padding: 26px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.palette-foot {
+  display: flex;
+  gap: 16px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--hairline);
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+/* The hint that the palette exists at all. Desktop only — there is no key to
+   press on a phone, and the tab bar is right there. */
+.palette-hint {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .palette-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin: 0 0 14px;
+    padding: 9px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-sm);
+    color: var(--text-muted);
+    font-size: 13px;
+    background: var(--fill-soft);
+    transition: background 0.18s var(--ease), color 0.18s var(--ease);
+  }
+
+  .palette-hint:hover {
+    background: var(--fill-soft-hover);
+    color: var(--text-secondary);
+  }
+}
+
+kbd {
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  margin-left: auto;
+}

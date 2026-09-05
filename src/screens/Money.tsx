@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Finance from './Finance'
 import {
   Card,
   Empty,
@@ -42,6 +43,34 @@ const SERIES_STYLE: Record<string, { color: string; dash?: string }> = {
 }
 
 export default function Money() {
+  const [section, setSection] = useState<'accounts' | 'depth'>('accounts')
+  return (
+    <div className="screen wrap">
+      <header className="page-head">
+        <div className="eyebrow">
+          <span className="t-cap" style={{ color: 'var(--accent)' }}>
+            Financial scoreboard
+          </span>
+        </div>
+        <h1 className="t-large">Money</h1>
+        <p className="t-sub">Sales → revenue → margin → profit → cash → payout.</p>
+      </header>
+
+      <Segmented
+        value={section}
+        onChange={setSection}
+        options={[
+          { value: 'accounts', label: 'Accounts & ledger' },
+          { value: 'depth', label: 'Bills, sheet, invoices' },
+        ]}
+      />
+
+      {section === 'accounts' ? <Accounts /> : <Finance />}
+    </div>
+  )
+}
+
+function Accounts() {
   const state = useStore()
   const [entity, setEntity] = useState<MoneyEntity | 'all'>('all')
   const [addLedger, setAddLedger] = useState(false)
@@ -89,17 +118,7 @@ export default function Money() {
     .sort((a, b) => b.date.localeCompare(a.date))
 
   return (
-    <div className="screen wrap">
-      <header className="page-head">
-        <div className="eyebrow">
-          <span className="t-cap" style={{ color: 'var(--accent)' }}>
-            Financial scoreboard
-          </span>
-        </div>
-        <h1 className="t-large">Money</h1>
-        <p className="t-sub">Sales → revenue → margin → profit → cash → payout.</p>
-      </header>
-
+    <>
       {/* Hero: the one number the whole protocol points at. */}
       <Card className="card-pad">
         <div className="t-cap">ACMR in bank</div>
@@ -269,7 +288,7 @@ export default function Money() {
 
       {addLedger && <LedgerSheet onClose={() => setAddLedger(false)} />}
       {addBalance && <BalanceSheet onClose={() => setAddBalance(false)} />}
-    </div>
+    </>
   )
 }
 

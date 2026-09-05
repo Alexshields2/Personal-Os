@@ -22,6 +22,7 @@ import { EMPTY_METRICS, STATE_VERSION } from './types'
 import type {
   AppState,
   BalanceSnapshot,
+  Bill,
   Client,
   Connection,
   DayEntry,
@@ -29,6 +30,8 @@ import type {
   DomainLink,
   DomainNode,
   Goal,
+  Holding,
+  Invoice,
   Project,
   Task,
   LearnItem,
@@ -64,6 +67,9 @@ function initialState(): AppState {
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    bills: [],
+    holdings: [],
+    invoices: [],
     clients: [],
     deals: [],
     projects: [],
@@ -163,6 +169,9 @@ function hydrate(raw: string): AppState {
     loops: parsed.loops ?? base.loops,
     domains: parsed.domains ?? base.domains,
     links: parsed.links ?? base.links,
+    bills: parsed.bills ?? [],
+    holdings: parsed.holdings ?? [],
+    invoices: parsed.invoices ?? [],
     clients: parsed.clients ?? [],
     deals: parsed.deals ?? [],
     projects: parsed.projects ?? [],
@@ -472,6 +481,45 @@ export const actions = {
 
   setLinks(links: DomainLink[]) {
     set({ ...state, links })
+  },
+
+  // --------------------------------------------------------------- money
+
+  setBills(bills: Bill[]) {
+    set({ ...state, bills })
+  },
+
+  updateBill(id: string, patch: Partial<Bill>) {
+    set({ ...state, bills: state.bills.map((b) => (b.id === id ? { ...b, ...patch } : b)) })
+  },
+
+  setHoldings(holdings: Holding[]) {
+    set({ ...state, holdings })
+  },
+
+  updateHolding(id: string, patch: Partial<Holding>) {
+    set({
+      ...state,
+      holdings: state.holdings.map((h) =>
+        h.id === id ? { ...h, ...patch, updated: todayISO() } : h,
+      ),
+    })
+  },
+
+  setInvoices(invoices: Invoice[]) {
+    set({ ...state, invoices })
+  },
+
+  updateInvoice(id: string, patch: Partial<Invoice>) {
+    set({
+      ...state,
+      invoices: state.invoices.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+    })
+  },
+
+  /** Marking one paid stamps the date, which is what the days-to-pay average reads. */
+  markInvoicePaid(id: string, iso = todayISO()) {
+    actions.updateInvoice(id, { status: 'paid', paidDate: iso })
   },
 
   // ---------------------------------------------------------------- work

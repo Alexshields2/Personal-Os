@@ -26,7 +26,8 @@ import {
   IconToday,
   IconWork,
 } from './components/icons'
-import { PROTOCOL_DAYS } from './lib/config'
+import Palette from './components/Palette'
+import { PROTOCOL_DAYS, SECTIONS } from './lib/config'
 import { useStore } from './lib/store'
 import { timeline } from './lib/selectors'
 
@@ -59,6 +60,15 @@ const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
   { id: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
+// The nav order lives in SECTIONS so search and the shell cannot disagree.
+if (import.meta.env.DEV) {
+  const navIds = TABS.map((t) => t.id).join()
+  const sectionIds = SECTIONS.map((s) => s.id).join()
+  if (navIds !== sectionIds) {
+    console.warn('Nav order and SECTIONS have drifted:', navIds, sectionIds)
+  }
+}
+
 const SCREENS: Record<TabId, () => ReactElement> = {
   home: Home,
   today: Today,
@@ -76,6 +86,7 @@ const SCREENS: Record<TabId, () => ReactElement> = {
 
 export default function App() {
   const [tab, setTab] = useState<TabId>('home')
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const state = useStore()
   const t = timeline(state)
   const Screen = SCREENS[tab]
@@ -84,6 +95,18 @@ export default function App() {
   useEffect(() => {
     document.querySelector('.scroll')?.scrollTo({ top: 0 })
   }, [tab])
+
+  // Cmd/Ctrl-K anywhere. Ignored while typing so it can't hijack a keystroke
+  // meant for a field, except in the palette's own input, which handles it.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'k' || !(e.metaKey || e.ctrlKey)) return
+      e.preventDefault()
+      setPaletteOpen((v) => !v)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // The stamp drives every token, so it has to land before the first paint of
   // any screen that reads them.
@@ -108,6 +131,10 @@ export default function App() {
             </span>
           </div>
         </div>
+        <button className="palette-hint" onClick={() => setPaletteOpen(true)}>
+          Search everything
+          <kbd>⌘K</kbd>
+        </button>
         {TABS.map(({ id, label, Icon }) => (
           <button
             key={id}
@@ -125,6 +152,13 @@ export default function App() {
       <main className="scroll">
         <Screen key={tab} />
       </main>
+
+      {paletteOpen && (
+        <Palette
+          onNavigate={(next) => setTab(next as TabId)}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
 
       <nav className="tabbar" aria-label="Sections">
         {TABS.map(({ id, label, Icon }) => (

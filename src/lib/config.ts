@@ -1,4 +1,5 @@
 import type {
+  BillCadence,
   DealStage,
   Goal,
   GoalHorizon,
@@ -663,3 +664,66 @@ export const OPEN_STAGES: DealStage[] = ['lead', 'qualified', 'proposal']
 
 /** A deal that hasn't moved in this long is drifting, whatever the stage says. */
 export const STALE_DEAL_DAYS = 14
+
+// --------------------------------------------------------------- money depth
+
+export const PURSE_LABEL: Record<string, string> = {
+  acmr: 'ACMR',
+  onemedia: '1Media',
+  personal: 'Personal',
+}
+
+/** Multiplier that turns each cadence into a monthly figure. */
+export const CADENCE_PER_MONTH: Record<BillCadence, number> = {
+  weekly: 52 / 12,
+  monthly: 1,
+  quarterly: 1 / 3,
+  annual: 1 / 12,
+}
+
+export const CADENCE_LABEL: Record<BillCadence, string> = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  annual: 'Annual',
+}
+
+export const HOLDING_CATEGORIES = [
+  'Property',
+  'Investments',
+  'Cash',
+  'Pension',
+  'Vehicle',
+  'Business equity',
+  'Loan',
+  'Mortgage',
+  'Tax owed',
+  'Other',
+]
+
+export const INVOICE_STATUS_LABEL: Record<string, string> = {
+  draft: 'Draft',
+  sent: 'Sent',
+  paid: 'Paid',
+}
+
+// ------------------------------------------------------------------ sections
+
+/**
+ * The sections, in nav order. Kept here rather than in App so search can offer
+ * them as results without importing the shell.
+ */
+export const SECTIONS: { id: string; label: string; blurb: string }[] = [
+  { id: 'home', label: 'Home', blurb: 'What needs you right now' },
+  { id: 'today', label: 'Today', blurb: 'Plan, log and review the day' },
+  { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },
+  { id: 'patterns', label: 'Patterns', blurb: 'Loops, breakdowns, your two versions' },
+  { id: 'map', label: 'Map', blurb: 'The life tree and its causes' },
+  { id: 'money', label: 'Money', blurb: 'Balances, net worth, the ledger' },
+  { id: 'learn', label: 'Learn', blurb: 'Books, courses, events and lessons' },
+  { id: 'network', label: 'Network', blurb: 'People and contact cadence' },
+  { id: 'goals', label: 'Goals', blurb: 'The ladder, and upkeep' },
+  { id: 'progress', label: 'Progress', blurb: 'The 126-day totals' },
+  { id: 'review', label: 'Review', blurb: 'The Sunday page' },
+  { id: 'settings', label: 'Settings', blurb: 'Targets, loops, appearance, sync' },
+]

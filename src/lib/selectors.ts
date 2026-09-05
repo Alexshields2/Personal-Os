@@ -2,12 +2,15 @@ import {
   CHECKLIST,
   CLEAN_IDS,
   COMPOUNDING,
+  CADENCE_PER_MONTH,
   DEAL_STAGES,
   GOAL_HORIZONS,
   METRIC_BY_KEY,
   METRICS,
   OPEN_STAGES,
   PILLARS,
+  PURSE_LABEL,
+  SECTIONS,
   PROTOCOL_DAYS,
   STALE_DEAL_DAYS,
 } from './config'
@@ -25,6 +28,7 @@ import {
 import type {
   AccountId,
   AppState,
+  Bill,
   Client,
   Connection,
   DayEntry,
@@ -34,10 +38,12 @@ import type {
   DomainNode,
   Goal,
   GoalHorizon,
+  Invoice,
   KeyResult,
   LedgerKind,
   MetricKey,
   Project,
+  Purse,
   Task,
   LearnItem,
   Loop,
@@ -1355,5 +1361,289 @@ export function goalBoard(state: AppState, iso = todayISO()): GoalBoard {
     atRisk,
     done: state.goals.filter((g) => g.done).length,
     total: state.goals.length,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Search
+//
+// Twelve sections is more than anyone navigates by tapping. Everything the app
+// holds is reachable from one box, ranked so an exact prefix beats a match
+// buried mid-word.
+
+export type SearchKind =
+  | 'section'
+  | 'task'
+  | 'project'
+  | 'goal'
+  | 'source'
+  | 'lesson'
+  | 'person'
+  | 'client'
+  | 'deal'
+  | 'branch'
+  | 'loop'
+  | 'priority'
+
+export interface SearchResult {
+  id: string
+  kind: SearchKind
+  label: string
+  sub: string
+  /** Section to open when it is chosen. */
+  tab: string
+  score: number
+}
+
+const KIND_LABEL: Record<SearchKind, string> = {
+  section: 'Section',
+  task: 'Task',
+  project: 'Project',
+  goal: 'Goal',
+  source: 'Learning',
+  lesson: 'Lesson',
+  person: 'Person',
+  client: 'Client',
+  deal: 'Deal',
+  branch: 'Branch',
+  loop: 'Loop',
+  priority: 'Priority',
+}
+
+export function searchKindLabel(kind: SearchKind): string {
+  return KIND_LABEL[kind]
+}
+
+/**
+ * Rank one candidate. An exact hit beats a prefix, a prefix beats the start of
+ * any word, and a match buried mid-word scores lowest — which is what stops
+ * "an" dragging every sentence containing it to the top.
+ */
+function rank(haystack: string, needle: string): number {
+  const h = haystack.toLowerCase()
+  if (!h) return 0
+  if (h === needle) return 100
+  if (h.startsWith(needle)) return 80
+  const at = h.indexOf(needle)
+  if (at === -1) return 0
+  // A match right after a space or punctuation is a word start.
+  return /[\s\-–—:,.(]/.test(h[at - 1] ?? ' ') ? 55 : 25
+}
+
+export function search(state: AppState, query: string, limit = 12): SearchResult[] {
+  const q = query.trim().toLowerCase()
+  if (q.length < 1) return []
+  const out: SearchResult[] = []
+
+  const push = (
+    id: string,
+    kind: SearchKind,
+    label: string,
+    sub: string,
+    tab: string,
+    extra = '',
+  ) => {
+    const score = Math.max(rank(label, q), rank(extra, q) * 0.6)
+    if (score > 0) out.push({ id, kind, label, sub, tab, score })
+  }
+
+  for (const s of SECTIONS) push(`section-${s.id}`, 'section', s.label, s.blurb, s.id, s.blurb)
+
+  for (const t of state.tasks) {
+    const project = state.projects.find((p) => p.id === t.projectId)
+    push(
+      `task-${t.id}`,
+      'task',
+      t.title,
+      [t.done ? 'done' : 'open', project?.name, t.due && `due ${t.due}`]
+        .filter(Boolean)
+        .join(' · '),
+      'work',
+    )
+  }
+
+  for (const p of state.projects) push(`project-${p.id}`, 'project', p.name, p.status, 'work')
+  for (const c of state.clients)
+    push(`client-${c.id}`, 'client', c.name, `${c.status} · ${c.entity}`, 'work', c.notes)
+  for (const d of state.deals)
+    push(`deal-${d.id}`, 'deal', d.name, `${d.stage} · ${d.entity}`, 'work', d.nextStep)
+
+  for (const g of state.goals)
+    push(`goal-${g.id}`, 'goal', g.title, g.horizon, 'goals', g.note)
+
+  for (const item of state.learning) {
+    push(
+      `source-${item.id}`,
+      'source',
+      item.title,
+      [item.kind, item.source, item.status].filter(Boolean).join(' · '),
+      'learn',
+      item.notes,
+    )
+    for (const lesson of item.lessons) {
+      push(`lesson-${lesson.id}`, 'lesson', lesson.text, `from ${item.title}`, 'learn', lesson.action)
+    }
+  }
+
+  for (const c of state.connections)
+    push(`person-${c.id}`, 'person', c.name, [c.role, c.status].filter(Boolean).join(' · '), 'network', `${c.why} ${c.notes}`)
+
+  for (const d of state.domains)
+    push(`branch-${d.id}`, 'branch', d.label, 'branch of the map', 'map', d.note)
+
+  for (const l of state.loops)
+    push(`loop-${l.id}`, 'loop', l.label, l.archived ? 'archived loop' : 'loop', 'patterns', l.note)
+
+  // Priorities are searched across every day, deduped by text — the same
+  // intention written on twelve days is one result, not twelve.
+  const seen = new Set<string>()
+  for (const day of loggedDays(state).reverse()) {
+    for (const p of day.priorities) {
+      const text = p.text.trim()
+      if (!text) continue
+      const key = text.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      push(`priority-${key}`, 'priority', text, `priority on ${day.date}`, 'today')
+    }
+  }
+
+  return out.sort((a, b) => b.score - a.score || a.label.localeCompare(b.label)).slice(0, limit)
+}
+
+// ---------------------------------------------------------------------------
+// Money, in depth
+//
+// Balances say what you have. These say what is leaving, what you own against
+// what you owe, who hasn't paid, and how long the cash lasts — which is the
+// only one of those that decides whether you can say no to a bad deal.
+
+export interface BillBook {
+  bills: Bill[]
+  /** Every cadence normalised to a monthly figure. */
+  monthly: number
+  annual: number
+  byPurse: { purse: Purse; label: string; monthly: number }[]
+  dueSoon: Bill[]
+}
+
+export function monthlyCost(bill: Bill): number {
+  return bill.amount * CADENCE_PER_MONTH[bill.cadence]
+}
+
+export function billBook(state: AppState, purse?: Purse, iso = todayISO()): BillBook {
+  const bills = purse ? state.bills.filter((b) => b.purse === purse) : state.bills
+  const monthly = bills.reduce((s, b) => s + monthlyCost(b), 0)
+  const purses: Purse[] = ['acmr', 'onemedia', 'personal']
+  return {
+    bills,
+    monthly,
+    annual: monthly * 12,
+    byPurse: purses.map((p) => ({
+      purse: p,
+      label: PURSE_LABEL[p],
+      monthly: state.bills.filter((b) => b.purse === p).reduce((s, b) => s + monthlyCost(b), 0),
+    })),
+    dueSoon: bills
+      .filter((b) => b.nextDue && daysBetween(iso, b.nextDue) <= 7)
+      .sort((a, b) => a.nextDue.localeCompare(b.nextDue)),
+  }
+}
+
+export interface BalanceSheet {
+  assets: number
+  liabilities: number
+  net: number
+  liquid: number
+  illiquid: number
+  /** True once anything has been itemised; false means the manual figure stands. */
+  itemised: boolean
+  /** The old manual net-worth snapshot, kept as the fallback. */
+  manual: number
+}
+
+/**
+ * Net worth, calculated. Falls back to the manual snapshot until at least one
+ * holding exists, so upgrading doesn't blank the number you were watching.
+ */
+export function balanceSheet(state: AppState): BalanceSheet {
+  const assets = state.holdings
+    .filter((h) => h.kind === 'asset')
+    .reduce((s, h) => s + h.value, 0)
+  const liabilities = state.holdings
+    .filter((h) => h.kind === 'liability')
+    .reduce((s, h) => s + h.value, 0)
+  const liquid = state.holdings
+    .filter((h) => h.kind === 'asset' && h.liquid)
+    .reduce((s, h) => s + h.value, 0)
+  const manual = accountBalance(state, 'netWorth')
+  const itemised = state.holdings.length > 0
+  return {
+    assets,
+    liabilities,
+    net: itemised ? assets - liabilities : manual,
+    liquid,
+    illiquid: assets - liquid,
+    itemised,
+    manual,
+  }
+}
+
+export interface InvoiceBook {
+  outstanding: number
+  overdue: Invoice[]
+  overdueValue: number
+  paidThisMonth: number
+  /** Mean days between issuing and payment. Null until something has been paid. */
+  averageDaysToPay: number | null
+}
+
+export function invoiceBook(state: AppState, entity?: MoneyEntity, iso = todayISO()): InvoiceBook {
+  const all = entity ? state.invoices.filter((i) => i.entity === entity) : state.invoices
+  const sent = all.filter((i) => i.status === 'sent')
+  const paid = all.filter((i) => i.status === 'paid' && i.paidDate)
+
+  const settled = paid.filter((i) => i.issued)
+  const monthStart = iso.slice(0, 7)
+
+  return {
+    outstanding: sent.reduce((s, i) => s + i.amount, 0),
+    overdue: sent
+      .filter((i) => i.due && daysBetween(i.due, iso) > 0)
+      .sort((a, b) => a.due.localeCompare(b.due)),
+    overdueValue: sent
+      .filter((i) => i.due && daysBetween(i.due, iso) > 0)
+      .reduce((s, i) => s + i.amount, 0),
+    paidThisMonth: paid
+      .filter((i) => i.paidDate.startsWith(monthStart))
+      .reduce((s, i) => s + i.amount, 0),
+    averageDaysToPay: settled.length
+      ? settled.reduce((s, i) => s + daysBetween(i.issued, i.paidDate), 0) / settled.length
+      : null,
+  }
+}
+
+export interface Runway {
+  cash: number
+  monthlyBurn: number
+  /** Months of cover. Infinity when nothing is going out. */
+  months: number
+  /** False until there are bills to burn — otherwise the number means nothing. */
+  known: boolean
+}
+
+/** How long the cash lasts at the current outgoings. */
+export function runway(state: AppState, purse: Purse): Runway {
+  const account: AccountId =
+    purse === 'acmr' ? 'acmrBank' : purse === 'onemedia' ? 'onemediaBank' : 'personalBank'
+  const cash = accountBalance(state, account)
+  const monthlyBurn = state.bills
+    .filter((b) => b.purse === purse)
+    .reduce((s, b) => s + monthlyCost(b), 0)
+  return {
+    cash,
+    monthlyBurn,
+    months: monthlyBurn > 0 ? cash / monthlyBurn : Infinity,
+    known: monthlyBurn > 0,
   }
 }

@@ -24,6 +24,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Tests gate the deploy: the app's whole value is derived numbers, and a
+      # wrong one is worse than a missing one because it still looks like data.
+      - run: npm test
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
