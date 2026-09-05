@@ -4,7 +4,7 @@ import { IconPlus } from './icons'
 import { PRIORITY_TAGS } from '../lib/config'
 import { todayISO } from '../lib/date'
 import { uid } from '../lib/format'
-import { actions, emptyDay, emptySlots, useStore } from '../lib/store'
+import { actions, emptyDay, emptySlots, newTask, useStore } from '../lib/store'
 import type { MoneyEntity, Priority } from '../lib/types'
 
 type Kind = 'task' | 'priority' | 'goal' | 'person' | 'deal'
@@ -72,16 +72,7 @@ function QuickAddSheet({
     if (!value || planFull) return
 
     if (kind === 'task') {
-      actions.addTask({
-        id: uid(),
-        projectId: '',
-        entity: tag,
-        title: value,
-        done: false,
-        due: '',
-        created: today,
-        doneDate: '',
-      })
+      actions.addTask(newTask(value, { entity: tag }))
       onNavigate('work')
     } else if (kind === 'priority' && nextSlot) {
       // Write the slots back first when the day had none stored yet.

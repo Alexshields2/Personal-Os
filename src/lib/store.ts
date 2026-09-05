@@ -216,7 +216,11 @@ function hydrate(raw: string): AppState {
     clients: parsed.clients ?? [],
     deals: parsed.deals ?? [],
     projects: parsed.projects ?? [],
-    tasks: parsed.tasks ?? [],
+    // Tasks predate scheduling, estimates and priority bands.
+    tasks: (parsed.tasks ?? []).map((t) => {
+      const legacy = t as Partial<Task>
+      return { scheduled: '', estimateMin: 0, priority: 2, ...legacy } as Task
+    }),
     rewards: parsed.rewards ?? base.rewards,
   }
 }
@@ -256,6 +260,27 @@ export function emptyDay(date: string): DayEntry {
     trackerNotes: {},
     journal: '',
     closed: false,
+  }
+}
+
+/**
+ * One place that knows a task's shape. Four call sites were building the object
+ * by hand, so every new field broke all of them.
+ */
+export function newTask(title: string, over: Partial<Task> = {}): Task {
+  return {
+    id: uid(),
+    projectId: '',
+    entity: 'consulting',
+    title,
+    done: false,
+    due: '',
+    scheduled: '',
+    estimateMin: 0,
+    priority: 2,
+    created: todayISO(),
+    doneDate: '',
+    ...over,
   }
 }
 
@@ -657,6 +682,10 @@ export const actions = {
     set({ ...state, tasks: state.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) })
   },
 
+  scheduleTask(id: string, date: string) {
+    actions.updateTask(id, { scheduled: date })
+  },
+
   toggleTask(id: string) {
     const task = state.tasks.find((t) => t.id === id)
     if (!task) return
@@ -838,10 +867,10 @@ export const actions = {
         { id: 'sp1', entity: 'consulting', name: 'Sales page rebuild', clientId: '', status: 'active', due: addDays(today, 10), notes: '' },
       ],
       tasks: [
-        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), created: at(6), doneDate: at(3) },
-        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), created: at(6), doneDate: '' },
-        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, created: at(2), doneDate: '' },
-        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', created: at(9), doneDate: '' },
+        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), scheduled: at(3), estimateMin: 45, priority: 2, created: at(6), doneDate: at(3) },
+        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), scheduled: today, estimateMin: 120, priority: 1, created: at(6), doneDate: '' },
+        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, scheduled: today, estimateMin: 180, priority: 2, created: at(2), doneDate: '' },
+        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', scheduled: '', estimateMin: 15, priority: 3, created: at(9), doneDate: '' },
       ],
       bills: [
         { id: 'sx1', label: 'Office rent', amount: 4200, cadence: 'monthly', nextDue: addDays(today, 3), purse: 'consulting', category: 'Premises' },

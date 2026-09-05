@@ -1941,3 +1941,76 @@ export function yearToDate(state: AppState, entity?: MoneyEntity, iso = todayISO
     bestMonth: best,
   }
 }
+
+// ---------------------------------------------------------------------------
+// The week board
+//
+// `due` is when a task is owed; `scheduled` is when you intend to sit down and
+// do it. Keeping them apart is the whole point — a week planned against
+// deadlines tells you nothing about whether the week fits.
+
+export interface BoardDay {
+  date: string
+  tasks: Task[]
+  /** Estimated minutes of open work sitting on that day. */
+  load: number
+  capacity: number
+  /** Load as a share of capacity. Over 100 means the day cannot hold it. */
+  pct: number
+  over: boolean
+  /** Open tasks with no estimate, which the load silently excludes. */
+  unestimated: number
+}
+
+export interface WeekBoard {
+  days: BoardDay[]
+  backlog: Task[]
+  totalLoad: number
+  totalCapacity: number
+}
+
+/** Highest priority first, then the longest job, then oldest. */
+function boardOrder(a: Task, b: Task): number {
+  if (a.done !== b.done) return a.done ? 1 : -1
+  if (a.priority !== b.priority) return a.priority - b.priority
+  if (a.estimateMin !== b.estimateMin) return b.estimateMin - a.estimateMin
+  return a.created.localeCompare(b.created)
+}
+
+export function weekBoard(state: AppState, weekStart: string): WeekBoard {
+  const capacity = state.targets.dailyCapacityMin || 480
+  const days: BoardDay[] = []
+
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(weekStart, i)
+    const tasks = state.tasks.filter((t) => t.scheduled === date).sort(boardOrder)
+    const open = tasks.filter((t) => !t.done)
+    const load = open.reduce((s, t) => s + t.estimateMin, 0)
+    days.push({
+      date,
+      tasks,
+      load,
+      capacity,
+      pct: capacity > 0 ? (load / capacity) * 100 : 0,
+      over: load > capacity,
+      unestimated: open.filter((t) => t.estimateMin === 0).length,
+    })
+  }
+
+  return {
+    days,
+    backlog: state.tasks.filter((t) => !t.scheduled && !t.done).sort(boardOrder),
+    totalLoad: days.reduce((s, d) => s + d.load, 0),
+    totalCapacity: capacity * 7,
+  }
+}
+
+/** "2h 30m" — hours read better than 150 minutes once a day is being planned. */
+export function durationLabel(minutes: number): string {
+  if (minutes <= 0) return '—'
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}

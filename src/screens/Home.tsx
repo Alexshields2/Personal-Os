@@ -3,8 +3,8 @@ import { Card, CardHead, Check, Empty, Meter, Ring, SectionTitle } from '../comp
 import { IconFlame, IconPlus, IconWarn } from '../components/icons'
 import { PRIORITY_TAGS, PROTOCOL_DAYS, STALE_DEAL_DAYS } from '../lib/config'
 import { formatLong, todayISO } from '../lib/date'
-import { euroCompact, uid } from '../lib/format'
-import { actions, emptyDay, useStore } from '../lib/store'
+import { euroCompact } from '../lib/format'
+import { actions, emptyDay, newTask, useStore } from '../lib/store'
 import {
   accountBalance,
   clientBook,
@@ -249,16 +249,7 @@ function Capture() {
 
   const add = () => {
     if (!text.trim()) return
-    actions.addTask({
-      id: uid(),
-      projectId: '',
-      entity: tag,
-      title: text.trim(),
-      done: false,
-      due: '',
-      created: todayISO(),
-      doneDate: '',
-    })
+    actions.addTask(newTask(text.trim(), { entity: tag }))
     setText('')
   }
 

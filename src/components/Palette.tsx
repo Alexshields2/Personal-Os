@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { SECTIONS } from '../lib/config'
-import { todayISO } from '../lib/date'
-import { uid } from '../lib/format'
-import { actions, useStore } from '../lib/store'
+import { actions, newTask, useStore } from '../lib/store'
 import { search, searchKindLabel } from '../lib/selectors'
 import type { SearchResult } from '../lib/selectors'
 
@@ -63,16 +61,7 @@ export default function Palette({
   }, [cursor])
 
   const capture = () => {
-    actions.addTask({
-      id: uid(),
-      projectId: '',
-      entity: 'consulting',
-      title: query.trim(),
-      done: false,
-      due: '',
-      created: todayISO(),
-      doneDate: '',
-    })
+    actions.addTask(newTask(query.trim()))
     onNavigate('work')
     onClose()
   }

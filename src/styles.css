@@ -1795,3 +1795,178 @@ kbd {
 .meter-won .meter-fill {
   background: var(--won) !important;
 }
+
+/* =========================================================================
+   The week board
+   ========================================================================= */
+
+.week {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(190px, 1fr);
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 6px;
+  scrollbar-width: none;
+}
+
+.week::-webkit-scrollbar {
+  display: none;
+}
+
+.week-col,
+.week-backlog {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 12px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 190px;
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+
+.week-backlog {
+  margin-top: 12px;
+}
+
+.week-col[data-today='true'] {
+  border-color: var(--hairline-strong);
+  background: var(--surface-2);
+}
+
+/* The column the pointer is over mid-drag. */
+.week-col[data-over='true'],
+.week-backlog[data-over='true'] {
+  border-color: var(--accent);
+  background: var(--fill-soft-hover);
+}
+
+.week-head {
+  display: grid;
+  gap: 5px;
+}
+
+.week-dow {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+}
+
+.week-load {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.week-load[data-over='true'] {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.week-note {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.week-cards {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+  align-content: start;
+}
+
+.week-cards-row {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 220px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.week-cards-row::-webkit-scrollbar {
+  display: none;
+}
+
+.week-empty {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 6px 2px;
+}
+
+.week-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px;
+  border-radius: var(--r-sm);
+  border: 1px dashed var(--hairline-strong);
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.week-add:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+/* A card. The left edge carries the priority band. */
+.task-card {
+  background: var(--surface-3);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid var(--text-muted);
+  border-radius: 9px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 5px;
+  cursor: grab;
+  touch-action: none;
+  transition: opacity 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+.task-card[data-priority='1'] {
+  border-left-color: var(--text-primary);
+}
+
+.task-card[data-priority='3'] {
+  border-left-color: var(--hairline-strong);
+}
+
+.task-card[data-done='true'] {
+  opacity: 0.5;
+}
+
+.task-card[data-dragging='true'] {
+  opacity: 0.45;
+  transform: scale(0.97);
+  cursor: grabbing;
+}
+
+.task-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.task-card-title {
+  font-size: 13.5px;
+  line-height: 1.35;
+  letter-spacing: -0.008em;
+}
+
+.task-card[data-done='true'] .task-card-title {
+  text-decoration: line-through;
+}
+
+.task-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  padding-left: 28px;
+}

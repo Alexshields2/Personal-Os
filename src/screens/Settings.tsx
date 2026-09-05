@@ -137,6 +137,19 @@ export default function Settings() {
         </div>
       </Card>
 
+      <SectionTitle title="Capacity" />
+      <Card className="card-pad">
+        <NumberField
+          label="Hours of real work a day can hold"
+          value={state.targets.dailyCapacityMin / 60}
+          onChange={(h) => actions.setTargets({ dailyCapacityMin: Math.max(0, h * 60) })}
+        />
+        <p className="t-foot muted" style={{ marginTop: 10 }}>
+          The line the week board plans against. Set it to what a day actually holds, not what
+          you wish it did — an honest number is the only one that can tell you a week won't fit.
+        </p>
+      </Card>
+
       <SectionTitle title="Appearance" />
       <Card className="card-pad">
         <Field label="Ground">

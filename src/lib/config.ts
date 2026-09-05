@@ -32,6 +32,7 @@ export const DEFAULT_TARGETS: Targets = {
   personalPayout: 1_000_000,
   bodyweightKg: 95,
   netWorth: 5_000_000,
+  dailyCapacityMin: 480,
 }
 
 export type PillarId = 'business' | 'body' | 'mind' | 'discipline'
@@ -707,6 +708,15 @@ export const INVOICE_STATUS_LABEL: Record<string, string> = {
   sent: 'Sent',
   paid: 'Paid',
 }
+
+export const TASK_PRIORITY_LABEL: Record<number, string> = {
+  1: 'Must',
+  2: 'Should',
+  3: 'Could',
+}
+
+/** Quick estimates, in minutes. Anything longer belongs in a project. */
+export const ESTIMATE_STEPS = [15, 30, 45, 60, 90, 120, 180, 240]
 
 // ---------------------------------------------------------------- trackers
 

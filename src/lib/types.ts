@@ -269,6 +269,8 @@ export interface Targets {
   personalPayout: number
   bodyweightKg: number
   netWorth: number
+  /** Minutes of real work a day can hold. The line the week is planned against. */
+  dailyCapacityMin: number
 }
 
 // ---------------------------------------------------------------------- work
@@ -324,6 +326,9 @@ export interface Project {
   notes: string
 }
 
+/** 1 is the highest. Three bands is as many as anyone actually sorts by. */
+export type TaskPriority = 1 | 2 | 3
+
 /** A unit of work. `projectId` empty means it stands on its own. */
 export interface Task {
   id: string
@@ -331,7 +336,16 @@ export interface Task {
   entity: PriorityTag
   title: string
   done: boolean
+  /**
+   * When it is *owed*. Distinct from `scheduled`, which is when you intend to
+   * sit down and do it — conflating the two is why week plans quietly slip.
+   */
   due: string
+  /** ISO date it is planned for. Empty means it sits in the backlog. */
+  scheduled: string
+  /** How long you think it takes, in minutes. 0 means unestimated. */
+  estimateMin: number
+  priority: TaskPriority
   created: string
   doneDate: string
 }

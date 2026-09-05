@@ -13,6 +13,7 @@ import {
   Stat,
   TextField,
 } from '../components/ui'
+import WeekBoard from '../components/WeekBoard'
 import { IconChevron, IconPlus, IconTrash, IconWarn } from '../components/icons'
 import {
   CLIENT_STATUS_LABEL,
@@ -26,7 +27,7 @@ import {
 } from '../lib/config'
 import { daysBetween, formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, uid } from '../lib/format'
-import { actions, useStore } from '../lib/store'
+import { actions, newTask, useStore } from '../lib/store'
 import { clientBook, pipeline, projectProgress, taskQueue } from '../lib/selectors'
 import type {
   ClientStatus,
@@ -37,11 +38,11 @@ import type {
   Task,
 } from '../lib/types'
 
-type View = 'tasks' | 'projects' | 'clients' | 'pipeline'
+type View = 'week' | 'tasks' | 'projects' | 'clients' | 'pipeline'
 
 export default function Work() {
   const state = useStore()
-  const [view, setView] = useState<View>('tasks')
+  const [view, setView] = useState<View>('week')
   const queue = useMemo(() => taskQueue(state), [state])
   const pipe = useMemo(() => pipeline(state), [state])
 
@@ -85,6 +86,7 @@ export default function Work() {
           value={view}
           onChange={setView}
           options={[
+            { value: 'week', label: 'Week' },
             { value: 'tasks', label: `Tasks · ${queue.openCount}` },
             { value: 'projects', label: 'Projects' },
             { value: 'clients', label: 'Clients' },
@@ -93,6 +95,7 @@ export default function Work() {
         />
       </div>
 
+      {view === 'week' && <WeekBoard />}
       {view === 'tasks' && <Tasks />}
       {view === 'projects' && <Projects />}
       {view === 'clients' && <Clients />}
@@ -112,16 +115,7 @@ function Tasks() {
 
   const add = () => {
     if (!title.trim()) return
-    actions.addTask({
-      id: uid(),
-      projectId: '',
-      entity: tag,
-      title: title.trim(),
-      done: false,
-      due: '',
-      created: todayISO(),
-      doneDate: '',
-    })
+    actions.addTask(newTask(title.trim(), { entity: tag }))
     setTitle('')
   }
 
@@ -384,16 +378,7 @@ function ProjectDetail({ id, onClose }: { id: string; onClose: () => void }) {
 
   const addTask = () => {
     if (!title.trim()) return
-    actions.addTask({
-      id: uid(),
-      projectId: id,
-      entity: project.entity,
-      title: title.trim(),
-      done: false,
-      due: '',
-      created: todayISO(),
-      doneDate: '',
-    })
+    actions.addTask(newTask(title.trim(), { projectId: id, entity: project.entity }))
     setTitle('')
   }
 
