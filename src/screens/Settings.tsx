@@ -88,7 +88,7 @@ export default function Settings() {
       <Card className="card-pad">
         <div className="stack" style={{ display: 'grid', gap: 14 }}>
           <NumberField
-            label={`ACMR bonus pool — currently ${euroCompact(state.targets.bonusPool)}`}
+            label={`Consulting.ie bonus pool — currently ${euroCompact(state.targets.bonusPool)}`}
             value={state.targets.bonusPool}
             onChange={(v) => actions.setTargets({ bonusPool: v })}
           />
@@ -185,7 +185,8 @@ export default function Settings() {
             <button
               className="btn btn-block"
               onClick={() => {
-                if (actions.seedDemo()) flash('Sample weeks added — export or reset any time.')
+                if (actions.seedDemo())
+                  flash('Sixty sample days added, across every section. Erase any time.')
               }}
             >
               Fill sample data

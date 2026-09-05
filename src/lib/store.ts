@@ -9,14 +9,14 @@ import {
   DEFAULT_LINKS,
   DEFAULT_LEARNING,
   DEFAULT_LOOPS,
+  DEFAULT_TRACKERS,
   DEFAULT_REWARDS,
   DEFAULT_TARGETS,
   DEFAULT_UPKEEP,
   MAX_PRIORITIES,
   MORNING,
-  PROTOCOL_DAYS,
 } from './config'
-import { addMinutes, todayISO, isoForDay } from './date'
+import { addDays, addMinutes, todayISO } from './date'
 import { uid } from './format'
 import { EMPTY_METRICS, STATE_VERSION } from './types'
 import type {
@@ -42,6 +42,7 @@ import type {
   Targets,
   Theme,
   TimeBlock,
+  Tracker,
   Upkeep,
   WeekEntry,
 } from './types'
@@ -67,6 +68,7 @@ function initialState(): AppState {
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    trackers: DEFAULT_TRACKERS.map((t) => ({ ...t })),
     bills: [],
     holdings: [],
     invoices: [],
@@ -76,6 +78,39 @@ function initialState(): AppState {
     tasks: [],
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
   }
+}
+
+/**
+ * v2 and earlier called the consulting business ACMR, and the id leaked into
+ * every corner of the document: metric keys, account ids, entity tags, domain
+ * ids, even free text. A deep rename is the only honest migration — anything
+ * narrower would leave a stored day keyed `acmrHours` that the app no longer
+ * reads, and the hours would silently vanish.
+ */
+const RENAMES: [RegExp, string][] = [
+  [/\bacmrBank\b/g, 'consultingBank'],
+  [/\bacmrHours\b/g, 'consultingHours'],
+  [/\bacmr_/g, 'consulting_'],
+  [/\bacmr\b/g, 'consulting'],
+  [/ACMR/g, 'Consulting.ie'],
+]
+
+function renamed(text: string): string {
+  return RENAMES.reduce((acc, [from, to]) => acc.replace(from, to), text)
+}
+
+function migrateEntityIds<T>(value: T): T {
+  if (typeof value === 'string') return renamed(value) as unknown as T
+  if (Array.isArray(value)) return value.map(migrateEntityIds) as unknown as T
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        renamed(k),
+        migrateEntityIds(v),
+      ]),
+    ) as T
+  }
+  return value
 }
 
 /** v1 shape of the reading list, before books became one kind of learning. */
@@ -116,6 +151,8 @@ function hydrate(raw: string): AppState {
   } catch {
     return base
   }
+  // Runs before anything reads a key, so the rest of hydrate sees only new ids.
+  if ((parsed.version ?? 1) < 3) parsed = migrateEntityIds(parsed)
   const days: Record<string, DayEntry> = {}
   for (const [k, v] of Object.entries(parsed.days ?? {})) {
     days[k] = {
@@ -126,6 +163,9 @@ function hydrate(raw: string): AppState {
       blocks: v?.blocks ?? [],
       loops: v?.loops ?? [],
       answers: v?.answers ?? {},
+      trackers: v?.trackers ?? {},
+      trackerNotes: v?.trackerNotes ?? {},
+      journal: v?.journal ?? '',
     }
   }
   return {
@@ -169,6 +209,7 @@ function hydrate(raw: string): AppState {
     loops: parsed.loops ?? base.loops,
     domains: parsed.domains ?? base.domains,
     links: parsed.links ?? base.links,
+    trackers: parsed.trackers ?? base.trackers,
     bills: parsed.bills ?? [],
     holdings: parsed.holdings ?? [],
     invoices: parsed.invoices ?? [],
@@ -190,7 +231,7 @@ export function emptySlots(date: string, n = CORE_PRIORITIES): Priority[] {
     id: `${date}-p${i + 1}`,
     text: '',
     done: false,
-    tag: 'acmr' as const,
+    tag: 'consulting' as const,
   }))
 }
 
@@ -211,6 +252,9 @@ export function emptyDay(date: string): DayEntry {
     lesson: '',
     loops: [],
     answers: {},
+    trackers: {},
+    trackerNotes: {},
+    journal: '',
     closed: false,
   }
 }
@@ -344,7 +388,7 @@ export const actions = {
     if (prev.priorities.length >= MAX_PRIORITIES) return
     actions.setPriorities(date, [
       ...prev.priorities,
-      { id: uid(), text: '', done: false, tag: 'acmr' },
+      { id: uid(), text: '', done: false, tag: 'consulting' },
     ])
   },
 
@@ -375,7 +419,7 @@ export const actions = {
     const start = last ? last.end : '09:00'
     actions.setBlocks(date, [
       ...prev.blocks,
-      { id: uid(), start, end: addMinutes(start, 60), label: '', tag: 'acmr' },
+      { id: uid(), start, end: addMinutes(start, 60), label: '', tag: 'consulting' },
     ])
   },
 
@@ -497,6 +541,29 @@ export const actions = {
 
   setLinks(links: DomainLink[]) {
     set({ ...state, links })
+  },
+
+  // ------------------------------------------------------------ trackers
+
+  setTrackers(trackers: Tracker[]) {
+    set({ ...state, trackers })
+  },
+
+  setTrackerValue(date: string, id: string, value: number) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, {
+      trackers: { ...prev.trackers, [id]: Math.max(0, value) },
+    })
+  },
+
+  setTrackerNote(date: string, id: string, text: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, { trackerNotes: { ...prev.trackerNotes, [id]: text } })
+  },
+
+  toggleTracker(date: string, id: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.setTrackerValue(date, id, prev.trackers[id] ? 0 : 1)
   },
 
   // --------------------------------------------------------------- money
@@ -671,39 +738,145 @@ export const actions = {
    * Refuses to run once anything real is logged — this must never be able to
    * overwrite actual entries.
    */
+  /**
+   * Fill the app with a plausible sixty days so every screen has something to
+   * show. An empty personal OS can't be judged: no oscillation, no patterns, no
+   * runway, and no way to tell whether any of it would be useful to you.
+   *
+   * The run deliberately oscillates and trends upward, because that is the
+   * shape the pattern engine exists to find. Refuses to run once anything real
+   * is logged — this must never be able to overwrite actual entries.
+   */
   seedDemo(): boolean {
     if (Object.keys(state.days).length > 0) return false
+
+    const today = todayISO()
+    const at = (back: number) => addDays(today, -back)
+    const manual = CHECKLIST.filter((c) => !c.metric && c.id !== 'training').map((c) => c.id)
     const days: Record<string, DayEntry> = {}
-    const checks: Record<string, boolean> = {}
-    for (const item of CHECKLIST) checks[item.id] = true
-    for (const item of MORNING) checks[item.id] = true
-    const upTo = Math.min(PROTOCOL_DAYS, 24)
-    for (let i = 1; i <= upTo; i++) {
-      const date = isoForDay(state.startDate, i)
+
+    for (let i = 60; i >= 1; i--) {
+      const date = at(i)
+      const t = 60 - i
+      // A ~21-day cycle around a slowly rising centre, plus a little noise.
+      const q = Math.max(
+        0.1,
+        Math.min(1, (Math.sin(t / 3.3) * 0.5 + 0.5) * 0.72 + t / 170 + (Math.random() - 0.5) * 0.1),
+      )
+      const weak = q < 0.45
       const d = emptyDay(date)
-      d.checks = { ...checks }
+
+      for (const id of manual) d.checks[id] = Math.random() < q
+      for (const m of MORNING) d.checks[m.id] = Math.random() < q + 0.1
+
       d.metrics = {
-        acmrHours: 10,
-        calories: 3000,
-        protein: 185,
-        creatine: 5,
-        waterL: 3.5,
-        steps: 10400,
-        sleepHours: 8,
-        pagesRead: 22,
-        mobilityMin: 10,
-        journalMin: 10,
-        goalReviewMin: 10,
-        socialMin: 18,
+        consultingHours: Number((10 * q).toFixed(1)),
+        calories: Math.round(3000 * Math.min(1, q + 0.2)),
+        protein: Math.round(185 * q),
+        creatine: q > 0.5 ? 5 : 0,
+        waterL: Number((3.5 * q).toFixed(2)),
+        steps: Math.round(11000 * q),
+        sleepHours: Number((5 + 3 * q).toFixed(2)),
+        pagesRead: Math.round(22 * q),
+        mobilityMin: q > 0.5 ? 10 : 0,
+        journalMin: q > 0.55 ? 10 : 0,
+        goalReviewMin: q > 0.6 ? 10 : 0,
+        socialMin: Math.round(20 + 70 * (1 - q)),
       }
-      d.trained = i % 7 !== 0
-      d.restDay = i % 7 === 0
+      d.trained = q > 0.45
+      d.restDay = false
+      d.planned = q > 0.4
+      d.energy = Math.max(1, Math.round(q * 5))
       d.closed = true
+
+      d.priorities = [
+        {
+          id: `${date}-p1`,
+          text: q < 0.4 ? 'Rebuild the Consulting.ie sales page' : 'Close the Kavanagh retainer',
+          done: Math.random() < q,
+          tag: 'consulting',
+        },
+        { id: `${date}-p2`, text: '1Media content batch', done: Math.random() < q, tag: 'onemedia' },
+        { id: `${date}-p3`, text: 'Gym and meal prep', done: Math.random() < q * 1.1, tag: 'life' },
+      ]
+
+      const loops: string[] = []
+      if (weak) {
+        loops.push('l_avoid')
+        if (Math.random() < 0.6) loops.push('l_scroll')
+        if (Math.random() < 0.5) loops.push('l_latenight')
+      }
+      if (q < 0.6 && Math.random() < 0.5) loops.push('l_busywork')
+      if (q < 0.35) loops.push('l_numb')
+      d.loops = loops
+
       days[date] = d
     }
-    set({ ...state, days })
+
+    set({
+      ...state,
+      startDate: at(60),
+      days,
+      balances: [
+        { id: 'sb1', date: at(1), account: 'consultingBank', amount: 184_000 },
+        { id: 'sb2', date: at(1), account: 'onemediaBank', amount: 16_000 },
+        { id: 'sb3', date: at(1), account: 'personalBank', amount: 42_000 },
+      ],
+      clients: [
+        { id: 'sc1', entity: 'consulting', name: 'Kavanagh Group', status: 'active', monthlyValue: 9500, since: at(300), renewal: addDays(today, 18), notes: '' },
+        { id: 'sc2', entity: 'consulting', name: 'Nolan Retail', status: 'active', monthlyValue: 3200, since: at(120), renewal: '', notes: '' },
+        { id: 'sc3', entity: 'onemedia', name: 'Aer Retail', status: 'prospect', monthlyValue: 0, since: at(20), renewal: '', notes: '' },
+      ],
+      deals: [
+        { id: 'sd1', entity: 'consulting', name: 'Kavanagh expansion', clientId: 'sc1', stage: 'proposal', value: 48_000, probability: 60, expectedClose: addDays(today, 24), nextStep: 'Chase the signature', moved: at(3), notes: '' },
+        { id: 'sd2', entity: 'consulting', name: 'Byrne Motors retainer', clientId: '', stage: 'qualified', value: 24_000, probability: 30, expectedClose: addDays(today, 45), nextStep: '', moved: at(31), notes: '' },
+        { id: 'sd3', entity: 'onemedia', name: 'Aer sponsorship', clientId: 'sc3', stage: 'lead', value: 15_000, probability: 10, expectedClose: '', nextStep: 'Send the deck', moved: at(2), notes: '' },
+        { id: 'sd4', entity: 'consulting', name: 'Doyle Group', clientId: '', stage: 'won', value: 36_000, probability: 100, expectedClose: at(14), nextStep: '', moved: at(14), notes: '' },
+        { id: 'sd5', entity: 'consulting', name: 'Hartley', clientId: '', stage: 'lost', value: 12_000, probability: 0, expectedClose: at(30), nextStep: '', moved: at(30), notes: '' },
+      ],
+      projects: [
+        { id: 'sp1', entity: 'consulting', name: 'Sales page rebuild', clientId: '', status: 'active', due: addDays(today, 10), notes: '' },
+      ],
+      tasks: [
+        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), created: at(6), doneDate: at(3) },
+        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), created: at(6), doneDate: '' },
+        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, created: at(2), doneDate: '' },
+        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', created: at(9), doneDate: '' },
+      ],
+      bills: [
+        { id: 'sx1', label: 'Office rent', amount: 4200, cadence: 'monthly', nextDue: addDays(today, 3), purse: 'consulting', category: 'Premises' },
+        { id: 'sx2', label: 'Payroll', amount: 31_000, cadence: 'monthly', nextDue: addDays(today, 9), purse: 'consulting', category: 'People' },
+        { id: 'sx3', label: 'Software', amount: 1800, cadence: 'annual', nextDue: addDays(today, 120), purse: 'consulting', category: 'Tooling' },
+        { id: 'sx4', label: 'Mortgage', amount: 2100, cadence: 'monthly', nextDue: addDays(today, 12), purse: 'personal', category: 'Property' },
+      ],
+      holdings: [
+        { id: 'sh1', kind: 'asset', label: 'House', value: 640_000, category: 'Property', liquid: false, updated: at(30) },
+        { id: 'sh2', kind: 'asset', label: 'Index funds', value: 88_000, category: 'Investments', liquid: true, updated: at(4) },
+        { id: 'sh3', kind: 'asset', label: 'Cash', value: 42_000, category: 'Cash', liquid: true, updated: at(1) },
+        { id: 'sh4', kind: 'liability', label: 'Mortgage', value: 310_000, category: 'Mortgage', liquid: false, updated: at(30) },
+        { id: 'sh5', kind: 'liability', label: 'Tax owed', value: 54_000, category: 'Tax owed', liquid: false, updated: at(8) },
+      ],
+      invoices: [
+        { id: 'si1', entity: 'consulting', clientId: 'sc1', reference: 'INV-041', amount: 9500, issued: at(52), due: at(22), status: 'sent', paidDate: '' },
+        { id: 'si2', entity: 'consulting', clientId: 'sc2', reference: 'INV-042', amount: 3200, issued: at(20), due: addDays(today, 10), status: 'sent', paidDate: '' },
+        { id: 'si3', entity: 'consulting', clientId: 'sc1', reference: 'INV-039', amount: 9500, issued: at(80), due: at(50), status: 'paid', paidDate: at(44) },
+      ],
+      connections: [
+        { id: 'sn1', name: 'Caoimhe', role: 'Partner', why: 'The person it is all for', status: 'inner', lastContact: at(1), cadenceDays: 7, notes: '' },
+        { id: 'sn2', name: 'Richard Doyle', role: 'MD, Doyle Group', why: 'Warm intro to three retainer-sized clients', status: 'reachedOut', lastContact: at(24), cadenceDays: 14, notes: '' },
+        { id: 'sn3', name: 'Mam', role: '', why: '', status: 'inner', lastContact: at(11), cadenceDays: 7, notes: '' },
+        { id: 'sn4', name: 'Sinead Walsh', role: 'Head of Brand, Aer Retail', why: '1Media sponsorship budget holder', status: 'target', lastContact: '', cadenceDays: 30, notes: '' },
+      ],
+      ledger: [
+        { id: 'sl1', date: at(14), entity: 'consulting', kind: 'revenue', amount: 36_000, note: 'Doyle Group' },
+        { id: 'sl2', date: at(12), entity: 'consulting', kind: 'cashCollected', amount: 18_000, note: 'Doyle deposit' },
+        { id: 'sl3', date: at(44), entity: 'consulting', kind: 'cashCollected', amount: 9500, note: 'INV-039' },
+        { id: 'sl4', date: at(30), entity: 'consulting', kind: 'payout', amount: 12_000, note: 'To personal' },
+      ],
+    })
     return true
   },
+
 }
 
 export function exportJSON(): string {

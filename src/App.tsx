@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType, ReactElement, SVGProps } from 'react'
+import Alex from './screens/Alex'
 import Home from './screens/Home'
 import Today from './screens/Today'
 import Money from './screens/Money'
@@ -13,6 +14,7 @@ import Goals from './screens/Goals'
 import Work from './screens/Work'
 import Settings from './screens/Settings'
 import {
+  IconAlex,
   IconHome,
   IconLearn,
   IconLife,
@@ -33,6 +35,7 @@ import { useStore } from './lib/store'
 import { timeline } from './lib/selectors'
 
 type TabId =
+  | 'alex'
   | 'home'
   | 'today'
   | 'work'
@@ -47,6 +50,7 @@ type TabId =
   | 'settings'
 
 const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { id: 'alex', label: 'Alex', Icon: IconAlex },
   { id: 'home', label: 'Home', Icon: IconHome },
   { id: 'today', label: 'Today', Icon: IconToday },
   { id: 'work', label: 'Work', Icon: IconWork },
@@ -70,7 +74,11 @@ if (import.meta.env.DEV) {
   }
 }
 
-const SCREENS: Record<TabId, () => ReactElement> = {
+// Alex takes a navigate callback so its two day-form buttons can hand off.
+type ScreenProps = { onNavigate?: (tab: string) => void }
+
+const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
+  alex: Alex,
   home: Home,
   today: Today,
   work: Work,
@@ -86,7 +94,7 @@ const SCREENS: Record<TabId, () => ReactElement> = {
 }
 
 export default function App() {
-  const [tab, setTab] = useState<TabId>('home')
+  const [tab, setTab] = useState<TabId>('alex')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const state = useStore()
   const t = timeline(state)
@@ -151,7 +159,7 @@ export default function App() {
       </nav>
 
       <main className="scroll">
-        <Screen key={tab} />
+        <Screen key={tab} onNavigate={(next: string) => setTab(next as TabId)} />
       </main>
 
       <QuickAdd onNavigate={(next) => setTab(next as TabId)} />

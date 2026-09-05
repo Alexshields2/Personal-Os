@@ -1,10 +1,10 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 2
+export const STATE_VERSION = 4
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
-  acmrHours: number
+  consultingHours: number
   calories: number
   protein: number
   creatine: number
@@ -21,7 +21,7 @@ export interface DayMetrics {
 export type MetricKey = keyof DayMetrics
 
 export const EMPTY_METRICS: DayMetrics = {
-  acmrHours: 0,
+  consultingHours: 0,
   calories: 0,
   protein: 0,
   creatine: 0,
@@ -36,7 +36,7 @@ export const EMPTY_METRICS: DayMetrics = {
 }
 
 /** Which part of the empire a priority belongs to. */
-export type PriorityTag = 'acmr' | 'onemedia' | 'life'
+export type PriorityTag = 'consulting' | 'onemedia' | 'life'
 
 /**
  * One of the day's committed outcomes. Order is rank: the first is the day's
@@ -84,20 +84,29 @@ export interface DayEntry {
   loops: string[]
   /** Nightly question id -> answer. */
   answers: Record<string, string>
+  /**
+   * Tracker id -> value. A check stores 1 or 0, a rating 1-10, a time the
+   * minutes since midnight. Text trackers live in `trackerNotes` instead, so
+   * the streak arithmetic never has to guess at a type.
+   */
+  trackers: Record<string, number>
+  trackerNotes: Record<string, string>
+  /** The day's journal entry, in your own words. */
+  journal: string
   /** Set when the nightly scorecard is signed off. */
   closed: boolean
 }
 
-export type MoneyEntity = 'acmr' | 'onemedia'
+export type MoneyEntity = 'consulting' | 'onemedia'
 
 /**
  * `netWorth` rides the same snapshot machinery as the bank accounts but is a
  * manual figure — it takes in property, investments and anything else that
  * never touches these three accounts, so it is never summed with them.
  */
-export type AccountId = 'acmrBank' | 'onemediaBank' | 'personalBank' | 'netWorth'
+export type AccountId = 'consultingBank' | 'onemediaBank' | 'personalBank' | 'netWorth'
 
-export const BANK_ACCOUNTS: AccountId[] = ['acmrBank', 'onemediaBank', 'personalBank']
+export const BANK_ACCOUNTS: AccountId[] = ['consultingBank', 'onemediaBank', 'personalBank']
 
 export type LedgerKind = 'revenue' | 'cashCollected' | 'profit' | 'payout' | 'expense'
 
@@ -243,7 +252,7 @@ export interface Upkeep {
 }
 
 export interface Targets {
-  acmrHours: number
+  consultingHours: number
   calories: number
   protein: number
   creatine: number
@@ -378,6 +387,33 @@ export interface Invoice {
   paidDate: string
 }
 
+// ---------------------------------------------------------------- trackers
+
+export type TrackerKind = 'check' | 'number' | 'rating' | 'time' | 'text'
+
+/**
+ * Anything you want to watch that the fixed protocol doesn't cover. A habit and
+ * a metric are the same object — one is a tick, the other is a number — so they
+ * share one sheet, one streak rule and one place to edit them.
+ */
+export interface Tracker {
+  id: string
+  label: string
+  kind: TrackerKind
+  /** Number trackers only. */
+  unit: string
+  /**
+   * The line that counts as a win. A rating is out of ten; a time is minutes
+   * since midnight, so "in bed by 22:30" is 1350 with direction `atMost`.
+   */
+  target: number
+  /** Whether the target is a floor to clear or a ceiling to stay under. */
+  direction: 'atLeast' | 'atMost'
+  /** Heading it sits under in the sheet. Empty groups together at the end. */
+  group: string
+  archived: boolean
+}
+
 export type Theme = 'dark' | 'light'
 
 /**
@@ -438,6 +474,7 @@ export interface AppState {
   loops: Loop[]
   domains: DomainNode[]
   links: DomainLink[]
+  trackers: Tracker[]
   bills: Bill[]
   holdings: Holding[]
   invoices: Invoice[]

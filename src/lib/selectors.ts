@@ -45,6 +45,7 @@ import type {
   Project,
   Purse,
   Task,
+  Tracker,
   LearnItem,
   Loop,
   MoneyEntity,
@@ -62,8 +63,8 @@ import type {
  * the number — that's the protocol's own rule, not a loophole.
  */
 export function isItemDone(item: ChecklistItem, day: DayEntry, targets: AppState['targets']) {
-  if (item.id === 'acmr_hours') {
-    return day.restDay || day.metrics.acmrHours >= targets.acmrHours
+  if (item.id === 'consulting_hours') {
+    return day.restDay || day.metrics.consultingHours >= targets.consultingHours
   }
   if (item.id === 'training') return day.trained || day.restDay
   if (item.metric) {
@@ -304,7 +305,7 @@ export function entityTotals(state: AppState, entity: MoneyEntity): EntityTotals
 }
 
 export function allEntityTotals(state: AppState): EntityTotals {
-  const a = entityTotals(state, 'acmr')
+  const a = entityTotals(state, 'consulting')
   const b = entityTotals(state, 'onemedia')
   return {
     revenue: a.revenue + b.revenue,
@@ -336,7 +337,7 @@ export function accountHistory(
 }
 
 export function businessTotal(state: AppState): number {
-  return accountBalance(state, 'acmrBank') + accountBalance(state, 'onemediaBank')
+  return accountBalance(state, 'consultingBank') + accountBalance(state, 'onemediaBank')
 }
 
 export function rewardsUnlocked(state: AppState): boolean {
@@ -346,20 +347,20 @@ export function rewardsUnlocked(state: AppState): boolean {
 /** Revenue booked inside a given Monday-anchored week, per entity. */
 export function weekRevenue(state: AppState, weekStart: string) {
   const end = addDays(weekStart, 7)
-  let acmr = 0
+  let consulting = 0
   let onemedia = 0
   let cash = 0
   let profit = 0
   for (const e of state.ledger) {
     if (e.date < weekStart || e.date >= end) continue
     if (e.kind === 'revenue') {
-      if (e.entity === 'acmr') acmr += e.amount
+      if (e.entity === 'consulting') consulting += e.amount
       else onemedia += e.amount
     }
     if (e.kind === 'cashCollected') cash += e.amount
     if (e.kind === 'profit') profit += e.amount
   }
-  return { acmr, onemedia, total: acmr + onemedia, cash, profit }
+  return { consulting, onemedia, total: consulting + onemedia, cash, profit }
 }
 
 export function currentWeekStart(iso = todayISO()): string {
@@ -1534,7 +1535,7 @@ export function monthlyCost(bill: Bill): number {
 export function billBook(state: AppState, purse?: Purse, iso = todayISO()): BillBook {
   const bills = purse ? state.bills.filter((b) => b.purse === purse) : state.bills
   const monthly = bills.reduce((s, b) => s + monthlyCost(b), 0)
-  const purses: Purse[] = ['acmr', 'onemedia', 'personal']
+  const purses: Purse[] = ['consulting', 'onemedia', 'personal']
   return {
     bills,
     monthly,
@@ -1635,7 +1636,7 @@ export interface Runway {
 /** How long the cash lasts at the current outgoings. */
 export function runway(state: AppState, purse: Purse): Runway {
   const account: AccountId =
-    purse === 'acmr' ? 'acmrBank' : purse === 'onemedia' ? 'onemediaBank' : 'personalBank'
+    purse === 'consulting' ? 'consultingBank' : purse === 'onemedia' ? 'onemediaBank' : 'personalBank'
   const cash = accountBalance(state, account)
   const monthlyBurn = state.bills
     .filter((b) => b.purse === purse)
@@ -1657,65 +1658,68 @@ export function runway(state: AppState, purse: Purse): Runway {
 // stays readable however lopsided the branches are.
 
 export const NODE_W = 164
-export const NODE_H = 54
-/**
- * Distance between rings. Tight enough that a whole map fits on screen at a
- * legible zoom, wide enough that sibling boxes on the busiest ring don't touch.
- */
-const RING = 262
+export const NODE_H = 66
 
 export interface Placed {
   x: number
   y: number
 }
 
+/** Row pitch: one level of the hierarchy. */
+const ROW = 132
+/** Column pitch for adjacent leaves. */
+const COL = 190
+
 /**
- * A radial tree: the root in the middle, each depth a ring outwards, and every
- * node given an angular slice sized by how many leaves sit beneath it — so a
- * heavy branch gets the room it needs and a thin one doesn't waste any. A
- * left-to-right tree was the obvious first choice and produced a column four
- * times taller than it was wide, which fits on screen at about a third size.
+ * A top-down hierarchy: the root at the top, its domains on the row beneath,
+ * their sub-domains beneath those. Leaves take the next free column and a
+ * parent centres over the span its children ended up occupying, which is what
+ * keeps the branches from crossing however lopsided the tree gets.
+ *
+ * This replaced a radial layout. Radial looked more like a mind-map but read
+ * as a scatter — with twenty-odd nodes you could not tell what sat under what,
+ * which is the only thing the drawing is for.
  */
 export function layoutDomains(domains: DomainNode[]): Map<string, Placed> {
   const out = new Map<string, Placed>()
   const children = (id: string) => domains.filter((d) => d.parentId === id)
+  let column = 0
 
-  const leafCount = (node: DomainNode): number => {
+  const place = (node: DomainNode, depth: number): number => {
     const kids = children(node.id)
-    return kids.length === 0 ? 1 : kids.reduce((s, k) => s + leafCount(k), 0)
-  }
+    let centre: number
 
-  const place = (node: DomainNode, depth: number, from: number, to: number) => {
-    const mid = (from + to) / 2
-    const radius = depth * RING
-    out.set(node.id, {
-      // Boxes are positioned by their top-left, so centre them on the point.
-      x: node.x ?? Math.round(Math.cos(mid) * radius - NODE_W / 2),
-      y: node.y ?? Math.round(Math.sin(mid) * radius - NODE_H / 2),
-    })
-
-    const kids = children(node.id)
-    if (kids.length === 0) return
-    const total = kids.reduce((s, k) => s + leafCount(k), 0)
-    let cursor = from
-    for (const kid of kids) {
-      const span = ((to - from) * leafCount(kid)) / total
-      place(kid, depth + 1, cursor, cursor + span)
-      cursor += span
+    if (kids.length === 0) {
+      centre = column * COL
+      column++
+    } else {
+      const spans = kids.map((k) => place(k, depth + 1))
+      centre = (Math.min(...spans) + Math.max(...spans)) / 2
     }
+
+    // A hand-placed node keeps its spot; its subtree still lays out normally.
+    out.set(node.id, {
+      x: node.x ?? Math.round(centre - NODE_W / 2),
+      y: node.y ?? depth * ROW,
+    })
+    return centre
   }
 
   const roots = domains.filter((d) => d.parentId === '')
-  // Start at -90° so the first branch sits at the top rather than the right.
-  roots.forEach((root, i) => {
-    const span = (Math.PI * 2) / roots.length
-    place(root, 0, -Math.PI / 2 + i * span, -Math.PI / 2 + (i + 1) * span)
-  })
+  for (const root of roots) {
+    place(root, 0)
+    // A gap between separate trees, so two roots never read as one.
+    column += 1
+  }
 
   let stray = 0
   for (const node of domains) {
     if (!out.has(node.id)) {
-      out.set(node.id, { x: node.x ?? -600, y: node.y ?? stray++ * (NODE_H + 20) })
+      out.set(node.id, {
+        x: node.x ?? column * COL + stray * COL,
+        y: node.y ?? ROW,
+      })
+      stray++
     }
   }
   return out
@@ -1730,5 +1734,210 @@ export function boardBounds(placed: Map<string, Placed>) {
     minY: Math.min(...points.map((p) => p.y)),
     maxX: Math.max(...points.map((p) => p.x)) + NODE_W,
     maxY: Math.max(...points.map((p) => p.y)) + NODE_H,
+  }
+}
+
+/**
+ * A per-day score for every node over the window, oldest first — the series the
+ * board draws inside each card. Computed in one bottom-up pass rather than by
+ * re-scoring the tree once per day, which at 23 nodes × 28 days would be a walk
+ * per cell.
+ */
+export function domainSeries(
+  state: AppState,
+  iso = todayISO(),
+  window = 28,
+): Map<string, number[]> {
+  const dates: string[] = []
+  for (let i = window - 1; i >= 0; i--) dates.push(addDays(iso, -i))
+  const days = dates.map((d) => state.days[d]).filter(isLogged)
+  const out = new Map<string, number[]>()
+  if (days.length === 0) return out
+
+  const ownDay = (node: DomainNode, day: DayEntry): number | null => {
+    const parts: number[] = []
+    for (const id of node.checkIds) {
+      const item = CHECKLIST.find((c) => c.id === id)
+      if (item) parts.push(isItemDone(item, day, state.targets) ? 100 : 0)
+    }
+    for (const key of node.metricKeys) {
+      const spec = METRIC_BY_KEY[key]
+      const target = state.targets[key as keyof AppState['targets']] as number
+      if (!spec || !target) continue
+      const v = day.metrics[key]
+      const ratio = spec.invert ? (v <= target ? 1 : target / Math.max(v, 1)) : Math.min(1, v / target)
+      parts.push(ratio * 100)
+    }
+    return parts.length ? parts.reduce((a, b) => a + b, 0) / parts.length : null
+  }
+
+  const resolve = (node: DomainNode): number[] | null => {
+    const kids = state.domains.filter((d) => d.parentId === node.id)
+    const kidSeries = kids.map(resolve).filter((s): s is number[] => s !== null)
+
+    const mine = days.map((d) => ownDay(node, d))
+    const hasOwn = mine.some((v) => v !== null)
+
+    let series: number[] | null = null
+    if (hasOwn) {
+      series = mine.map((v) => v ?? 0)
+    } else if (kidSeries.length) {
+      series = days.map(
+        (_, i) => kidSeries.reduce((s, k) => s + (k[i] ?? 0), 0) / kidSeries.length,
+      )
+    }
+    if (series) out.set(node.id, series)
+    return series
+  }
+
+  for (const root of state.domains.filter((d) => d.parentId === '')) resolve(root)
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Trackers
+//
+// A habit and a metric are the same object here — one is a tick, the other a
+// number — so they share a streak rule: a day counts when the value clears its
+// target, whichever direction the target points.
+
+export interface TrackerStat {
+  tracker: Tracker
+  /** Today's value, 0 when nothing is logged. */
+  value: number
+  hit: boolean
+  /** Consecutive days up to `iso` where the target was met. */
+  streak: number
+  /** Share of logged days in the window that met it. */
+  rate: number
+  days: number
+  /** Values over the window, oldest first, for the sparkline. */
+  series: number[]
+  /** Mean of the logged values. Meaningless for a check, so null there. */
+  average: number | null
+}
+
+/**
+ * Whether a value counts as a win.
+ *
+ * Ceilings are the awkward case, because zero means two different things. For
+ * "no lies today" zero *is* the win, so the day only has to have been logged.
+ * For "in bed by 22:30" zero means the time was never entered — treating that
+ * as a win gave every unfilled time tracker a perfect record. So a ceiling
+ * above zero demands a real value, and a ceiling of zero demands a logged day.
+ *
+ * A floor of zero means no target at all: cash collected is worth recording
+ * whatever the figure, so anything above zero counts.
+ */
+export function trackerHit(tracker: Tracker, value: number, logged: boolean): boolean {
+  // Text has nothing to clear, so it is never a hit or a miss — only written.
+  if (tracker.kind === 'text') return false
+  if (tracker.kind === 'check') return value > 0
+  if (tracker.direction === 'atMost') {
+    return tracker.target === 0 ? logged && value === 0 : value > 0 && value <= tracker.target
+  }
+  if (tracker.target <= 0) return value > 0
+  return value >= tracker.target
+}
+
+export function trackerStats(state: AppState, iso = todayISO(), window = 30): TrackerStat[] {
+  const dates: string[] = []
+  for (let i = window - 1; i >= 0; i--) dates.push(addDays(iso, -i))
+
+  return state.trackers
+    .filter((t) => !t.archived)
+    .map((tracker) => {
+      const logged = dates.filter((d) => isLogged(state.days[d]))
+      const valueOn = (date: string) => state.days[date]?.trackers?.[tracker.id] ?? 0
+      const loggedOn = (date: string) => isLogged(state.days[date])
+      const hitOn = (date: string) => trackerHit(tracker, valueOn(date), loggedOn(date))
+
+      let streak = 0
+      let cursor = iso
+      // Today only breaks a streak once it's closed — mid-morning shouldn't zero it.
+      if (!hitOn(cursor)) {
+        if (state.days[cursor]?.closed) {
+          streak = 0
+          cursor = ''
+        } else {
+          cursor = addDays(cursor, -1)
+        }
+      }
+      while (cursor && hitOn(cursor)) {
+        streak++
+        cursor = addDays(cursor, -1)
+      }
+
+      const hits = logged.filter(hitOn).length
+      const numbers = logged.map(valueOn).filter((v) => v > 0)
+
+      return {
+        tracker,
+        value: valueOn(iso),
+        hit: hitOn(iso),
+        streak,
+        rate: logged.length ? (hits / logged.length) * 100 : 0,
+        days: logged.length,
+        series: dates.map(valueOn),
+        average:
+          tracker.kind === 'number' && numbers.length
+            ? numbers.reduce((a, b) => a + b, 0) / numbers.length
+            : null,
+      }
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Revenue, year to date
+
+export interface YearToDate {
+  year: string
+  revenue: number
+  cashCollected: number
+  profit: number
+  payout: number
+  /** Revenue by month, January first, for the chart. */
+  monthly: number[]
+  /** Same months, cash actually collected. */
+  monthlyCash: number[]
+  bestMonth: { month: number; amount: number } | null
+}
+
+/**
+ * This calendar year's money for one business, or both. Revenue and cash are
+ * kept apart on purpose: invoicing a number and banking it are different events
+ * and confusing them is how a good year runs out of money.
+ */
+export function yearToDate(state: AppState, entity?: MoneyEntity, iso = todayISO()): YearToDate {
+  const year = iso.slice(0, 4)
+  const rows = state.ledger.filter(
+    (e) => e.date.startsWith(year) && (!entity || e.entity === entity),
+  )
+  const sum = (kind: LedgerKind) =>
+    rows.filter((e) => e.kind === kind).reduce((s, e) => s + e.amount, 0)
+
+  const monthly = Array.from({ length: 12 }, () => 0)
+  const monthlyCash = Array.from({ length: 12 }, () => 0)
+  for (const e of rows) {
+    const m = Number(e.date.slice(5, 7)) - 1
+    if (m < 0 || m > 11) continue
+    if (e.kind === 'revenue') monthly[m] += e.amount
+    if (e.kind === 'cashCollected') monthlyCash[m] += e.amount
+  }
+
+  const best = monthly.reduce(
+    (acc, amount, month) => (amount > (acc?.amount ?? 0) ? { month, amount } : acc),
+    null as { month: number; amount: number } | null,
+  )
+
+  return {
+    year,
+    revenue: sum('revenue'),
+    cashCollected: sum('cashCollected'),
+    profit: sum('profit'),
+    payout: sum('payout'),
+    monthly,
+    monthlyCash,
+    bestMonth: best,
   }
 }

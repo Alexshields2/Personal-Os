@@ -160,14 +160,14 @@ export default function Review() {
         </div>
       </Card>
 
-      <SectionTitle title="ACMR" />
+      <SectionTitle title="Consulting.ie" />
       <Card className="card-pad">
         <div className="grid-2" style={{ marginBottom: 6 }}>
           <Stat label="Revenue" value={euro(money.total)} sub="From the ledger" />
           <Stat label="Cash collected" value={euro(money.cash)} sub="From the ledger" />
         </div>
         <div className="grid-2" style={{ marginTop: 12 }}>
-          <Stat label="ACMR" value={euro(money.acmr)} />
+          <Stat label="Consulting.ie" value={euro(money.consulting)} />
           <Stat label="1Media" value={euro(money.onemedia)} />
         </div>
         <div className="grid-2" style={{ marginTop: 14 }}>
@@ -233,7 +233,7 @@ export default function Review() {
         </div>
         <div className="rows" style={{ marginTop: 12 }}>
           <ToggleRow
-            label="Proper time with Bella / family"
+            label="Proper time with Caoimhe / family"
             on={week.familyTime}
             onToggle={() => set({ familyTime: !week.familyTime })}
           />

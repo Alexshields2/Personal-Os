@@ -27,7 +27,7 @@
 
   /* Categorical series. Separated by luminance, and always paired with a dash
      pattern and a label — luminance alone is not enough to carry a series. */
-  --series-acmr: #ffffff;
+  --series-consulting: #ffffff;
   --series-1media: #9b9b9b;
   --series-personal: #5d5d5d;
 
@@ -39,10 +39,13 @@
   --seq-5: #ffffff;
   --seq-track: rgba(255, 255, 255, 0.07);
 
-  /* Status. In a monochrome system attention *is* contrast: what needs looking
-     at goes bright, what is fine recedes. Every use still ships with an icon
-     and a label, which is what actually carries the meaning. */
+  /* Status. Attention is contrast: what needs looking at goes bright, what is
+     fine recedes. The one exception is --won: a single green, reserved for
+     "you hit it". Because it is the only hue in the whole app, it needs no
+     legend — anything green is a win and nothing else ever is. */
   --good: #8a8a8a;
+  --won: #30d158;
+  --won-dim: rgba(48, 209, 88, 0.16);
   --warning: #ffffff;
   --critical: #ffffff;
 
@@ -88,7 +91,7 @@
   --accent-dim: rgba(0, 0, 0, 0.08);
   --on-accent: #ffffff;
 
-  --series-acmr: #000000;
+  --series-consulting: #000000;
   --series-1media: #707070;
   --series-personal: #a6a6a6;
 
@@ -100,6 +103,8 @@
   --seq-track: rgba(0, 0, 0, 0.06);
 
   --good: #6e6e6e;
+  --won: #1d8f38;
+  --won-dim: rgba(29, 143, 56, 0.14);
   --warning: #000000;
   --critical: #000000;
 
@@ -1590,4 +1595,203 @@ kbd {
 
 .board-node[data-root='true'] .board-node-bar i {
   background: var(--on-accent);
+}
+
+/* The briefing's lead finding — the one thing worth reading first */
+.brief-headline {
+  border-color: var(--hairline-strong);
+  background: var(--surface-2);
+}
+
+.board-node-spark {
+  width: 100%;
+  height: 16px;
+  display: block;
+  color: var(--text-primary);
+  overflow: visible;
+}
+
+.board-node[data-root='true'] .board-node-spark {
+  color: var(--on-accent);
+}
+
+/* The two forms the whole system runs on */
+.dayforms {
+  margin-bottom: 14px;
+}
+
+.dayform {
+  display: grid;
+  gap: 3px;
+  padding: 15px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: var(--surface-1);
+  text-align: left;
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease);
+}
+
+.dayform:hover {
+  background: var(--surface-2);
+}
+
+/* Whichever one is due right now leads; the other stays available but quiet. */
+.dayform-lead {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+
+.dayform-lead:hover {
+  background: var(--accent);
+  opacity: 0.9;
+}
+
+.dayform-cap {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.dayform-lead .dayform-cap,
+.dayform-lead .dayform-sub {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme='light'] .dayform-lead .dayform-cap,
+:root[data-theme='light'] .dayform-lead .dayform-sub {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.dayform-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+}
+
+.dayform-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* =========================================================================
+   The nightly sheet
+   ========================================================================= */
+
+.sheet-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.tk-group {
+  padding: 11px 15px 5px;
+  border-top: 1px solid var(--hairline);
+}
+
+.sheet-grid > .tk-group:first-child {
+  border-top: none;
+}
+
+.tk-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 15px;
+  border-top: 1px solid var(--hairline);
+}
+
+.tk-main {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.tk-label {
+  font-size: 15px;
+  letter-spacing: -0.011em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tk-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A win, and the only place a hue appears in the whole app. */
+.tk-row[data-won='true'] .tk-label {
+  color: var(--won);
+}
+
+.tk-row[data-won='true'] .tk-streak {
+  color: var(--won);
+  border-color: var(--won);
+  background: var(--won-dim);
+}
+
+.tk-streak {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.tk-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+/* Rating 1-10, sized to stay tappable on a phone */
+.rating {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 3px;
+  width: 100%;
+}
+
+.rating button {
+  height: 34px;
+  border-radius: 8px;
+  background: var(--fill-soft);
+  border: 1px solid var(--hairline);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.rating button[aria-pressed='true'] {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--on-accent);
+}
+
+.rating button[data-won='true'][aria-pressed='true'] {
+  background: var(--won);
+  color: #04140a;
+}
+
+/* Won states across the app */
+.pill-won {
+  background: var(--won-dim);
+  border-color: var(--won);
+  color: var(--won);
+}
+
+.meter-won > i,
+.meter-won .meter-fill {
+  background: var(--won) !important;
 }

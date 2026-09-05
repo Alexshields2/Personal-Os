@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IconPlus } from './icons'
 import { actions, useStore } from '../lib/store'
-import { NODE_H, NODE_W, boardBounds, domainScores, layoutDomains } from '../lib/selectors'
+import {
+  NODE_H,
+  NODE_W,
+  boardBounds,
+  domainScores,
+  domainSeries,
+  layoutDomains,
+} from '../lib/selectors'
 import type { Placed } from '../lib/selectors'
 
 const MIN_ZOOM = 0.3
@@ -33,6 +40,7 @@ export default function Board({
   const drag = useRef<{ id: string | null; dx: number; dy: number; moved: boolean } | null>(null)
 
   const scores = useMemo(() => domainScores(state), [state])
+  const series = useMemo(() => domainSeries(state), [state])
   const placed = useMemo(() => layoutDomains(state.domains), [state.domains])
 
   const fit = useCallback(() => {
@@ -270,9 +278,7 @@ export default function Board({
                   {kids > 0 && <span>{kids} under</span>}
                   {s && s.loopHits > 0 && <span>{s.loopHits} loops</span>}
                 </div>
-                <div className="board-node-bar">
-                  <i style={{ width: `${s?.score ?? 0}%` }} />
-                </div>
+                <NodeSpark values={series.get(node.id)} score={s?.score ?? null} />
               </div>
             )
           })}
@@ -301,4 +307,42 @@ function curve(from: Placed, to: Placed): string {
   const cx = (x1 + x2) / 2 + (y2 - y1) * 0.08
   const cy = (y1 + y2) / 2 - (x2 - x1) * 0.08
   return `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`
+}
+
+/**
+ * The branch's own trend, drawn inside the card. The number tells you where a
+ * branch is; the line tells you which way it is going, which is the half you
+ * cannot get from a score alone.
+ */
+function NodeSpark({ values, score }: { values: number[] | undefined; score: number | null }) {
+  // Under three points there is no shape to read, so fall back to the bar.
+  if (!values || values.length < 3) {
+    return (
+      <div className="board-node-bar">
+        <i style={{ width: `${score ?? 0}%` }} />
+      </div>
+    )
+  }
+  const w = 100
+  const h = 16
+  const max = Math.max(100, ...values)
+  const d = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w
+      const y = h - (v / max) * h
+      return `${i ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+  return (
+    <svg className="board-node-spark" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      <path d={`${d} L${w},${h} L0,${h} Z`} fill="currentColor" opacity="0.16" />
+      <path
+        d={d}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  )
 }

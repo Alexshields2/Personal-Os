@@ -157,3 +157,11 @@ export const IconHome = (p: P) => (
     <path d="M9.8 20.4v-5.2h4.4v5.2" />
   </svg>
 )
+
+export const IconAlex = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="12" cy="12" r="3.1" />
+    <path d="M12 3.2v3.4M12 17.4v3.4M3.2 12h3.4M17.4 12h3.4" />
+    <path d="M5.8 5.8l2.4 2.4M15.8 15.8l2.4 2.4M18.2 5.8l-2.4 2.4M8.2 15.8l-2.4 2.4" />
+  </svg>
+)

@@ -12,6 +12,7 @@ import {
   TextField,
 } from '../components/ui'
 import { Sparkline } from '../components/charts'
+import TrackerSheet from '../components/TrackerSheet'
 import { IconChevron, IconFlame, IconPlus, IconTrash } from '../components/icons'
 import {
   CHECKLIST,
@@ -29,6 +30,7 @@ import {
 } from '../lib/config'
 import type { ChecklistItem, PillarId } from '../lib/config'
 import { addDays, blockHours, dayNumber, formatLong, fromISO, todayISO } from '../lib/date'
+import { dayIntent } from '../lib/nav'
 import { num } from '../lib/format'
 import { actions, emptyDay, emptySlots, useStore } from '../lib/store'
 import { currentStreak, isItemDone, isLogged, planStatus, scoreDay } from '../lib/selectors'
@@ -45,7 +47,10 @@ type View = 'plan' | 'log' | 'review'
 export default function Today() {
   const state = useStore()
   const [date, setDate] = useState(todayISO())
-  const [view, setView] = useState<View>(() => (new Date().getHours() < 12 ? 'plan' : 'log'))
+  // An explicit hand-off from Home or Alex wins; otherwise the hour decides.
+  const [view, setView] = useState<View>(
+    () => dayIntent.take() ?? (new Date().getHours() < 12 ? 'plan' : 'log'),
+  )
 
   const day = state.days[date] ?? emptyDay(date)
   const score = scoreDay(day, state.targets)
@@ -569,6 +574,19 @@ function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: 
     <>
       <SectionTitle title="How the plan went" />
       <PriorityCard date={date} day={day} mode="grade" />
+
+      <TrackerSheet date={date} />
+
+      <SectionTitle title="Journal" />
+      <Card className="card-pad">
+        <textarea
+          className="input"
+          style={{ minHeight: 132 }}
+          value={day.journal}
+          placeholder="The day, in your own words. Nobody else reads this."
+          onChange={(e) => actions.updateDay(date, { journal: e.target.value })}
+        />
+      </Card>
 
       <SectionTitle title="Energy" />
       <Card className="card-pad">

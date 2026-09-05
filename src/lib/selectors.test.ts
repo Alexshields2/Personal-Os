@@ -22,6 +22,8 @@ import {
   priorityRun,
   scoreDay,
   taskQueue,
+  trackerHit,
+  trackerStats,
   upkeepStatus,
   weakestStandards,
   weekdayScores,
@@ -93,7 +95,7 @@ describe('scoreDay', () => {
   it('lets a scheduled recovery day satisfy the hours and training standards', () => {
     const state = makeState()
     const rest = day('2026-01-01', {
-      metrics: { ...perfectMetrics(), acmrHours: 0 },
+      metrics: { ...perfectMetrics(), consultingHours: 0 },
       checks: { ...MANUAL_CHECKS },
       restDay: true,
     })
@@ -355,7 +357,7 @@ describe('oscillation', () => {
       const date = addDays(TODAY, -(19 - i))
       return i < 10
         ? perfectDay(date)
-        : day(date, { metrics: { ...perfectMetrics(), acmrHours: 0, steps: 0, protein: 0 } })
+        : day(date, { metrics: { ...perfectMetrics(), consultingHours: 0, steps: 0, protein: 0 } })
     })
     const osc = oscillation(makeState({ days: daysMap(days) }), TODAY)
     expect(osc.enough).toBe(true)
@@ -432,8 +434,8 @@ describe('the life map', () => {
   it('rolls loop hits up from the children', () => {
     const days = [0, 1].map((i) => day(addDays(TODAY, -i), { loops: ['l_avoid'] }))
     const scores = domainScores(makeState({ days: daysMap(days) }), TODAY)
-    // l_avoid is bound to Sales, which sits under ACMR, under Wealth.
-    expect(scores.get('acmr_sales')!.loopHits).toBe(2)
+    // l_avoid is bound to Sales, which sits under Consulting.ie, under Wealth.
+    expect(scores.get('consulting_sales')!.loopHits).toBe(2)
     expect(scores.get('wealth')!.loopHits).toBeGreaterThanOrEqual(2)
   })
 
@@ -481,11 +483,11 @@ describe('pipeline', () => {
   it('filters to one business', () => {
     const state = makeState({
       deals: [
-        deal('a', { entity: 'acmr', stage: 'lead', value: 1000, probability: 100 }),
+        deal('a', { entity: 'consulting', stage: 'lead', value: 1000, probability: 100 }),
         deal('b', { entity: 'onemedia', stage: 'lead', value: 9000, probability: 100 }),
       ],
     })
-    expect(pipeline(state, 'acmr', TODAY).value).toBe(1000)
+    expect(pipeline(state, 'consulting', TODAY).value).toBe(1000)
   })
 })
 
@@ -689,16 +691,26 @@ describe('board layout', () => {
     expect(placed.get('appearance')!.x).not.toBe(1234)
   })
 
-  it('spreads the tree around the root rather than stacking it', () => {
-    const placed = layoutDomains(makeState().domains)
+  it('puts the root on top with each level on the row beneath', () => {
+    const state = makeState()
+    const placed = layoutDomains(state.domains)
     const root = placed.get('root')!
-    const others = [...placed.entries()].filter(([id]) => id !== 'root').map(([, p]) => p)
-    // Nodes land on both sides of the root in both axes — that is what makes it
-    // a map rather than a column.
-    expect(others.some((p) => p.x > root.x)).toBe(true)
-    expect(others.some((p) => p.x < root.x)).toBe(true)
-    expect(others.some((p) => p.y > root.y)).toBe(true)
-    expect(others.some((p) => p.y < root.y)).toBe(true)
+    // Every other node sits below the root, and depth strictly increases the row.
+    for (const [id, p] of placed) {
+      if (id !== 'root') expect(p.y).toBeGreaterThan(root.y)
+    }
+    expect(placed.get('health')!.y).toBeLessThan(placed.get('body')!.y)
+    expect(placed.get('body')!.y).toBeLessThan(placed.get('training')!.y)
+  })
+
+  it('centres a parent over the children it spans', () => {
+    const placed = layoutDomains(makeState().domains)
+    const body = placed.get('body')!
+    const kids = ['training', 'nutrition', 'movement'].map((id) => placed.get(id)!)
+    const left = Math.min(...kids.map((k) => k.x))
+    const right = Math.max(...kids.map((k) => k.x))
+    expect(body.x).toBeGreaterThanOrEqual(left - 1)
+    expect(body.x).toBeLessThanOrEqual(right + 1)
   })
 
   it('bounds the whole board, including nodes in negative space', () => {
@@ -710,5 +722,66 @@ describe('board layout', () => {
       expect(p.x).toBeGreaterThanOrEqual(b.minX)
       expect(p.y).toBeGreaterThanOrEqual(b.minY)
     }
+  })
+})
+
+describe('trackers', () => {
+  const habit = (over: Partial<import('./types').Tracker> = {}) => ({
+    id: 't',
+    label: 'Test',
+    kind: 'check' as const,
+    unit: '',
+    target: 1,
+    direction: 'atLeast' as const,
+    group: '',
+    archived: false,
+    ...over,
+  })
+
+  it('lets a ceiling of zero be won on a logged day', () => {
+    // Regression: "no lies today" was impossible to hit, because a ceiling
+    // demanded a value above zero to distinguish it from an unlogged day.
+    const t = habit({ kind: 'number', target: 0, direction: 'atMost' })
+    expect(trackerHit(t, 0, true)).toBe(true)
+    expect(trackerHit(t, 1, true)).toBe(false)
+    // An unlogged day is still not a free win.
+    expect(trackerHit(t, 0, false)).toBe(false)
+  })
+
+  it('does not credit an unentered time against its cut-off', () => {
+    // Regression: an unset time is 0, and 0 is before any cut-off, so every
+    // time tracker reported a perfect record until one was actually filled in.
+    const t = habit({ kind: 'time', target: 6 * 60, direction: 'atMost' })
+    expect(trackerHit(t, 0, true)).toBe(false)
+    expect(trackerHit(t, 5 * 60 + 30, true)).toBe(true)
+    expect(trackerHit(t, 7 * 60, true)).toBe(false)
+  })
+
+  it('treats a floor of zero as no target at all', () => {
+    const t = habit({ kind: 'number', target: 0, direction: 'atLeast' })
+    expect(trackerHit(t, 0, true)).toBe(false)
+    expect(trackerHit(t, 250, true)).toBe(true)
+  })
+
+  it('scores a rating against its threshold', () => {
+    const t = habit({ kind: 'rating', target: 7 })
+    expect(trackerHit(t, 6, true)).toBe(false)
+    expect(trackerHit(t, 7, true)).toBe(true)
+  })
+
+  it('never scores a text tracker', () => {
+    expect(trackerHit(habit({ kind: 'text' }), 5, true)).toBe(false)
+  })
+
+  it('counts a streak and stops at the first miss', () => {
+    const t = habit({ id: 'tk', kind: 'check' })
+    const days = [0, 1, 2, 4].map((i) =>
+      day(addDays(TODAY, -i), { trackers: { tk: i === 4 ? 1 : 1 } }),
+    )
+    // Day 3 back is missing entirely, which breaks the run.
+    const state = makeState({ trackers: [t], days: daysMap(days) })
+    const stat = trackerStats(state, TODAY)[0]
+    expect(stat.streak).toBe(3)
+    expect(stat.hit).toBe(true)
   })
 })

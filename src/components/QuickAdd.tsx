@@ -50,7 +50,7 @@ function QuickAddSheet({
   const state = useStore()
   const [kind, setKind] = useState<Kind>('task')
   const [text, setText] = useState('')
-  const [tag, setTag] = useState<Priority['tag']>('acmr')
+  const [tag, setTag] = useState<Priority['tag']>('consulting')
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -124,7 +124,7 @@ function QuickAddSheet({
         ...state.deals,
         {
           id: uid(),
-          entity: (tag === 'life' ? 'acmr' : tag) as MoneyEntity,
+          entity: (tag === 'life' ? 'consulting' : tag) as MoneyEntity,
           name: value,
           clientId: '',
           stage: 'lead',
@@ -173,7 +173,7 @@ function QuickAddSheet({
         {kind !== 'goal' && kind !== 'person' && (
           <Field label="Belongs to">
             <Segmented
-              value={tag === 'life' && kind === 'deal' ? 'acmr' : tag}
+              value={tag === 'life' && kind === 'deal' ? 'consulting' : tag}
               onChange={setTag}
               options={PRIORITY_TAGS.filter((t) => !(kind === 'deal' && t.id === 'life')).map(
                 (t) => ({ value: t.id, label: t.label }),

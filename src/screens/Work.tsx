@@ -107,7 +107,7 @@ function Tasks() {
   const state = useStore()
   const queue = useMemo(() => taskQueue(state), [state])
   const [title, setTitle] = useState('')
-  const [tag, setTag] = useState<Priority['tag']>('acmr')
+  const [tag, setTag] = useState<Priority['tag']>('consulting')
   const [showDone, setShowDone] = useState(false)
 
   const add = () => {
@@ -236,7 +236,7 @@ function TaskRow({ task }: { task: Task }) {
           {task.title}
         </span>
         <span className="row-sub" style={late ? { color: 'var(--warning)' } : undefined}>
-          {task.entity === 'acmr' ? 'ACMR' : task.entity === 'onemedia' ? '1Media' : 'Life'}
+          {task.entity === 'consulting' ? 'Consulting.ie' : task.entity === 'onemedia' ? '1Media' : 'Life'}
           {project && ` · ${project.name}`}
           {task.due && ` · ${late ? 'was due' : 'due'} ${formatShort(task.due)}`}
         </span>
@@ -297,7 +297,7 @@ function Projects() {
                       {p.name}
                     </span>
                     <span className="row-sub">
-                      {p.entity === 'acmr' ? 'ACMR' : p.entity === 'onemedia' ? '1Media' : 'Life'}
+                      {p.entity === 'consulting' ? 'Consulting.ie' : p.entity === 'onemedia' ? '1Media' : 'Life'}
                       {client && ` · ${client.name}`} · {PROJECT_STATUS_LABEL[p.status]}
                       {prog && prog.total > 0 && ` · ${prog.done}/${prog.total} tasks`}
                       {p.due && ` · due ${formatShort(p.due)}`}
@@ -324,7 +324,7 @@ function Projects() {
 function ProjectSheet({ onClose }: { onClose: () => void }) {
   const state = useStore()
   const [name, setName] = useState('')
-  const [entity, setEntity] = useState<Priority['tag']>('acmr')
+  const [entity, setEntity] = useState<Priority['tag']>('consulting')
   const [clientId, setClientId] = useState('')
   const [due, setDue] = useState('')
 
@@ -574,7 +574,7 @@ function Clients() {
 function ClientSheet({ onClose }: { onClose: () => void }) {
   const state = useStore()
   const [name, setName] = useState('')
-  const [entity, setEntity] = useState<MoneyEntity>('acmr')
+  const [entity, setEntity] = useState<MoneyEntity>('consulting')
   const [monthlyValue, setMonthly] = useState(0)
   const [status, setStatus] = useState<ClientStatus>('active')
 
@@ -605,7 +605,7 @@ function ClientSheet({ onClose }: { onClose: () => void }) {
             value={entity}
             onChange={setEntity}
             options={[
-              { value: 'acmr', label: 'ACMR' },
+              { value: 'consulting', label: 'Consulting.ie' },
               { value: 'onemedia', label: '1Media' },
             ]}
           />
@@ -708,7 +708,7 @@ function PipelineView() {
           onChange={setEntity}
           options={[
             { value: 'all', label: 'Both' },
-            { value: 'acmr', label: 'ACMR' },
+            { value: 'consulting', label: 'Consulting.ie' },
             { value: 'onemedia', label: '1Media' },
           ]}
         />
@@ -800,7 +800,7 @@ function PipelineView() {
 function DealSheet({ onClose }: { onClose: () => void }) {
   const state = useStore()
   const [name, setName] = useState('')
-  const [entity, setEntity] = useState<MoneyEntity>('acmr')
+  const [entity, setEntity] = useState<MoneyEntity>('consulting')
   const [value, setValue] = useState(0)
   const [stage, setStage] = useState<DealStage>('lead')
   const [expectedClose, setClose] = useState('')
@@ -835,7 +835,7 @@ function DealSheet({ onClose }: { onClose: () => void }) {
             value={entity}
             onChange={setEntity}
             options={[
-              { value: 'acmr', label: 'ACMR' },
+              { value: 'consulting', label: 'Consulting.ie' },
               { value: 'onemedia', label: '1Media' },
             ]}
           />

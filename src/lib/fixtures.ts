@@ -43,6 +43,9 @@ export function day(date: string, over: Partial<DayEntry> = {}): DayEntry {
     lesson: '',
     loops: [],
     answers: {},
+    trackers: {},
+    trackerNotes: {},
+    journal: '',
     // Closed is what makes `isLogged` true without inventing metric values.
     closed: true,
     ...over,
@@ -52,7 +55,7 @@ export function day(date: string, over: Partial<DayEntry> = {}): DayEntry {
 /** A day that hits every target — the top of the scoring range. */
 export function perfectMetrics(): DayMetrics {
   return {
-    acmrHours: 10,
+    consultingHours: 10,
     calories: 3000,
     protein: 180,
     creatine: 5,
@@ -69,14 +72,14 @@ export function perfectMetrics(): DayMetrics {
 }
 
 export function priority(id: string, over: Partial<Priority> = {}): Priority {
-  return { id, text: `task ${id}`, done: false, tag: 'acmr', ...over }
+  return { id, text: `task ${id}`, done: false, tag: 'consulting', ...over }
 }
 
 export function task(id: string, over: Partial<Task> = {}): Task {
   return {
     id,
     projectId: '',
-    entity: 'acmr',
+    entity: 'consulting',
     title: `task ${id}`,
     done: false,
     due: '',
@@ -89,7 +92,7 @@ export function task(id: string, over: Partial<Task> = {}): Task {
 export function deal(id: string, over: Partial<Deal> = {}): Deal {
   return {
     id,
-    entity: 'acmr',
+    entity: 'consulting',
     name: `deal ${id}`,
     clientId: '',
     stage: 'lead',
@@ -106,7 +109,7 @@ export function deal(id: string, over: Partial<Deal> = {}): Deal {
 export function client(id: string, over: Partial<Client> = {}): Client {
   return {
     id,
-    entity: 'acmr',
+    entity: 'consulting',
     name: `client ${id}`,
     status: 'active',
     monthlyValue: 1000,
@@ -150,7 +153,7 @@ export function ledger(id: string, over: Partial<LedgerEntry> = {}): LedgerEntry
   return {
     id,
     date: '2026-01-01',
-    entity: 'acmr',
+    entity: 'consulting',
     kind: 'revenue',
     amount: 1000,
     note: '',
@@ -182,6 +185,7 @@ export function makeState(over: Partial<AppState> = {}): AppState {
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    trackers: [],
     bills: [],
     holdings: [],
     invoices: [],

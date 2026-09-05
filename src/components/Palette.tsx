@@ -66,7 +66,7 @@ export default function Palette({
     actions.addTask({
       id: uid(),
       projectId: '',
-      entity: 'acmr',
+      entity: 'consulting',
       title: query.trim(),
       done: false,
       due: '',

@@ -1,5 +1,6 @@
 import type {
   BillCadence,
+  Tracker,
   DealStage,
   Goal,
   GoalHorizon,
@@ -15,7 +16,7 @@ import type {
 export const PROTOCOL_DAYS = 126
 
 export const DEFAULT_TARGETS: Targets = {
-  acmrHours: 10,
+  consultingHours: 10,
   calories: 3000,
   protein: 180,
   creatine: 5,
@@ -58,11 +59,11 @@ export interface ChecklistItem {
 export const CHECKLIST: ChecklistItem[] = [
   // Business — 30
   {
-    id: 'acmr_hours',
+    id: 'consulting_hours',
     label: '10 hours in office',
     pillar: 'business',
     points: 14,
-    metric: 'acmrHours',
+    metric: 'consultingHours',
     hint: 'or recovery day',
   },
   { id: 'measurable', label: 'Measurable progress produced', pillar: 'business', points: 6 },
@@ -135,7 +136,7 @@ export interface MetricSpec {
 }
 
 export const METRICS: MetricSpec[] = [
-  { key: 'acmrHours', label: 'ACMR hours', unit: 'h', step: 0.5, dp: 1 },
+  { key: 'consultingHours', label: 'Consulting.ie hours', unit: 'h', step: 0.5, dp: 1 },
   { key: 'calories', label: 'Calories', unit: 'kcal', step: 50, dp: 0 },
   { key: 'protein', label: 'Protein', unit: 'g', step: 10, dp: 0 },
   { key: 'creatine', label: 'Creatine', unit: 'g', step: 1, dp: 0 },
@@ -175,11 +176,11 @@ export interface CompoundSpec {
 
 export const COMPOUNDING: CompoundSpec[] = [
   {
-    id: 'acmr',
-    label: 'ACMR hours',
+    id: 'consulting',
+    label: 'Consulting.ie hours',
     unit: 'h',
     target: 1080,
-    source: { type: 'metric', key: 'acmrHours' },
+    source: { type: 'metric', key: 'consultingHours' },
     note: '10h × 6 days × 18 weeks',
   },
   { id: 'workouts', label: 'Workouts', unit: '', target: 108, source: { type: 'workouts' } },
@@ -272,7 +273,7 @@ export const COMPOUNDING: CompoundSpec[] = [
 export const CLEAN_IDS = ['no_alcohol', 'no_drugs', 'no_porn', 'no_posting', 'disappeared']
 
 export const INNER_CIRCLE = [
-  'Bella',
+  'Caoimhe',
   'Mam',
   'Dad',
   'Cian',
@@ -320,12 +321,12 @@ export const MILESTONES = [
 ]
 
 export const ENTITY_LABEL: Record<string, string> = {
-  acmr: 'ACMR',
+  consulting: 'Consulting.ie',
   onemedia: '1Media',
 }
 
 export const ACCOUNT_LABEL: Record<string, string> = {
-  acmrBank: 'ACMR bank',
+  consultingBank: 'Consulting.ie bank',
   onemediaBank: '1Media bank',
   personalBank: 'Personal bank',
   netWorth: 'Net worth',
@@ -373,16 +374,16 @@ export const DEFAULT_GOALS: Goal[] = [
     parentId: '',
     horizon: 'tenYear',
     domainId: 'wealth',
-    title: '€10M in the ACMR bank',
+    title: '€10M in the Consulting.ie bank',
     note: 'The scoreboard the 1,080 hours point at',
     due: '',
     done: false,
     keyResults: [
       {
         id: 'kr1',
-        label: 'ACMR bank balance',
+        label: 'Consulting.ie bank balance',
         source: 'account',
-        ref: 'acmrBank',
+        ref: 'consultingBank',
         target: 10_000_000,
         current: 0,
         unit: '€',
@@ -438,13 +439,13 @@ export const CORE_PRIORITIES = 3
 export const MAX_PRIORITIES = 6
 
 export const PRIORITY_TAGS: { id: PriorityTag; label: string }[] = [
-  { id: 'acmr', label: 'ACMR' },
+  { id: 'consulting', label: 'Consulting.ie' },
   { id: 'onemedia', label: '1Media' },
   { id: 'life', label: 'Life' },
 ]
 
 export const PRIORITY_TAG_LABEL: Record<PriorityTag, string> = {
-  acmr: 'ACMR',
+  consulting: 'Consulting.ie',
   onemedia: '1Media',
   life: 'Life',
 }
@@ -455,8 +456,8 @@ export const PRIORITY_RANK = ['The one thing', 'Second', 'Third']
 /** Dropped in when a plan is started from scratch. Edit or delete freely. */
 export const DEFAULT_BLOCKS: { start: string; end: string; label: string; tag: PriorityTag }[] = [
   { start: '07:00', end: '09:00', label: 'Morning routine + gym', tag: 'life' },
-  { start: '09:00', end: '12:00', label: 'Deep work — the one thing', tag: 'acmr' },
-  { start: '13:00', end: '17:00', label: 'Client work + sales', tag: 'acmr' },
+  { start: '09:00', end: '12:00', label: 'Deep work — the one thing', tag: 'consulting' },
+  { start: '13:00', end: '17:00', label: 'Client work + sales', tag: 'consulting' },
   { start: '17:00', end: '19:00', label: '1Media', tag: 'onemedia' },
   { start: '21:00', end: '21:30', label: 'Shutdown + tomorrow’s plan', tag: 'life' },
 ]
@@ -591,10 +592,10 @@ export const DEFAULT_DOMAINS: DomainNode[] = [
 
   // ---- Wealth
   { id: 'wealth', parentId: 'root', label: 'Wealth', note: 'Both businesses and the capital they throw off', loopIds: [], checkIds: [], metricKeys: [] },
-  { id: 'acmr', parentId: 'wealth', label: 'ACMR', note: '', loopIds: [], checkIds: [], metricKeys: [] },
-  { id: 'acmr_sales', parentId: 'acmr', label: 'Sales', note: 'The only input that changes the top line', loopIds: ['l_avoid'], checkIds: ['sales_activity'], metricKeys: [] },
-  { id: 'acmr_delivery', parentId: 'acmr', label: 'Delivery', note: '', loopIds: [], checkIds: ['client_work', 'measurable'], metricKeys: ['acmrHours'] },
-  { id: 'acmr_team', parentId: 'acmr', label: 'Team', note: '', loopIds: [], checkIds: ['bottlenecks'], metricKeys: [] },
+  { id: 'consulting', parentId: 'wealth', label: 'Consulting.ie', note: '', loopIds: [], checkIds: [], metricKeys: [] },
+  { id: 'consulting_sales', parentId: 'consulting', label: 'Sales', note: 'The only input that changes the top line', loopIds: ['l_avoid'], checkIds: ['sales_activity'], metricKeys: [] },
+  { id: 'consulting_delivery', parentId: 'consulting', label: 'Delivery', note: '', loopIds: [], checkIds: ['client_work', 'measurable'], metricKeys: ['consultingHours'] },
+  { id: 'consulting_team', parentId: 'consulting', label: 'Team', note: '', loopIds: [], checkIds: ['bottlenecks'], metricKeys: [] },
   { id: 'onemedia', parentId: 'wealth', label: '1Media', note: '', loopIds: [], checkIds: [], metricKeys: [] },
   { id: 'capital', parentId: 'wealth', label: 'Capital', note: 'What survives if both businesses go to zero', loopIds: [], checkIds: ['no_spending'], metricKeys: [] },
 
@@ -614,10 +615,10 @@ export const DEFAULT_DOMAINS: DomainNode[] = [
 /** Cause → effect you actually believe. Editable; these are the obvious ones. */
 export const DEFAULT_LINKS: DomainLink[] = [
   { id: 'k1', fromId: 'recovery', toId: 'focus', note: 'Short sleep and the day gets reactive', weight: 3 },
-  { id: 'k2', fromId: 'focus', toId: 'acmr_sales', note: 'Reactive days are the ones with no selling in them', weight: 3 },
+  { id: 'k2', fromId: 'focus', toId: 'consulting_sales', note: 'Reactive days are the ones with no selling in them', weight: 3 },
   { id: 'k3', fromId: 'discipline', toId: 'recovery', note: 'Late nights start as something else', weight: 2 },
-  { id: 'k4', fromId: 'acmr_sales', toId: 'capital', note: '', weight: 3 },
-  { id: 'k5', fromId: 'boundaries', toId: 'acmr_delivery', note: 'Saying yes too often is what buries the week', weight: 2 },
+  { id: 'k4', fromId: 'consulting_sales', toId: 'capital', note: '', weight: 3 },
+  { id: 'k5', fromId: 'boundaries', toId: 'consulting_delivery', note: 'Saying yes too often is what buries the week', weight: 2 },
   { id: 'k6', fromId: 'training', toId: 'focus', note: '', weight: 2 },
 ]
 
@@ -668,7 +669,7 @@ export const STALE_DEAL_DAYS = 14
 // --------------------------------------------------------------- money depth
 
 export const PURSE_LABEL: Record<string, string> = {
-  acmr: 'ACMR',
+  consulting: 'Consulting.ie',
   onemedia: '1Media',
   personal: 'Personal',
 }
@@ -707,6 +708,44 @@ export const INVOICE_STATUS_LABEL: Record<string, string> = {
   paid: 'Paid',
 }
 
+// ---------------------------------------------------------------- trackers
+
+/**
+ * The nightly sheet, taken from the spreadsheet this replaced. Anything already
+ * scored by the protocol checklist — calories, sleep, water, the gym, scrolling
+ * — is deliberately absent, because logging the same number twice is how two
+ * records start disagreeing.
+ */
+export const DEFAULT_TRACKERS: Tracker[] = [
+  // Times. Stored as minutes since midnight; the two bookends of the day.
+  { id: 'tk_wake', label: 'Wake up', kind: 'time', unit: '', target: 6 * 60, direction: 'atMost', group: 'The day', archived: false },
+  { id: 'tk_bed', label: 'In bed', kind: 'time', unit: '', target: 22 * 60 + 30, direction: 'atMost', group: 'The day', archived: false },
+  { id: 'tk_shutoff', label: 'Shut off', kind: 'time', unit: '', target: 21 * 60, direction: 'atMost', group: 'The day', archived: false },
+  { id: 'tk_tech', label: 'Tech off by 22:30', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'The day', archived: false },
+
+  // Body
+  { id: 'tk_diet', label: 'Diet', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Body', archived: false },
+  { id: 'tk_sugar', label: 'No sugar or junk', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: false },
+  { id: 'tk_cold', label: 'Cold exposure', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: false },
+  { id: 'tk_workout', label: 'Workout quality', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Body', archived: false },
+
+  // Mind
+  { id: 'tk_meditation', label: 'Meditation', kind: 'number', unit: 'min', target: 10, direction: 'atLeast', group: 'Mind', archived: false },
+  { id: 'tk_focus', label: 'Focus', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Mind', archived: false },
+  { id: 'tk_wellbeing', label: 'Wellbeing', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Mind', archived: false },
+
+  // Work
+  { id: 'tk_workdone', label: 'All work completed', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: false },
+  { id: 'tk_schedule', label: 'Schedule updated', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: false },
+  { id: 'tk_cash', label: 'Cash collected today', kind: 'number', unit: '€', target: 0, direction: 'atLeast', group: 'Work', archived: false },
+  { id: 'tk_bank', label: 'Cash in bank', kind: 'number', unit: '€', target: 0, direction: 'atLeast', group: 'Work', archived: false },
+
+  // Truth. Uncomfortable on purpose — a ceiling of zero.
+  { id: 'tk_lies', label: 'Lies told today', kind: 'number', unit: '', target: 0, direction: 'atMost', group: 'Truth', archived: false },
+  { id: 'tk_con_biz', label: 'Constraint — business', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: false },
+  { id: 'tk_con_life', label: 'Constraint — personal', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: false },
+]
+
 // ------------------------------------------------------------------ sections
 
 /**
@@ -714,6 +753,7 @@ export const INVOICE_STATUS_LABEL: Record<string, string> = {
  * them as results without importing the shell.
  */
 export const SECTIONS: { id: string; label: string; blurb: string }[] = [
+  { id: 'alex', label: 'Alex', blurb: 'The overview, and what it adds up to' },
   { id: 'home', label: 'Home', blurb: 'What needs you right now' },
   { id: 'today', label: 'Today', blurb: 'Plan, log and review the day' },
   { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },
@@ -726,4 +766,19 @@ export const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: 'progress', label: 'Progress', blurb: 'The 126-day totals' },
   { id: 'review', label: 'Review', blurb: 'The Sunday page' },
   { id: 'settings', label: 'Settings', blurb: 'Targets, loops, appearance, sync' },
+]
+
+export const MONTH_LABEL = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ]

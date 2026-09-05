@@ -20,7 +20,7 @@ function bill(id: string, over: Partial<Bill> = {}): Bill {
     amount: 100,
     cadence: 'monthly',
     nextDue: '',
-    purse: 'acmr',
+    purse: 'consulting',
     category: '',
     ...over,
   }
@@ -42,7 +42,7 @@ function holding(id: string, over: Partial<Holding> = {}): Holding {
 function invoice(id: string, over: Partial<Invoice> = {}): Invoice {
   return {
     id,
-    entity: 'acmr',
+    entity: 'consulting',
     clientId: '',
     reference: id,
     amount: 1000,
@@ -65,7 +65,7 @@ describe('bills', () => {
   it('totals across cadences and splits by purse', () => {
     const state = makeState({
       bills: [
-        bill('a', { amount: 1000, purse: 'acmr' }),
+        bill('a', { amount: 1000, purse: 'consulting' }),
         bill('b', { amount: 6000, cadence: 'annual', purse: 'personal' }),
       ],
     })
@@ -90,19 +90,19 @@ describe('bills', () => {
 describe('runway', () => {
   it('divides the cash by what leaves each month', () => {
     const state = makeState({
-      balances: [{ id: 'b', date: TODAY, account: 'acmrBank', amount: 30_000 }],
-      bills: [bill('a', { amount: 10_000, purse: 'acmr' })],
+      balances: [{ id: 'b', date: TODAY, account: 'consultingBank', amount: 30_000 }],
+      bills: [bill('a', { amount: 10_000, purse: 'consulting' })],
     })
-    const r = runway(state, 'acmr')
+    const r = runway(state, 'consulting')
     expect(r.months).toBe(3)
     expect(r.known).toBe(true)
   })
 
   it('refuses to claim a runway when nothing is going out', () => {
     const state = makeState({
-      balances: [{ id: 'b', date: TODAY, account: 'acmrBank', amount: 30_000 }],
+      balances: [{ id: 'b', date: TODAY, account: 'consultingBank', amount: 30_000 }],
     })
-    const r = runway(state, 'acmr')
+    const r = runway(state, 'consulting')
     expect(r.known).toBe(false)
     expect(r.months).toBe(Infinity)
   })

@@ -15,7 +15,7 @@ import {
 import { BalanceChart } from '../components/charts'
 import type { Series } from '../components/charts'
 import { IconLock, IconPlus, IconTrash, IconUnlock } from '../components/icons'
-import { ACCOUNT_LABEL, ENTITY_LABEL, KIND_LABEL } from '../lib/config'
+import { ACCOUNT_LABEL, ENTITY_LABEL, KIND_LABEL, MONTH_LABEL } from '../lib/config'
 import { formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, pct, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
@@ -24,7 +24,9 @@ import {
   accountHistory,
   businessTotal,
   entityTotals,
+  clientBook,
   rewardsUnlocked,
+  yearToDate,
 } from '../lib/selectors'
 import { BANK_ACCOUNTS } from '../lib/types'
 import type { AccountId, LedgerKind, MoneyEntity } from '../lib/types'
@@ -37,7 +39,7 @@ import type { AccountId, LedgerKind, MoneyEntity } from '../lib/types'
  * single-series chart rather than a fourth slot that would break the set.
  */
 const SERIES_STYLE: Record<string, { color: string; dash?: string }> = {
-  acmrBank: { color: 'var(--series-acmr)' },
+  consultingBank: { color: 'var(--series-consulting)' },
   onemediaBank: { color: 'var(--series-1media)', dash: '10 7' },
   personalBank: { color: 'var(--series-personal)', dash: '2.5 6' },
 }
@@ -76,23 +78,23 @@ function Accounts() {
   const [addLedger, setAddLedger] = useState(false)
   const [addBalance, setAddBalance] = useState(false)
 
-  const acmrBank = accountBalance(state, 'acmrBank')
+  const consultingBank = accountBalance(state, 'consultingBank')
   const onemediaBank = accountBalance(state, 'onemediaBank')
   const personalBank = accountBalance(state, 'personalBank')
   const unlocked = rewardsUnlocked(state)
 
-  const acmr = entityTotals(state, 'acmr')
+  const consulting = entityTotals(state, 'consulting')
   const media = entityTotals(state, 'onemedia')
   const shown =
     entity === 'all'
       ? {
-          revenue: acmr.revenue + media.revenue,
-          cashCollected: acmr.cashCollected + media.cashCollected,
-          profit: acmr.profit + media.profit,
-          payout: acmr.payout + media.payout,
+          revenue: consulting.revenue + media.revenue,
+          cashCollected: consulting.cashCollected + media.cashCollected,
+          profit: consulting.profit + media.profit,
+          payout: consulting.payout + media.payout,
         }
-      : entity === 'acmr'
-        ? acmr
+      : entity === 'consulting'
+        ? consulting
         : media
 
   const series: Series[] = BANK_ACCOUNTS.map((a) => ({
@@ -101,6 +103,12 @@ function Accounts() {
     ...SERIES_STYLE[a],
     points: accountHistory(state, a),
   }))
+
+  const ytdAll = yearToDate(state, undefined)
+  const ytdConsulting = yearToDate(state, 'consulting')
+  const ytdMedia = yearToDate(state, 'onemedia')
+  const bookConsulting = clientBook(state, 'consulting')
+  const bookMedia = clientBook(state, 'onemedia')
 
   const netWorth = accountBalance(state, 'netWorth')
   const netWorthSeries: Series[] = [
@@ -121,23 +129,64 @@ function Accounts() {
     <>
       {/* Hero: the one number the whole protocol points at. */}
       <Card className="card-pad">
-        <div className="t-cap">ACMR in bank</div>
+        <div className="t-cap">Consulting.ie in bank</div>
         <div className="hero" style={{ margin: '8px 0 4px' }}>
-          {euroCompact(acmrBank)}
+          {euroCompact(consultingBank)}
         </div>
         <div className="t-foot" style={{ marginBottom: 12 }}>
-          {euro(acmrBank)} of {euroCompact(state.targets.bonusPool)} target ·{' '}
-          {pct(acmrBank, state.targets.bonusPool).toFixed(1)}%
+          {euro(consultingBank)} of {euroCompact(state.targets.bonusPool)} target ·{' '}
+          {pct(consultingBank, state.targets.bonusPool).toFixed(1)}%
         </div>
-        <Meter pct={pct(acmrBank, state.targets.bonusPool)} color="var(--series-acmr)" />
+        <Meter pct={pct(consultingBank, state.targets.bonusPool)} color="var(--series-consulting)" />
       </Card>
+
+      <SectionTitle title={`${ytdAll.year} so far`} />
+      <Card>
+        {[
+          { label: 'Consulting.ie', ytd: ytdConsulting, mrr: bookConsulting.mrr, clients: bookConsulting.active.length },
+          { label: '1Media', ytd: ytdMedia, mrr: bookMedia.mrr, clients: bookMedia.active.length },
+        ].map((row) => (
+          <div className="insight" key={row.label}>
+            <div className="insight-head">
+              <span className="insight-title">{row.label}</span>
+              <span className="t-num">{euroCompact(row.ytd.revenue)}</span>
+            </div>
+            <Meter
+              pct={ytdAll.revenue ? (row.ytd.revenue / ytdAll.revenue) * 100 : 0}
+            />
+            <div className="insight-body">
+              {euro(row.ytd.cashCollected)} collected · {euroCompact(row.mrr)} MRR across{' '}
+              {row.clients} client{row.clients === 1 ? '' : 's'}
+              {row.ytd.bestMonth && row.ytd.bestMonth.amount > 0 &&
+                ` · best month ${MONTH_LABEL[row.ytd.bestMonth.month]} at ${euroCompact(row.ytd.bestMonth.amount)}`}
+            </div>
+          </div>
+        ))}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            padding: 13,
+            borderTop: '1px solid var(--hairline)',
+          }}
+        >
+          <span className="t-cap">Both, year to date</span>
+          <span className="t-num">
+            {euro(ytdAll.revenue)} invoiced · {euro(ytdAll.cashCollected)} collected
+          </span>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Invoiced and collected are kept apart on purpose. Confusing the two is how a good year
+        runs out of money.
+      </p>
 
       <div className="grid-3" style={{ marginTop: 14 }}>
         <Stat label="1Media bank" value={euroCompact(onemediaBank)} sub={euro(onemediaBank)} />
         <Stat
           label="Business total"
           value={euroCompact(businessTotal(state))}
-          sub="ACMR + 1Media"
+          sub="Consulting.ie + 1Media"
         />
         <Stat label="Personal bank" value={euroCompact(personalBank)} sub={euro(personalBank)} />
         <Stat label="Net worth" value={euroCompact(netWorth)} sub={euro(netWorth)} />
@@ -231,7 +280,7 @@ function Accounts() {
           onChange={setEntity}
           options={[
             { value: 'all', label: 'Both' },
-            { value: 'acmr', label: 'ACMR' },
+            { value: 'consulting', label: 'Consulting.ie' },
             { value: 'onemedia', label: '1Media' },
           ]}
         />
@@ -259,7 +308,7 @@ function Accounts() {
                   className="dot"
                   style={{
                     background:
-                      e.entity === 'acmr' ? 'var(--series-acmr)' : 'var(--series-1media)',
+                      e.entity === 'consulting' ? 'var(--series-consulting)' : 'var(--series-1media)',
                   }}
                 />
                 <span className="row-main">
@@ -294,7 +343,7 @@ function Accounts() {
 
 function LedgerSheet({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(todayISO())
-  const [entity, setEntity] = useState<MoneyEntity>('acmr')
+  const [entity, setEntity] = useState<MoneyEntity>('consulting')
   const [kind, setKind] = useState<LedgerKind>('revenue')
   const [amount, setAmount] = useState(0)
   const [note, setNote] = useState('')
@@ -313,7 +362,7 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
           value={entity}
           onChange={setEntity}
           options={[
-            { value: 'acmr', label: 'ACMR' },
+            { value: 'consulting', label: 'Consulting.ie' },
             { value: 'onemedia', label: '1Media' },
           ]}
         />
@@ -351,7 +400,7 @@ function BalanceSheet({ onClose }: { onClose: () => void }) {
   const state = useStore()
   const [date, setDate] = useState(todayISO())
   const [values, setValues] = useState<Record<AccountId, number>>({
-    acmrBank: accountBalance(state, 'acmrBank'),
+    consultingBank: accountBalance(state, 'consultingBank'),
     onemediaBank: accountBalance(state, 'onemediaBank'),
     personalBank: accountBalance(state, 'personalBank'),
     netWorth: accountBalance(state, 'netWorth'),

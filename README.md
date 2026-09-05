@@ -121,19 +121,19 @@ Training and scheduled recovery are separate. A recovery day satisfies the
 
 **Money** tracks three things that are easy to confuse:
 
-- **Bank balances** — a point-in-time reading per account (ACMR, 1Media,
+- **Bank balances** — a point-in-time reading per account (Consulting.ie, 1Media,
   personal). The most recent reading is the current balance; the history draws
-  the curve. The €10M target is measured against the ACMR bank balance.
+  the curve. The €10M target is measured against the Consulting.ie bank balance.
 - **Net worth** — a separate manual figure covering property, investments and
   anything that never touches those three accounts. It is deliberately *not*
   the three balances added up, and gets its own chart.
 - **The ledger** — individual revenue, cash-collected, profit and payout events,
-  attributed to ACMR or 1Media.
+  attributed to Consulting.ie or 1Media.
 
 The rewards stay locked until *payout received* reaches €1M. Received, not
 invoiced, not projected.
 
-**Progress** aggregates every logged day into the 126-day totals — 1,080 ACMR
+**Progress** aggregates every logged day into the 126-day totals — 1,080 Consulting.ie
 hours, 108 workouts, a million steps, 63 hours of reading, and the rest — each
 with a pace marker showing whether you're ahead of or behind where that total
 should be by now.

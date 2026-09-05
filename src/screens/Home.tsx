@@ -176,8 +176,8 @@ export default function Home() {
                 <span className="row-main">
                   <span className="row-title">{task.title}</span>
                   <span className="row-sub">
-                    {task.entity === 'acmr'
-                      ? 'ACMR'
+                    {task.entity === 'consulting'
+                      ? 'Consulting.ie'
                       : task.entity === 'onemedia'
                         ? '1Media'
                         : 'Life'}
@@ -194,7 +194,7 @@ export default function Home() {
         <Card className="card-pad">
           <CardHead title="Money" />
           <div style={{ display: 'grid', gap: 7, marginTop: 8 }}>
-            <Line label="ACMR bank" value={euroCompact(accountBalance(state, 'acmrBank'))} />
+            <Line label="Consulting.ie bank" value={euroCompact(accountBalance(state, 'consultingBank'))} />
             <Line label="Net worth" value={euroCompact(accountBalance(state, 'netWorth'))} />
             <Line label="MRR" value={euroCompact(book.mrr)} />
           </div>
@@ -245,7 +245,7 @@ function Line({ label, value }: { label: string; value: string }) {
 /** One box for anything that turns up. It lands as a task; triage it later. */
 function Capture() {
   const [text, setText] = useState('')
-  const [tag, setTag] = useState<Priority['tag']>('acmr')
+  const [tag, setTag] = useState<Priority['tag']>('consulting')
 
   const add = () => {
     if (!text.trim()) return

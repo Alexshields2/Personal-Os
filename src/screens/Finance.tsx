@@ -67,7 +67,7 @@ function Bills() {
   const book = useMemo(() => billBook(state), [state])
   const [adding, setAdding] = useState(false)
 
-  const purses: Purse[] = ['acmr', 'onemedia', 'personal']
+  const purses: Purse[] = ['consulting', 'onemedia', 'personal']
 
   return (
     <>
@@ -244,7 +244,7 @@ function BillSheet({ onClose }: { onClose: () => void }) {
             value={purse}
             onChange={setPurse}
             options={[
-              { value: 'acmr', label: 'ACMR' },
+              { value: 'consulting', label: 'Consulting.ie' },
               { value: 'onemedia', label: '1Media' },
               { value: 'personal', label: 'Personal' },
             ]}
@@ -514,7 +514,7 @@ function Invoices() {
           onChange={setEntity}
           options={[
             { value: 'all', label: 'Both' },
-            { value: 'acmr', label: 'ACMR' },
+            { value: 'consulting', label: 'Consulting.ie' },
             { value: 'onemedia', label: '1Media' },
           ]}
         />
@@ -629,7 +629,7 @@ function InvoiceSheet({ onClose }: { onClose: () => void }) {
   const state = useStore()
   const [reference, setReference] = useState('')
   const [amount, setAmount] = useState(0)
-  const [entity, setEntity] = useState<MoneyEntity>('acmr')
+  const [entity, setEntity] = useState<MoneyEntity>('consulting')
   const [clientId, setClientId] = useState('')
   const [issued, setIssued] = useState(todayISO())
   const [due, setDue] = useState('')
@@ -666,7 +666,7 @@ function InvoiceSheet({ onClose }: { onClose: () => void }) {
             value={entity}
             onChange={setEntity}
             options={[
-              { value: 'acmr', label: 'ACMR' },
+              { value: 'consulting', label: 'Consulting.ie' },
               { value: 'onemedia', label: '1Media' },
             ]}
           />
