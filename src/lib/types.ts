@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 4
+export const STATE_VERSION = 5
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -428,6 +428,33 @@ export interface Tracker {
   archived: boolean
 }
 
+// ------------------------------------------------------------------ vision
+
+/** One picture on the board. `src` is a data URI or a plain URL. */
+export interface VisionImage {
+  id: string
+  src: string
+  caption: string
+}
+
+export interface VisionColumn {
+  id: string
+  title: string
+  /** The one-line target. The thing the column is actually for. */
+  headline: string
+  /** The written plan underneath it. */
+  body: string
+  images: VisionImage[]
+}
+
+export interface Vision {
+  title: string
+  year: number
+  /** The document at the top: the year's plan in prose. */
+  intro: string
+  columns: VisionColumn[]
+}
+
 export type Theme = 'dark' | 'light'
 
 /**
@@ -488,6 +515,7 @@ export interface AppState {
   loops: Loop[]
   domains: DomainNode[]
   links: DomainLink[]
+  vision: Vision
   trackers: Tracker[]
   bills: Bill[]
   holdings: Holding[]

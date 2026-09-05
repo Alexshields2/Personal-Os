@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType, ReactElement, SVGProps } from 'react'
 import Alex from './screens/Alex'
+import VisionBoard from './screens/VisionBoard'
 import Home from './screens/Home'
 import Today from './screens/Today'
 import Money from './screens/Money'
@@ -26,6 +27,7 @@ import {
   IconReview,
   IconSettings,
   IconToday,
+  IconVision,
   IconWork,
 } from './components/icons'
 import Palette from './components/Palette'
@@ -36,6 +38,7 @@ import { timeline } from './lib/selectors'
 
 type TabId =
   | 'alex'
+  | 'vision'
   | 'home'
   | 'today'
   | 'work'
@@ -51,6 +54,7 @@ type TabId =
 
 const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { id: 'alex', label: 'Alex', Icon: IconAlex },
+  { id: 'vision', label: 'Vision', Icon: IconVision },
   { id: 'home', label: 'Home', Icon: IconHome },
   { id: 'today', label: 'Today', Icon: IconToday },
   { id: 'work', label: 'Work', Icon: IconWork },
@@ -79,6 +83,7 @@ type ScreenProps = { onNavigate?: (tab: string) => void }
 
 const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
   alex: Alex,
+  vision: VisionBoard,
   home: Home,
   today: Today,
   work: Work,

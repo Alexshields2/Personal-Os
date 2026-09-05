@@ -10,6 +10,7 @@ import {
   DEFAULT_LEARNING,
   DEFAULT_LOOPS,
   DEFAULT_TRACKERS,
+  DEFAULT_VISION,
   DEFAULT_REWARDS,
   DEFAULT_TARGETS,
   DEFAULT_UPKEEP,
@@ -44,6 +45,8 @@ import type {
   TimeBlock,
   Tracker,
   Upkeep,
+  Vision,
+  VisionColumn,
   WeekEntry,
 } from './types'
 
@@ -68,6 +71,7 @@ function initialState(): AppState {
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    vision: { ...DEFAULT_VISION, columns: DEFAULT_VISION.columns.map((c) => ({ ...c, images: [] })) },
     trackers: DEFAULT_TRACKERS.map((t) => ({ ...t })),
     bills: [],
     holdings: [],
@@ -209,6 +213,7 @@ function hydrate(raw: string): AppState {
     loops: parsed.loops ?? base.loops,
     domains: parsed.domains ?? base.domains,
     links: parsed.links ?? base.links,
+    vision: parsed.vision ?? base.vision,
     trackers: parsed.trackers ?? base.trackers,
     bills: parsed.bills ?? [],
     holdings: parsed.holdings ?? [],
@@ -568,6 +573,48 @@ export const actions = {
     set({ ...state, links })
   },
 
+  // -------------------------------------------------------------- vision
+
+  setVision(patch: Partial<Vision>) {
+    set({ ...state, vision: { ...state.vision, ...patch } })
+  },
+
+  updateVisionColumn(id: string, patch: Partial<VisionColumn>) {
+    set({
+      ...state,
+      vision: {
+        ...state.vision,
+        columns: state.vision.columns.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      },
+    })
+  },
+
+  addVisionColumn(title: string) {
+    actions.setVision({
+      columns: [...state.vision.columns, { id: uid(), title, headline: '', body: '', images: [] }],
+    })
+  },
+
+  removeVisionColumn(id: string) {
+    actions.setVision({ columns: state.vision.columns.filter((c) => c.id !== id) })
+  },
+
+  addVisionImage(columnId: string, src: string, caption = '') {
+    const col = state.vision.columns.find((c) => c.id === columnId)
+    if (!col) return
+    actions.updateVisionColumn(columnId, {
+      images: [...col.images, { id: uid(), src, caption }],
+    })
+  },
+
+  removeVisionImage(columnId: string, imageId: string) {
+    const col = state.vision.columns.find((c) => c.id === columnId)
+    if (!col) return
+    actions.updateVisionColumn(columnId, {
+      images: col.images.filter((i) => i.id !== imageId),
+    })
+  },
+
   // ------------------------------------------------------------ trackers
 
   setTrackers(trackers: Tracker[]) {
@@ -896,6 +943,37 @@ export const actions = {
         { id: 'sn3', name: 'Mam', role: '', why: '', status: 'inner', lastContact: at(11), cadenceDays: 7, notes: '' },
         { id: 'sn4', name: 'Sinead Walsh', role: 'Head of Brand, Aer Retail', why: '1Media sponsorship budget holder', status: 'target', lastContact: '', cadenceDays: 30, notes: '' },
       ],
+      vision: {
+        ...state.vision,
+        year: new Date().getFullYear(),
+        intro:
+          'The year the business stopped depending on me being in the room, and the body stopped being the thing I put last.',
+        columns: state.vision.columns.map((c) => {
+          const filled: Record<string, { headline: string; body: string }> = {
+            v_health: {
+              headline: '95kg lean, sub-12% by December',
+              body: 'Five sessions a week, 185g protein, eight hours. Progress photos every Sunday.',
+            },
+            v_wealth: {
+              headline: '€1M cash collected in Consulting.ie',
+              body: 'Three retainers over €10k a month. No client above 30% of MRR.',
+            },
+            v_love: {
+              headline: 'Present, not just around',
+              body: 'One phone-free evening a week with Caoimhe. Two trips out of the country.',
+            },
+            v_network: {
+              headline: 'Twelve rooms I have no business being in',
+              body: 'One warm introduction a fortnight. A dinner I host every quarter.',
+            },
+            v_happiness: {
+              headline: 'A life I would not need a holiday from',
+              body: 'An office I want to walk into. Saturdays that are actually off.',
+            },
+          }
+          return { ...c, ...(filled[c.id] ?? {}) }
+        }),
+      },
       ledger: [
         { id: 'sl1', date: at(14), entity: 'consulting', kind: 'revenue', amount: 36_000, note: 'Doyle Group' },
         { id: 'sl2', date: at(12), entity: 'consulting', kind: 'cashCollected', amount: 18_000, note: 'Doyle deposit' },

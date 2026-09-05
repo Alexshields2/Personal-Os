@@ -1,6 +1,7 @@
 import type {
   BillCadence,
   Tracker,
+  Vision,
   DealStage,
   Goal,
   GoalHorizon,
@@ -718,6 +719,34 @@ export const TASK_PRIORITY_LABEL: Record<number, string> = {
 /** Quick estimates, in minutes. Anything longer belongs in a project. */
 export const ESTIMATE_STEPS = [15, 30, 45, 60, 90, 120, 180, 240]
 
+// ------------------------------------------------------------------ vision
+
+/**
+ * The year on one wall. Five columns because five is what fits across a screen
+ * and still reads — a sixth turns the whole thing into a list, which is the one
+ * thing a vision board must not be.
+ */
+export const DEFAULT_VISION: Vision = {
+  title: 'Warplan',
+  year: new Date().getFullYear(),
+  intro: '',
+  columns: [
+    { id: 'v_health', title: 'Health', headline: '', body: '', images: [] },
+    { id: 'v_wealth', title: 'Wealth', headline: '', body: '', images: [] },
+    { id: 'v_love', title: 'Love', headline: '', body: '', images: [] },
+    { id: 'v_network', title: 'Network', headline: '', body: '', images: [] },
+    { id: 'v_happiness', title: 'Happiness', headline: '', body: '', images: [] },
+  ],
+}
+
+/**
+ * Uploads are downscaled to this before being stored. A board is a dozen
+ * pictures and the whole document lives in localStorage, so a full-resolution
+ * photo would eat the quota on its own.
+ */
+export const VISION_IMAGE_MAX_PX = 640
+export const VISION_IMAGE_QUALITY = 0.72
+
 // ---------------------------------------------------------------- trackers
 
 /**
@@ -764,6 +793,7 @@ export const DEFAULT_TRACKERS: Tracker[] = [
  */
 export const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: 'alex', label: 'Alex', blurb: 'The overview, and what it adds up to' },
+  { id: 'vision', label: 'Vision', blurb: 'The year on one wall' },
   { id: 'home', label: 'Home', blurb: 'What needs you right now' },
   { id: 'today', label: 'Today', blurb: 'Plan, log and review the day' },
   { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },

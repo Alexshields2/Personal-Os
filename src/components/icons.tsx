@@ -165,3 +165,11 @@ export const IconAlex = (p: P) => (
     <path d="M5.8 5.8l2.4 2.4M15.8 15.8l2.4 2.4M18.2 5.8l-2.4 2.4M8.2 15.8l-2.4 2.4" />
   </svg>
 )
+
+export const IconVision = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="3" y="4.6" width="18" height="14.8" rx="2" />
+    <path d="M3 15.6l4.8-4.2 3.6 3.1 3.4-3.9L21 15" />
+    <circle cx="8.6" cy="8.8" r="1.4" />
+  </svg>
+)
