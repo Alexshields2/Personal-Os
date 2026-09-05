@@ -136,7 +136,17 @@ function hydrate(raw: string): AppState {
     balances: parsed.balances ?? [],
     payoutReceived: parsed.payoutReceived ?? 0,
     learning: parsed.learning ?? migrateBooks(parsed) ?? base.learning,
-    goals: parsed.goals ?? base.goals,
+    // v1 goals were a flat list with no ladder, no branch and no key results.
+    goals: (parsed.goals ?? base.goals).map((g) => {
+      const legacy = g as Partial<Goal>
+      return {
+        parentId: '',
+        horizon: 'year' as const,
+        domainId: '',
+        keyResults: [],
+        ...legacy,
+      } as Goal
+    }),
     connections: (parsed.connections ?? base.connections).map((c) => {
       // v1 connections carried only name, why and status. Reading them as
       // partial is what lets the defaults below survive the spread.

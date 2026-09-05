@@ -176,13 +176,41 @@ export interface LearnItem {
   lessons: Lesson[]
 }
 
+/** How far out a goal sits. The ladder is what stops a ten-year goal being a wish. */
+export type GoalHorizon = 'life' | 'tenYear' | 'threeYear' | 'year' | 'quarter'
+
+/**
+ * How a key result knows where it stands. `manual` is a number you type;
+ * everything else is pulled from data the app already holds, so it can't drift
+ * out of date the way a hand-updated percentage always does.
+ */
+export type KeyResultSource = 'manual' | 'account' | 'ledger' | 'metric'
+
+export interface KeyResult {
+  id: string
+  label: string
+  source: KeyResultSource
+  /** Account id, ledger kind or metric key, depending on `source`. */
+  ref: string
+  target: number
+  /** Only read when `source` is manual. */
+  current: number
+  unit: string
+}
+
 export interface Goal {
   id: string
+  /** Links a shorter goal up to the longer one it serves. Empty at the top. */
+  parentId: string
+  horizon: GoalHorizon
+  /** Optional tie into the life map, so a goal sits on a branch. */
+  domainId: string
   title: string
   note: string
   /** Optional ISO deadline. */
   due: string
   done: boolean
+  keyResults: KeyResult[]
 }
 
 export type ConnectionStatus = 'inner' | 'connected' | 'reachedOut' | 'target'

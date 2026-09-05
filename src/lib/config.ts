@@ -1,5 +1,7 @@
 import type {
   DealStage,
+  Goal,
+  GoalHorizon,
   DomainLink,
   DomainNode,
   LearnItem,
@@ -352,22 +354,72 @@ export const DEFAULT_UPKEEP = [
   { id: 'u2', label: 'Progress photos', intervalDays: 7, lastDone: '' },
 ]
 
-export const DEFAULT_GOALS = [
+export const GOAL_HORIZONS: { id: GoalHorizon; label: string; short: string }[] = [
+  { id: 'life', label: 'Lifetime', short: 'Life' },
+  { id: 'tenYear', label: 'Ten years', short: '10y' },
+  { id: 'threeYear', label: 'Three years', short: '3y' },
+  { id: 'year', label: 'This year', short: '1y' },
+  { id: 'quarter', label: 'This quarter', short: 'Q' },
+]
+
+export const HORIZON_LABEL: Record<string, string> = Object.fromEntries(
+  GOAL_HORIZONS.map((h) => [h.id, h.label]),
+)
+
+export const DEFAULT_GOALS: Goal[] = [
   {
     id: 'g1',
+    parentId: '',
+    horizon: 'tenYear',
+    domainId: 'wealth',
     title: '€10M in the ACMR bank',
     note: 'The scoreboard the 1,080 hours point at',
     due: '',
     done: false,
+    keyResults: [
+      {
+        id: 'kr1',
+        label: 'ACMR bank balance',
+        source: 'account',
+        ref: 'acmrBank',
+        target: 10_000_000,
+        current: 0,
+        unit: '€',
+      },
+    ],
   },
   {
     id: 'g2',
+    parentId: 'g1',
+    horizon: 'threeYear',
+    domainId: 'capital',
     title: '€1M personal payout received',
     note: 'Received, not invoiced. Unlocks the rewards',
     due: '',
     done: false,
+    keyResults: [
+      {
+        id: 'kr2',
+        label: 'Payout received',
+        source: 'ledger',
+        ref: 'payout',
+        target: 1_000_000,
+        current: 0,
+        unit: '€',
+      },
+    ],
   },
-  { id: 'g3', title: '95kg lean and muscular', note: 'Long-term physique target', due: '', done: false },
+  {
+    id: 'g3',
+    parentId: '',
+    horizon: 'threeYear',
+    domainId: 'body',
+    title: '95kg lean and muscular',
+    note: 'Long-term physique target',
+    due: '',
+    done: false,
+    keyResults: [],
+  },
 ]
 
 export const KIND_LABEL: Record<string, string> = {

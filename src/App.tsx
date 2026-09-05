@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType, ReactElement, SVGProps } from 'react'
+import Home from './screens/Home'
 import Today from './screens/Today'
 import Money from './screens/Money'
 import Progress from './screens/Progress'
 import Review from './screens/Review'
-import Life from './screens/Life'
 import Learn from './screens/Learn'
 import Network from './screens/Network'
 import Patterns from './screens/Patterns'
 import LifeMap from './screens/Map'
+import Goals from './screens/Goals'
 import Work from './screens/Work'
 import Settings from './screens/Settings'
 import {
+  IconHome,
   IconLearn,
   IconLife,
   IconMap,
@@ -29,6 +31,7 @@ import { useStore } from './lib/store'
 import { timeline } from './lib/selectors'
 
 type TabId =
+  | 'home'
   | 'today'
   | 'work'
   | 'patterns'
@@ -36,12 +39,13 @@ type TabId =
   | 'money'
   | 'learn'
   | 'network'
-  | 'life'
+  | 'goals'
   | 'progress'
   | 'review'
   | 'settings'
 
 const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { id: 'home', label: 'Home', Icon: IconHome },
   { id: 'today', label: 'Today', Icon: IconToday },
   { id: 'work', label: 'Work', Icon: IconWork },
   { id: 'patterns', label: 'Patterns', Icon: IconPatterns },
@@ -49,13 +53,14 @@ const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
   { id: 'money', label: 'Money', Icon: IconMoney },
   { id: 'learn', label: 'Learn', Icon: IconLearn },
   { id: 'network', label: 'Network', Icon: IconNetwork },
-  { id: 'life', label: 'Life', Icon: IconLife },
+  { id: 'goals', label: 'Goals', Icon: IconLife },
   { id: 'progress', label: 'Progress', Icon: IconProgress },
   { id: 'review', label: 'Review', Icon: IconReview },
   { id: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
 const SCREENS: Record<TabId, () => ReactElement> = {
+  home: Home,
   today: Today,
   work: Work,
   patterns: Patterns,
@@ -63,14 +68,14 @@ const SCREENS: Record<TabId, () => ReactElement> = {
   money: Money,
   learn: Learn,
   network: Network,
-  life: Life,
+  goals: Goals,
   progress: Progress,
   review: Review,
   settings: Settings,
 }
 
 export default function App() {
-  const [tab, setTab] = useState<TabId>('today')
+  const [tab, setTab] = useState<TabId>('home')
   const state = useStore()
   const t = timeline(state)
   const Screen = SCREENS[tab]

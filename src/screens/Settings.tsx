@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Card, Empty, Field, NumberField, SectionTitle } from '../components/ui'
+import { Card, Empty, Field, NumberField, SectionTitle, Segmented } from '../components/ui'
 import SyncCard from '../components/SyncCard'
 import { useSync } from '../lib/sync'
 import { METRICS, PROTOCOL_DAYS } from '../lib/config'
@@ -8,7 +8,7 @@ import { uid } from '../lib/format'
 import { formatWithYear, isoForDay } from '../lib/date'
 import { euroCompact } from '../lib/format'
 import { actions, exportJSON, useStore } from '../lib/store'
-import type { AppState, Targets } from '../lib/types'
+import type { AppState, Targets, Theme } from '../lib/types'
 
 export default function Settings() {
   const state = useStore()
@@ -135,6 +135,24 @@ export default function Settings() {
             </div>
           ))}
         </div>
+      </Card>
+
+      <SectionTitle title="Appearance" />
+      <Card className="card-pad">
+        <Field label="Ground">
+          <Segmented
+            value={state.theme}
+            onChange={(theme: Theme) => actions.setTheme(theme)}
+            options={[
+              { value: 'dark', label: 'Dark' },
+              { value: 'light', label: 'Light' },
+            ]}
+          />
+        </Field>
+        <p className="t-foot muted" style={{ marginTop: 10 }}>
+          Black and white either way — this only decides which end is the ground. Dark suits
+          the hours this actually gets used in.
+        </p>
       </Card>
 
       <Loops />

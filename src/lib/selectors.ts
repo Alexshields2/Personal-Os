@@ -3,6 +3,7 @@ import {
   CLEAN_IDS,
   COMPOUNDING,
   DEAL_STAGES,
+  GOAL_HORIZONS,
   METRIC_BY_KEY,
   METRICS,
   OPEN_STAGES,
@@ -31,6 +32,11 @@ import type {
   DealStage,
   DomainLink,
   DomainNode,
+  Goal,
+  GoalHorizon,
+  KeyResult,
+  LedgerKind,
+  MetricKey,
   Project,
   Task,
   LearnItem,
@@ -381,12 +387,6 @@ export function upkeepDueCount(state: AppState, iso = todayISO()): number {
 // ---------------------------------------------------------------------------
 // Goals
 
-export function goalProgress(state: AppState): { done: number; total: number } {
-  return {
-    done: state.goals.filter((g) => g.done).length,
-    total: state.goals.length,
-  }
-}
 
 // ---------------------------------------------------------------------------
 // The daily plan
@@ -1253,5 +1253,107 @@ export function projectProgress(state: AppState, projectId: string): ProjectProg
     done,
     pct: tasks.length ? (done / tasks.length) * 100 : 0,
     openTasks: tasks.filter((t) => !t.done),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Goals
+//
+// A key result either reads itself out of data the app already holds, or it is
+// a number you type. The first kind can't drift out of date; the second kind
+// always does, so it is the fallback rather than the default.
+
+export interface KeyResultProgress {
+  kr: KeyResult
+  current: number
+  target: number
+  pct: number
+  /** False when the source can no longer be resolved (a deleted account, say). */
+  live: boolean
+}
+
+export function keyResultProgress(state: AppState, kr: KeyResult): KeyResultProgress {
+  let current = kr.current
+  let live = true
+
+  if (kr.source === 'account') {
+    current = accountBalance(state, kr.ref as AccountId)
+  } else if (kr.source === 'ledger') {
+    current = state.ledger
+      .filter((e) => e.kind === (kr.ref as LedgerKind))
+      .reduce((s, e) => s + e.amount, 0)
+  } else if (kr.source === 'metric') {
+    const key = kr.ref as MetricKey
+    if (!METRIC_BY_KEY[key]) live = false
+    else current = loggedDays(state).reduce((s, d) => s + (d.metrics[key] ?? 0), 0)
+  }
+
+  return {
+    kr,
+    current,
+    target: kr.target,
+    pct: kr.target > 0 ? Math.min(100, (current / kr.target) * 100) : 0,
+    live,
+  }
+}
+
+export interface GoalProgress {
+  goal: Goal
+  results: KeyResultProgress[]
+  /** Mean of the key results; falls back to done/not-done with none. */
+  pct: number
+  children: Goal[]
+  /** Days left, or null with no deadline. Negative once it has passed. */
+  daysLeft: number | null
+}
+
+export function goalProgress(state: AppState, goal: Goal, iso = todayISO()): GoalProgress {
+  const results = goal.keyResults.map((kr) => keyResultProgress(state, kr))
+  return {
+    goal,
+    results,
+    pct: results.length
+      ? results.reduce((s, r) => s + r.pct, 0) / results.length
+      : goal.done
+        ? 100
+        : 0,
+    children: state.goals.filter((g) => g.parentId === goal.id),
+    daysLeft: goal.due ? daysBetween(iso, goal.due) : null,
+  }
+}
+
+export interface GoalBoard {
+  byHorizon: { horizon: GoalHorizon; label: string; goals: GoalProgress[] }[]
+  atRisk: GoalProgress[]
+  done: number
+  total: number
+}
+
+/**
+ * Everything, grouped by how far out it sits. "At risk" means a dated goal
+ * whose progress is further behind than its remaining time can account for —
+ * being 20% done with 80% of the time gone is the shape worth catching.
+ */
+export function goalBoard(state: AppState, iso = todayISO()): GoalBoard {
+  const all = state.goals.map((g) => goalProgress(state, g, iso))
+
+  const atRisk = all.filter((p) => {
+    if (p.goal.done || p.daysLeft === null) return false
+    if (p.daysLeft < 0) return true
+    // Compare progress against elapsed share of the run-up to the deadline.
+    const span = p.goal.due ? daysBetween(p.goal.due, iso) : 0
+    void span
+    return p.pct < 50 && p.daysLeft <= 30
+  })
+
+  return {
+    byHorizon: GOAL_HORIZONS.map((h) => ({
+      horizon: h.id,
+      label: h.label,
+      goals: all.filter((p) => p.goal.horizon === h.id),
+    })),
+    atRisk,
+    done: state.goals.filter((g) => g.done).length,
+    total: state.goals.length,
   }
 }

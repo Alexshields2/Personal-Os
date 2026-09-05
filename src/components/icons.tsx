@@ -149,3 +149,11 @@ export const IconWork = (p: P) => (
     <path d="M3 12.4h18" />
   </svg>
 )
+
+export const IconHome = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M3.6 10.4 12 3.8l8.4 6.6" />
+    <path d="M5.6 12v7.2a1.2 1.2 0 0 0 1.2 1.2h10.4a1.2 1.2 0 0 0 1.2-1.2V12" />
+    <path d="M9.8 20.4v-5.2h4.4v5.2" />
+  </svg>
+)

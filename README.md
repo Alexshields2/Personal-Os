@@ -4,8 +4,13 @@ A private operating system for one person: the day, the two businesses, the
 money, the people, and what keeps going wrong. It grew out of a 126-day
 protocol, which is still the spine of the daily scoring.
 
-Nine sections: **Today** (plan, log, review), **Patterns**, **Money**,
-**Learn**, **Network**, **Life**, **Progress**, **Review** and **Settings**.
+Twelve sections: **Home**, **Today** (plan, log, review), **Work**,
+**Patterns**, **Map**, **Money**, **Learn**, **Network**, **Goals**,
+**Progress**, **Review** and **Settings**.
+
+It is black and white on purpose — no hue anywhere. Emphasis is contrast, so
+what needs attention goes bright and what is fine recedes. Dark is the default;
+**Settings → Appearance** flips the ground to paper.
 
 It runs local-first: every edit is written to the device immediately and the app
 works with no network. Configure Supabase (below) and it also syncs across your
@@ -163,12 +168,40 @@ cadence — weekly, fortnightly, monthly, quarterly — and the relationships go
 quiet come to you instead of being remembered by accident. Status runs target →
 reached out → connected → inner circle.
 
-**Life** holds the rest of the long game:
+**Map** is the life map: Alex at the root, domains under him, sub-domains under
+those, as deep as is useful. It is not a mind-map — every node scores off the
+standards and metrics bound to it, and a node with no bindings of its own takes
+the mean of its children, so a branch can be *shown* to be weak rather than felt
+to be weak. Cause-to-effect links between branches ("short sleep and the day
+gets reactive") are asserted by hand and labelled as beliefs; the app never
+infers one. Patterns can then narrow its loops and standards to any branch.
 
-- **Upkeep** — recurring tasks with an interval. Haircut every 14 days ships by
-  default. Ticking one restarts its clock from today, and anything past its
-  interval shows as due.
-- **Goals** — what you're aiming at, with an optional target date.
+**Your two versions** sits at the top of Patterns. A seven-day rolling mean
+against the long mean says which version of you is currently running: above the
+line is the one that builds, below it the one that tears the work down. The mean
+itself is the honest number — it is the version that actually shows up on
+average, and the drift in it is the only progress that survives a bad week.
+Unlogged days carry the last known value rather than counting as zero, which
+would invent a crash out of a day you simply didn't open the app.
+
+**Work** covers both businesses:
+
+- **Tasks** split by how late they already are — overdue, today, this week, undated
+- **Projects**, with their task completion
+- **Clients**, with MRR and a warning when one of them is more than 40% of it
+- **Pipeline** — deals weighted by their own probability, and anything that
+  hasn't moved in a fortnight flagged as stopped, whatever its stage says
+
+**Goals** is a ladder: lifetime → ten years → three years → this year → this
+quarter, each goal naming the longer one it serves and the branch of the map it
+sits on. Key results underneath read themselves out of the money and the daily
+metrics wherever they can, because a hand-typed percentage is out of date the
+moment it's typed. **Upkeep** — recurring tasks with an interval — lives here
+too; ticking one restarts its clock from today.
+
+**Home** answers one question: what needs me right now. Today's one thing, which
+version is running, everything overdue or at risk across every section, and a
+capture box for anything that turns up. It owns no data of its own.
 
 ## Adjusting it
 
