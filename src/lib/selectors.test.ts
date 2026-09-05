@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CHECKLIST } from './config'
 import { addDays } from './date'
 import {
+  boardBounds,
   breakdownSignals,
   carriedPriorities,
   clientBook,
@@ -12,6 +13,7 @@ import {
   goalProgress,
   isLogged,
   keyResultProgress,
+  layoutDomains,
   loopStats,
   oscillation,
   pipeline,
@@ -649,5 +651,64 @@ describe('network and upkeep', () => {
       TODAY,
     )
     expect(late.overdue).toBe(true)
+  })
+})
+
+describe('board layout', () => {
+  it('places every node, including one orphaned by an edit', () => {
+    const state = makeState({
+      domains: [
+        ...makeState().domains,
+        {
+          id: 'orphan',
+          parentId: 'deleted-parent',
+          label: 'Orphan',
+          note: '',
+          loopIds: [],
+          checkIds: [],
+          metricKeys: [],
+        },
+      ],
+    })
+    const placed = layoutDomains(state.domains)
+    expect(placed.size).toBe(state.domains.length)
+    for (const node of state.domains) {
+      const at = placed.get(node.id)!
+      expect(Number.isFinite(at.x)).toBe(true)
+      expect(Number.isFinite(at.y)).toBe(true)
+    }
+  })
+
+  it('lets a hand-placed node override the automatic position', () => {
+    const domains = makeState().domains.map((d) =>
+      d.id === 'recovery' ? { ...d, x: 1234, y: -56 } : d,
+    )
+    const placed = layoutDomains(domains)
+    expect(placed.get('recovery')).toEqual({ x: 1234, y: -56 })
+    // Its siblings still lay out automatically around it.
+    expect(placed.get('appearance')!.x).not.toBe(1234)
+  })
+
+  it('spreads the tree around the root rather than stacking it', () => {
+    const placed = layoutDomains(makeState().domains)
+    const root = placed.get('root')!
+    const others = [...placed.entries()].filter(([id]) => id !== 'root').map(([, p]) => p)
+    // Nodes land on both sides of the root in both axes — that is what makes it
+    // a map rather than a column.
+    expect(others.some((p) => p.x > root.x)).toBe(true)
+    expect(others.some((p) => p.x < root.x)).toBe(true)
+    expect(others.some((p) => p.y > root.y)).toBe(true)
+    expect(others.some((p) => p.y < root.y)).toBe(true)
+  })
+
+  it('bounds the whole board, including nodes in negative space', () => {
+    const placed = layoutDomains(makeState().domains)
+    const b = boardBounds(placed)
+    expect(b.maxX).toBeGreaterThan(b.minX)
+    expect(b.maxY).toBeGreaterThan(b.minY)
+    for (const p of placed.values()) {
+      expect(p.x).toBeGreaterThanOrEqual(b.minX)
+      expect(p.y).toBeGreaterThanOrEqual(b.minY)
+    }
   })
 })

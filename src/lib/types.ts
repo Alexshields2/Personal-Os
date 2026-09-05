@@ -392,6 +392,13 @@ export interface DomainNode {
   parentId: string
   label: string
   note: string
+  /**
+   * Board position. Undefined means never placed by hand, so the tidy layout
+   * decides — which is what lets an existing map open as a sensible board
+   * instead of a pile at the origin.
+   */
+  x?: number
+  y?: number
   /** Loop ids that belong to this branch. */
   loopIds: string[]
   /** Checklist item ids whose hit rate feeds this node's score. */

@@ -10,12 +10,13 @@ import {
   Stat,
   TextField,
 } from '../components/ui'
+import Board from '../components/Board'
 import { IconChevron, IconPlus, IconTrash, IconWarn } from '../components/icons'
 import { CHECKLIST, LINK_WEIGHT_LABEL, METRIC_BY_KEY } from '../lib/config'
 import { actions, useStore } from '../lib/store'
 import { domainEdges, domainOrder, domainPath, domainScores, loopStats } from '../lib/selectors'
 
-type View = 'tree' | 'links'
+type View = 'board' | 'tree' | 'links'
 
 /**
  * The life map. Alex at the root, domains under him, sub-domains under those —
@@ -25,7 +26,7 @@ type View = 'tree' | 'links'
  */
 export default function LifeMap() {
   const state = useStore()
-  const [view, setView] = useState<View>('tree')
+  const [view, setView] = useState<View>('board')
   const [open, setOpen] = useState<Set<string>>(() => new Set(['root', 'health', 'wealth']))
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -57,8 +58,8 @@ export default function LifeMap() {
         </div>
         <h1 className="t-large">Map</h1>
         <p className="t-sub">
-          Everything you're running, broken down until it's actionable. Each branch scores off
-          the standards and numbers tied to it, over the last 28 days.
+          Everything you're running, laid out and broken down until it's actionable. Each
+          branch scores off the standards and numbers tied to it, over the last 28 days.
         </p>
       </header>
 
@@ -77,13 +78,16 @@ export default function LifeMap() {
           value={view}
           onChange={setView}
           options={[
-            { value: 'tree', label: 'Tree' },
-            { value: 'links', label: `Cause → effect · ${state.links.length}` },
+            { value: 'board', label: 'Board' },
+            { value: 'tree', label: 'Outline' },
+            { value: 'links', label: `Causes · ${state.links.length}` },
           ]}
         />
       </div>
 
-      {view === 'tree' ? (
+      {view === 'board' && <Board selected={selected} onSelect={setSelected} />}
+
+      {view === 'tree' && (
         <>
           <Card>
             <div className="tree">
@@ -143,9 +147,9 @@ export default function LifeMap() {
             feeds it and what it feeds. An em dash means nothing is bound to it yet.
           </p>
         </>
-      ) : (
-        <LinkList onOpen={setSelected} />
       )}
+
+      {view === 'links' && <LinkList onOpen={setSelected} />}
 
       {selected && <NodeSheet id={selected} onClose={() => setSelected(null)} />}
     </div>

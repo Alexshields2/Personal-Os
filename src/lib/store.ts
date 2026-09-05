@@ -464,6 +464,22 @@ export const actions = {
     })
   },
 
+  /** Board drag. Stamping a position is what opts a node out of auto-layout. */
+  moveDomain(id: string, x: number, y: number) {
+    set({
+      ...state,
+      domains: state.domains.map((d) => (d.id === id ? { ...d, x, y } : d)),
+    })
+  },
+
+  /** Hand every node back to the tidy layout. */
+  resetDomainLayout() {
+    set({
+      ...state,
+      domains: state.domains.map(({ x: _x, y: _y, ...rest }) => rest),
+    })
+  },
+
   /** Removing a node takes its whole subtree, and any link touching it. */
   removeDomain(id: string) {
     const doomed = new Set<string>()

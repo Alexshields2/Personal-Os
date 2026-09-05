@@ -1647,3 +1647,88 @@ export function runway(state: AppState, purse: Purse): Runway {
     known: monthlyBurn > 0,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Board layout
+//
+// The map reads as a board, not a list, so every node needs a position. Nodes
+// that have been dragged keep theirs; the rest get a tidy tree — depth sets the
+// column, and a parent sits at the mean of its children so the whole thing
+// stays readable however lopsided the branches are.
+
+export const NODE_W = 164
+export const NODE_H = 54
+/**
+ * Distance between rings. Tight enough that a whole map fits on screen at a
+ * legible zoom, wide enough that sibling boxes on the busiest ring don't touch.
+ */
+const RING = 262
+
+export interface Placed {
+  x: number
+  y: number
+}
+
+/**
+ * A radial tree: the root in the middle, each depth a ring outwards, and every
+ * node given an angular slice sized by how many leaves sit beneath it — so a
+ * heavy branch gets the room it needs and a thin one doesn't waste any. A
+ * left-to-right tree was the obvious first choice and produced a column four
+ * times taller than it was wide, which fits on screen at about a third size.
+ */
+export function layoutDomains(domains: DomainNode[]): Map<string, Placed> {
+  const out = new Map<string, Placed>()
+  const children = (id: string) => domains.filter((d) => d.parentId === id)
+
+  const leafCount = (node: DomainNode): number => {
+    const kids = children(node.id)
+    return kids.length === 0 ? 1 : kids.reduce((s, k) => s + leafCount(k), 0)
+  }
+
+  const place = (node: DomainNode, depth: number, from: number, to: number) => {
+    const mid = (from + to) / 2
+    const radius = depth * RING
+    out.set(node.id, {
+      // Boxes are positioned by their top-left, so centre them on the point.
+      x: node.x ?? Math.round(Math.cos(mid) * radius - NODE_W / 2),
+      y: node.y ?? Math.round(Math.sin(mid) * radius - NODE_H / 2),
+    })
+
+    const kids = children(node.id)
+    if (kids.length === 0) return
+    const total = kids.reduce((s, k) => s + leafCount(k), 0)
+    let cursor = from
+    for (const kid of kids) {
+      const span = ((to - from) * leafCount(kid)) / total
+      place(kid, depth + 1, cursor, cursor + span)
+      cursor += span
+    }
+  }
+
+  const roots = domains.filter((d) => d.parentId === '')
+  // Start at -90° so the first branch sits at the top rather than the right.
+  roots.forEach((root, i) => {
+    const span = (Math.PI * 2) / roots.length
+    place(root, 0, -Math.PI / 2 + i * span, -Math.PI / 2 + (i + 1) * span)
+  })
+
+  let stray = 0
+  for (const node of domains) {
+    if (!out.has(node.id)) {
+      out.set(node.id, { x: node.x ?? -600, y: node.y ?? stray++ * (NODE_H + 20) })
+    }
+  }
+  return out
+}
+
+/** Bounding box of the placed board, for zoom-to-fit. */
+export function boardBounds(placed: Map<string, Placed>) {
+  const points = [...placed.values()]
+  if (points.length === 0) return { minX: 0, minY: 0, maxX: NODE_W, maxY: NODE_H }
+  return {
+    minX: Math.min(...points.map((p) => p.x)),
+    minY: Math.min(...points.map((p) => p.y)),
+    maxX: Math.max(...points.map((p) => p.x)) + NODE_W,
+    maxY: Math.max(...points.map((p) => p.y)) + NODE_H,
+  }
+}

@@ -177,8 +177,18 @@ cadence — weekly, fortnightly, monthly, quarterly — and the relationships go
 quiet come to you instead of being remembered by accident. Status runs target →
 reached out → connected → inner circle.
 
-**Map** is the life map: Alex at the root, domains under him, sub-domains under
-those, as deep as is useful. It is not a mind-map — every node scores off the
+**Map** is the life map, and it opens as a **board** rather than an outline:
+Alex at the centre, domains on a ring around him, sub-domains on the ring beyond
+— drag a branch to place it, drag the background to pan, scroll to zoom. Solid
+lines are structure; dashed arrows are the causes you asserted, drawn
+differently because they are a different kind of claim. Dragging a branch stamps
+its position and opts it out of the automatic layout for good, so a map you have
+arranged by hand stays arranged while anything you add later still places
+itself; **Tidy** hands everything back to the layout. An **Outline** view is
+still there for scanning scores quickly.
+
+Underneath it is the same tree: Alex at the root, domains under him, sub-domains
+under those, as deep as is useful. It is not a mind-map — every node scores off the
 standards and metrics bound to it, and a node with no bindings of its own takes
 the mean of its children, so a branch can be *shown* to be weak rather than felt
 to be weak. Cause-to-effect links between branches ("short sleep and the day
@@ -207,6 +217,11 @@ sits on. Key results underneath read themselves out of the money and the daily
 metrics wherever they can, because a hand-typed percentage is out of date the
 moment it's typed. **Upkeep** — recurring tasks with an interval — lives here
 too; ticking one restarts its clock from today.
+
+The **+** button in the corner is on every screen: one field that adds a task, a
+priority into today's three, a goal, a person or a deal. Today's slots fill left
+to right, and when all three are taken it says so rather than quietly dropping
+what you typed.
 
 Press **⌘K** (or Ctrl-K) anywhere to search everything — sections, tasks,
 projects, clients, deals, goals, lessons, people, branches, loops, and every

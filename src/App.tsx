@@ -27,6 +27,7 @@ import {
   IconWork,
 } from './components/icons'
 import Palette from './components/Palette'
+import QuickAdd from './components/QuickAdd'
 import { PROTOCOL_DAYS, SECTIONS } from './lib/config'
 import { useStore } from './lib/store'
 import { timeline } from './lib/selectors'
@@ -152,6 +153,8 @@ export default function App() {
       <main className="scroll">
         <Screen key={tab} />
       </main>
+
+      <QuickAdd onNavigate={(next) => setTab(next as TabId)} />
 
       {paletteOpen && (
         <Palette

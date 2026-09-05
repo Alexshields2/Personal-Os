@@ -1420,3 +1420,174 @@ kbd {
   color: var(--text-secondary);
   margin-left: auto;
 }
+
+/* Quick add — one capture point, on every screen */
+.fab {
+  position: fixed;
+  right: 18px;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 18px);
+  z-index: 45;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  transition: transform 0.2s var(--ease), opacity 0.2s var(--ease);
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.2;
+}
+
+.fab:active {
+  transform: scale(0.92);
+}
+
+@media (min-width: 900px) {
+  .fab {
+    bottom: 28px;
+    right: 28px;
+  }
+}
+
+/* =========================================================================
+   The life map, as a board
+   ========================================================================= */
+
+.board-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+
+.board-zoom {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  min-width: 42px;
+  text-align: center;
+}
+
+.board {
+  position: relative;
+  overflow: hidden;
+  height: min(72vh, 720px);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface-1);
+  /* A faint grid reads as a canvas rather than an empty card. */
+  background-image: radial-gradient(var(--hairline) 1px, transparent 1px);
+  background-size: 26px 26px;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.board:active {
+  cursor: grabbing;
+}
+
+.board-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.board-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.board-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 11px;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--hairline-strong);
+  cursor: grab;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+
+.board-node:active {
+  cursor: grabbing;
+}
+
+.board-node[data-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.board-node[data-root='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: transparent;
+}
+
+.board-node-label {
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.011em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-node-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.board-node[data-root='true'] .board-node-meta {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme='light'] .board-node[data-root='true'] .board-node-meta {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.board-node-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--seq-track);
+  overflow: hidden;
+}
+
+.board-node-bar i {
+  display: block;
+  height: 100%;
+  background: var(--text-primary);
+  border-radius: 2px;
+}
+
+.board-node[data-root='true'] .board-node-bar {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.board-node[data-root='true'] .board-node-bar i {
+  background: var(--on-accent);
+}
