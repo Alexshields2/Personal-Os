@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { IconCheck } from './icons'
 
 // ---------------------------------------------------------------- containers
@@ -7,11 +7,17 @@ import { IconCheck } from './icons'
 export function Card({
   children,
   className = '',
+  style,
 }: {
   children: ReactNode
   className?: string
+  style?: CSSProperties
 }) {
-  return <div className={`card ${className}`}>{children}</div>
+  return (
+    <div className={`card ${className}`} style={style}>
+      {children}
+    </div>
+  )
 }
 
 export function CardHead({ title, action }: { title: string; action?: ReactNode }) {

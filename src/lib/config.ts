@@ -1,4 +1,4 @@
-import type { MetricKey, Targets } from './types'
+import type { LearnItem, Loop, MetricKey, PriorityTag, Targets } from './types'
 
 export const PROTOCOL_DAYS = 126
 
@@ -271,13 +271,26 @@ export const INNER_CIRCLE = [
   'Prospects',
 ]
 
-export const DEFAULT_BOOKS = [
-  { id: 'b1', title: 'Reality Transurfing', status: 'reading' as const, notes: '' },
+export const DEFAULT_LEARNING: LearnItem[] = [
+  {
+    id: 'b1',
+    kind: 'book',
+    title: 'Reality Transurfing',
+    source: 'Vadim Zeland',
+    status: 'active',
+    date: '',
+    notes: '',
+    lessons: [],
+  },
   {
     id: 'b2',
+    kind: 'book',
     title: 'How to Win Friends and Influence People',
-    status: 'queued' as const,
+    source: 'Dale Carnegie',
+    status: 'queued',
+    date: '',
     notes: '',
+    lessons: [],
   },
 ]
 
@@ -307,9 +320,22 @@ export const ACCOUNT_LABEL: Record<string, string> = {
 }
 
 export const CONNECTION_LABEL: Record<string, string> = {
-  target: 'Target',
-  reachedOut: 'Reached out',
+  inner: 'Inner circle',
   connected: 'Connected',
+  reachedOut: 'Reached out',
+  target: 'Target',
+}
+
+/** Sensible starting cadences, in days. 0 is "no cadence". */
+export const CADENCE_OPTIONS = [0, 7, 14, 30, 90]
+
+export function cadenceLabel(days: number): string {
+  if (days <= 0) return 'No cadence'
+  if (days === 7) return 'Weekly'
+  if (days === 14) return 'Fortnightly'
+  if (days === 30) return 'Monthly'
+  if (days === 90) return 'Quarterly'
+  return `Every ${days} days`
 }
 
 export const DEFAULT_UPKEEP = [
@@ -342,3 +368,141 @@ export const KIND_LABEL: Record<string, string> = {
   payout: 'Payout to me',
   expense: 'Expense',
 }
+
+// --------------------------------------------------------------- daily plan
+
+/** The three slots are the discipline; the rest is overflow for a heavy day. */
+export const CORE_PRIORITIES = 3
+export const MAX_PRIORITIES = 6
+
+export const PRIORITY_TAGS: { id: PriorityTag; label: string }[] = [
+  { id: 'acmr', label: 'ACMR' },
+  { id: 'onemedia', label: '1Media' },
+  { id: 'life', label: 'Life' },
+]
+
+export const PRIORITY_TAG_LABEL: Record<PriorityTag, string> = {
+  acmr: 'ACMR',
+  onemedia: '1Media',
+  life: 'Life',
+}
+
+/** Rank labels for the first three slots. Slot 1 is the day's one thing. */
+export const PRIORITY_RANK = ['The one thing', 'Second', 'Third']
+
+/** Dropped in when a plan is started from scratch. Edit or delete freely. */
+export const DEFAULT_BLOCKS: { start: string; end: string; label: string; tag: PriorityTag }[] = [
+  { start: '07:00', end: '09:00', label: 'Morning routine + gym', tag: 'life' },
+  { start: '09:00', end: '12:00', label: 'Deep work — the one thing', tag: 'acmr' },
+  { start: '13:00', end: '17:00', label: 'Client work + sales', tag: 'acmr' },
+  { start: '17:00', end: '19:00', label: '1Media', tag: 'onemedia' },
+  { start: '21:00', end: '21:30', label: 'Shutdown + tomorrow’s plan', tag: 'life' },
+]
+
+/**
+ * The end-of-day ritual. Unscored, like MORNING — it closes the day rather
+ * than grading it. `derived` items are ticked by the app, not by hand.
+ */
+export const SHUTDOWN: { id: string; label: string; hint?: string; derived?: boolean }[] = [
+  { id: 's_logged', label: 'Day logged honestly', hint: 'The numbers above, as they actually were' },
+  { id: 's_inbox', label: 'Inbox and messages cleared' },
+  { id: 's_tomorrow', label: 'Tomorrow’s three are set', derived: true, hint: 'Filled in below' },
+  { id: 's_desk', label: 'Desk clear, laptop shut' },
+]
+
+export const ENERGY_LABEL = ['', 'Empty', 'Low', 'Steady', 'Strong', 'Peak']
+
+// ------------------------------------------------------------------ learning
+
+export const LEARN_KIND_LABEL: Record<string, string> = {
+  book: 'Book',
+  course: 'Course',
+  event: 'Event',
+}
+
+export const LEARN_STATUS_LABEL: Record<string, string> = {
+  queued: 'Queued',
+  active: 'In progress',
+  done: 'Finished',
+}
+
+// --------------------------------------------------------------------- loops
+
+/**
+ * Starting set of failure patterns. Free-text mistakes can't be counted, so a
+ * loop has to be a thing you pick rather than a thing you write — that's what
+ * makes the pattern detection possible at all. Edit the list to match the ones
+ * that are actually yours; a generic loop never gets ticked.
+ */
+export const DEFAULT_LOOPS: Loop[] = [
+  {
+    id: 'l_avoid',
+    label: 'Avoided the hard thing',
+    note: 'Did everything except the one thing',
+    archived: false,
+  },
+  { id: 'l_noplan', label: 'Started the day without a plan', note: '', archived: false },
+  {
+    id: 'l_reactive',
+    label: 'Let other people set the agenda',
+    note: 'Inbox and phone ran the day',
+    archived: false,
+  },
+  {
+    id: 'l_busywork',
+    label: 'Busywork instead of revenue',
+    note: 'Felt productive, moved nothing',
+    archived: false,
+  },
+  {
+    id: 'l_perfection',
+    label: 'Polished instead of shipped',
+    note: '',
+    archived: false,
+  },
+  { id: 'l_scroll', label: 'Scrolled to escape', note: '', archived: false },
+  {
+    id: 'l_numb',
+    label: 'Numbed out',
+    note: 'Drink, porn, food — whichever it was',
+    archived: false,
+  },
+  { id: 'l_latenight', label: 'Late night, wrecked the morning', note: '', archived: false },
+  {
+    id: 'l_overcommit',
+    label: 'Said yes when I meant no',
+    note: '',
+    archived: false,
+  },
+  { id: 'l_isolate', label: 'Withdrew from people', note: '', archived: false },
+]
+
+// --------------------------------------------------------- nightly questions
+
+export interface Question {
+  id: string
+  q: string
+  hint?: string
+}
+
+/** Asked every night. Four is the most that gets answered honestly. */
+export const CORE_QUESTIONS: Question[] = [
+  { id: 'q_moved', q: 'What actually moved the needle today?', hint: 'Outcome, not activity' },
+  { id: 'q_avoided', q: 'What did I avoid — and what was I really avoiding?' },
+  { id: 'q_cost', q: 'What did today cost me?', hint: 'Time, money, energy, trust' },
+  { id: 'q_apply', q: 'What do I do differently tomorrow because of today?' },
+]
+
+/**
+ * One deeper question per weekday, so the reflection can't go on autopilot.
+ * Indexed by `Date.getDay()` — Sunday first.
+ */
+export const ROTATING_QUESTIONS: Question[] = [
+  { id: 'q_sun', q: 'What pattern showed up more than once this week?' },
+  { id: 'q_mon', q: 'What am I pretending not to know?' },
+  { id: 'q_tue', q: 'Who did I make progress for besides myself?' },
+  { id: 'q_wed', q: 'If today repeated for a year, where would I end up?' },
+  { id: 'q_thu', q: 'What am I doing that someone else should be doing?' },
+  { id: 'q_fri', q: 'What did I say I would do and not do?' },
+  { id: 'q_sat', q: 'What would the version of me I am building have done differently?' },
+]

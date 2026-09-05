@@ -90,3 +90,23 @@ export function formatWithYear(iso: string): string {
 export function weekdayLetter(iso: string): string {
   return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][fromISO(iso).getDay()]
 }
+
+// ------------------------------------------------------------- time of day
+
+/** Minutes since midnight for an 'HH:MM' string. */
+export function minutesOfDay(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+
+/** Adds minutes to an 'HH:MM' string, clamped to the end of the same day. */
+export function addMinutes(hhmm: string, n: number): string {
+  const total = Math.max(0, Math.min(23 * 60 + 59, minutesOfDay(hhmm) + n))
+  const h = Math.floor(total / 60)
+  return `${String(h).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+/** Length of a block in hours; negative spans read as zero rather than nonsense. */
+export function blockHours(start: string, end: string): number {
+  return Math.max(0, (minutesOfDay(end) - minutesOfDay(start)) / 60)
+}

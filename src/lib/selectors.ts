@@ -2,12 +2,14 @@ import {
   CHECKLIST,
   CLEAN_IDS,
   COMPOUNDING,
+  METRICS,
   PILLARS,
   PROTOCOL_DAYS,
 } from './config'
 import type { ChecklistItem, PillarId } from './config'
 import {
   addDays,
+  blockHours,
   dayNumber,
   daysBetween,
   fromISO,
@@ -15,7 +17,17 @@ import {
   todayISO,
   weekStartISO,
 } from './date'
-import type { AccountId, AppState, DayEntry, MoneyEntity, Upkeep } from './types'
+import type {
+  AccountId,
+  AppState,
+  Connection,
+  DayEntry,
+  LearnItem,
+  Loop,
+  MoneyEntity,
+  Priority,
+  Upkeep,
+} from './types'
 
 // ---------------------------------------------------------------------------
 // Daily scoring
@@ -363,4 +375,439 @@ export function goalProgress(state: AppState): { done: number; total: number } {
     done: state.goals.filter((g) => g.done).length,
     total: state.goals.length,
   }
+}
+
+// ---------------------------------------------------------------------------
+// The daily plan
+
+export interface PlanStatus {
+  /** Priorities with something written in them. Empty slots don't count. */
+  filled: Priority[]
+  set: number
+  done: number
+  pct: number
+  /** Rank 1 — the one that decides whether the day was worth it. */
+  oneThing: Priority | undefined
+  oneThingDone: boolean
+  plannedHours: number
+}
+
+export function planStatus(day: DayEntry | undefined): PlanStatus {
+  const filled = (day?.priorities ?? []).filter((p) => p.text.trim() !== '')
+  const done = filled.filter((p) => p.done).length
+  const oneThing = filled[0]
+  return {
+    filled,
+    set: filled.length,
+    done,
+    pct: filled.length ? (done / filled.length) * 100 : 0,
+    oneThing,
+    oneThingDone: Boolean(oneThing?.done),
+    plannedHours: (day?.blocks ?? []).reduce((s, b) => s + blockHours(b.start, b.end), 0),
+  }
+}
+
+export interface PriorityRun {
+  /** Days that had at least one priority written down. */
+  daysPlanned: number
+  set: number
+  done: number
+  pct: number
+  /** How often the day's number one actually landed — the number that matters. */
+  oneThingHit: number
+  oneThingRate: number
+}
+
+/** Plan-versus-reality across every logged day. Unplanned days are excluded. */
+export function priorityRun(state: AppState): PriorityRun {
+  let daysPlanned = 0
+  let set = 0
+  let done = 0
+  let oneThingHit = 0
+  for (const day of loggedDays(state)) {
+    const p = planStatus(day)
+    if (p.set === 0) continue
+    daysPlanned++
+    set += p.set
+    done += p.done
+    if (p.oneThingDone) oneThingHit++
+  }
+  return {
+    daysPlanned,
+    set,
+    done,
+    pct: set ? (done / set) * 100 : 0,
+    oneThingHit,
+    oneThingRate: daysPlanned ? (oneThingHit / daysPlanned) * 100 : 0,
+  }
+}
+
+/** Consecutive days up to `iso` where the day's one thing was hit. */
+export function oneThingStreak(state: AppState, iso = todayISO()): number {
+  let n = 0
+  let cursor = iso
+  // Today only breaks the streak once it's closed — mid-morning shouldn't zero it.
+  if (!planStatus(state.days[cursor]).oneThingDone) {
+    if (state.days[cursor]?.closed) return 0
+    cursor = addDays(cursor, -1)
+  }
+  while (planStatus(state.days[cursor]).oneThingDone) {
+    n++
+    cursor = addDays(cursor, -1)
+  }
+  return n
+}
+
+// ---------------------------------------------------------------------------
+// Patterns — loops, breakdowns and what precedes them
+//
+// The point of this section is to answer one question: what keeps happening?
+// Self-reported loops give the honest half; the logged numbers give the half
+// you can't argue with. Everything below needs a minimum sample before it will
+// claim anything, because a pattern found in four days is not a pattern.
+
+/** Below this a signal is noise, and saying it out loud would be worse than silence. */
+const MIN_SAMPLE = 5
+
+export interface LoopStat {
+  loop: Loop
+  /** Times it fired in the window. */
+  count: number
+  /** Logged days in the window — the denominator. */
+  days: number
+  rate: number
+  recent: number
+  prior: number
+  /** Only stated when both halves hold enough logged days to compare. */
+  trend: 'rising' | 'falling' | 'flat'
+  lastFired: string
+  /** Consecutive days up to today where it fired. */
+  streak: number
+}
+
+/**
+ * Loop frequency over the trailing `window` days, with the most recent half
+ * compared against the half before it so a loop that is getting worse is
+ * visible before it becomes the norm.
+ */
+export function loopStats(state: AppState, iso = todayISO(), window = 28): LoopStat[] {
+  const half = Math.floor(window / 2)
+  const dates: string[] = []
+  for (let i = 0; i < window; i++) dates.push(addDays(iso, -i))
+  const logged = dates.filter((d) => isLogged(state.days[d]))
+
+  return state.loops
+    .filter((l) => !l.archived)
+    .map((loop) => {
+      let count = 0
+      let recent = 0
+      let prior = 0
+      let lastFired = ''
+      for (const [i, date] of dates.entries()) {
+        if (!state.days[date]?.loops.includes(loop.id)) continue
+        count++
+        if (i < half) recent++
+        else prior++
+        if (!lastFired) lastFired = date
+      }
+      let streak = 0
+      for (const date of dates) {
+        if (!state.days[date]?.loops.includes(loop.id)) break
+        streak++
+      }
+
+      // Compare rates, not raw counts: early in a protocol the older half holds
+      // far fewer logged days, and counting alone would call every loop rising.
+      const recentDays = dates.slice(0, half).filter((d) => isLogged(state.days[d])).length
+      const priorDays = dates.slice(half).filter((d) => isLogged(state.days[d])).length
+      const recentRate = recentDays ? recent / recentDays : 0
+      const priorRate = priorDays ? prior / priorDays : 0
+      const comparable = recentDays >= 4 && priorDays >= 4
+      const shift = recentRate - priorRate
+
+      return {
+        loop,
+        count,
+        days: logged.length,
+        rate: logged.length ? (count / logged.length) * 100 : 0,
+        recent,
+        prior,
+        trend:
+          !comparable || Math.abs(shift) < 0.1 ? 'flat' : shift > 0 ? 'rising' : 'falling',
+        lastFired,
+        streak,
+      } satisfies LoopStat
+    })
+    .sort((a, b) => b.count - a.count || a.loop.label.localeCompare(b.loop.label))
+}
+
+export interface WeakStandard {
+  id: string
+  label: string
+  pillar: string
+  missed: number
+  logged: number
+  rate: number
+  points: number
+}
+
+/** The standards you drop most often, weighted by what they cost you. */
+export function weakestStandards(state: AppState): WeakStandard[] {
+  const days = loggedDays(state)
+  if (days.length < MIN_SAMPLE) return []
+  return CHECKLIST.map((item) => {
+    const missed = days.filter((d) => !isItemDone(item, d, state.targets)).length
+    return {
+      id: item.id,
+      label: item.label,
+      pillar: PILLARS.find((p) => p.id === item.pillar)?.label ?? '',
+      missed,
+      logged: days.length,
+      rate: (missed / days.length) * 100,
+      points: item.points,
+    }
+  })
+    .filter((w) => w.missed > 0)
+    .sort((a, b) => b.rate * b.points - a.rate * a.points)
+}
+
+export interface CarriedPriority {
+  text: string
+  tag: string
+  /** Days it was written down and not finished, in total. */
+  times: number
+  /** Longest unbroken run of writing it down and not doing it. */
+  maxRun: number
+  /** Whether that longest run is the one still going. */
+  ongoing: boolean
+  firstDate: string
+  lastDate: string
+  everDone: boolean
+}
+
+/**
+ * The same intention, rewritten and left open. Ranked by the longest unbroken
+ * run rather than by total misses, because those are two different things: a
+ * standing item like "gym" will accumulate misses forever without ever being
+ * stuck, whereas five days in a row of writing the same sentence and not doing
+ * it is a wall. Only the second one is worth a screen.
+ */
+export function carriedPriorities(state: AppState): CarriedPriority[] {
+  const seen = new Map<string, { text: string; tag: string; hits: { date: string; done: boolean }[] }>()
+  for (const day of loggedDays(state)) {
+    for (const p of day.priorities) {
+      const text = p.text.trim()
+      if (!text) continue
+      const key = text.toLowerCase().replace(/\s+/g, ' ')
+      const entry = seen.get(key) ?? { text, tag: p.tag, hits: [] }
+      entry.hits.push({ date: day.date, done: p.done })
+      seen.set(key, entry)
+    }
+  }
+
+  const out: CarriedPriority[] = []
+  for (const { text, tag, hits } of seen.values()) {
+    hits.sort((a, b) => a.date.localeCompare(b.date))
+    let run = 0
+    let maxRun = 0
+    let runEnd = ''
+    for (const h of hits) {
+      run = h.done ? 0 : run + 1
+      if (run > maxRun) {
+        maxRun = run
+        runEnd = h.date
+      }
+    }
+    if (maxRun < 2) continue
+    out.push({
+      text,
+      tag,
+      times: hits.filter((h) => !h.done).length,
+      maxRun,
+      // The run is still live if it reaches the last time the item was written.
+      ongoing: runEnd === hits[hits.length - 1].date && !hits[hits.length - 1].done,
+      firstDate: hits[0].date,
+      lastDate: hits[hits.length - 1].date,
+      everDone: hits.some((h) => h.done),
+    })
+  }
+  return out.sort((a, b) => b.maxRun - a.maxRun || b.times - a.times)
+}
+
+export interface MetricGap {
+  key: string
+  label: string
+  unit: string
+  dp: number
+  winning: number
+  losing: number
+  /** Signed difference, winning minus losing. */
+  gap: number
+  /** Share of the losing average the gap represents — used to rank. */
+  weight: number
+}
+
+/**
+ * What is measurably different about the days that fall apart. Compares each
+ * metric's average on winning days (80+) against breakdown days (under 50).
+ * Correlation, not cause — but it is where to look first.
+ */
+export function breakdownSignals(state: AppState): MetricGap[] {
+  const days = loggedDays(state)
+  const winning = days.filter((d) => scoreDay(d, state.targets).score >= 80)
+  const losing = days.filter((d) => scoreDay(d, state.targets).score < 50)
+  if (winning.length < 3 || losing.length < 3) return []
+
+  const mean = (list: DayEntry[], key: string) =>
+    list.reduce((s, d) => s + (d.metrics[key as keyof DayEntry['metrics']] ?? 0), 0) / list.length
+
+  return METRICS.map((m) => {
+    const w = mean(winning, m.key)
+    const l = mean(losing, m.key)
+    const gap = w - l
+    return {
+      key: m.key,
+      label: m.label,
+      unit: m.unit,
+      dp: m.dp,
+      winning: w,
+      losing: l,
+      gap,
+      weight: Math.abs(gap) / Math.max(1, Math.abs(l)),
+    }
+  })
+    .filter((g) => Math.abs(g.gap) > 0)
+    .sort((a, b) => b.weight - a.weight)
+}
+
+export interface WeekdayScore {
+  dow: number
+  label: string
+  avg: number
+  days: number
+}
+
+const DOW_LABEL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/** Average score by day of the week. The weak day is nearly always the same one. */
+export function weekdayScores(state: AppState): WeekdayScore[] {
+  const buckets: { total: number; n: number }[] = Array.from({ length: 7 }, () => ({
+    total: 0,
+    n: 0,
+  }))
+  for (const day of loggedDays(state)) {
+    const b = buckets[fromISO(day.date).getDay()]
+    b.total += scoreDay(day, state.targets).score
+    b.n++
+  }
+  return buckets.map((b, dow) => ({
+    dow,
+    label: DOW_LABEL[dow],
+    avg: b.n ? b.total / b.n : 0,
+    days: b.n,
+  }))
+}
+
+export interface PlanEffect {
+  plannedDays: number
+  unplannedDays: number
+  plannedAvg: number
+  unplannedAvg: number
+  delta: number
+  /** Only true once both sides have enough days to mean anything. */
+  meaningful: boolean
+}
+
+/** What writing the plan down is actually worth, in points per day. */
+export function planEffect(state: AppState): PlanEffect {
+  const days = loggedDays(state)
+  const withPlan = days.filter((d) => planStatus(d).set > 0)
+  const without = days.filter((d) => planStatus(d).set === 0)
+  const avg = (list: DayEntry[]) =>
+    list.length ? list.reduce((s, d) => s + scoreDay(d, state.targets).score, 0) / list.length : 0
+  const plannedAvg = avg(withPlan)
+  const unplannedAvg = avg(without)
+  return {
+    plannedDays: withPlan.length,
+    unplannedDays: without.length,
+    plannedAvg,
+    unplannedAvg,
+    delta: plannedAvg - unplannedAvg,
+    meaningful: withPlan.length >= 3 && without.length >= 3,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Learning
+
+export interface LearnStats {
+  active: number
+  done: number
+  queued: number
+  lessons: number
+  applied: number
+  /** Lessons captured but never turned into an action taken. */
+  unapplied: number
+}
+
+export function learnStats(state: AppState): LearnStats {
+  const lessons = state.learning.flatMap((i) => i.lessons)
+  return {
+    active: state.learning.filter((i) => i.status === 'active').length,
+    done: state.learning.filter((i) => i.status === 'done').length,
+    queued: state.learning.filter((i) => i.status === 'queued').length,
+    lessons: lessons.length,
+    applied: lessons.filter((l) => l.applied).length,
+    unapplied: lessons.filter((l) => !l.applied).length,
+  }
+}
+
+export interface DatedLesson {
+  itemId: string
+  itemTitle: string
+  kind: LearnItem['kind']
+  lesson: LearnItem['lessons'][number]
+}
+
+/** Every lesson across every source, newest first. */
+export function allLessons(state: AppState): DatedLesson[] {
+  return state.learning
+    .flatMap((item) =>
+      item.lessons.map((lesson) => ({
+        itemId: item.id,
+        itemTitle: item.title,
+        kind: item.kind,
+        lesson,
+      })),
+    )
+    .sort((a, b) => b.lesson.date.localeCompare(a.lesson.date))
+}
+
+// ---------------------------------------------------------------------------
+// Network
+
+export interface ContactStatus {
+  /** Days since the last logged conversation; null when there never was one. */
+  daysSince: number | null
+  /** Days until the cadence comes round. Negative once it has passed. */
+  dueIn: number
+  due: boolean
+  tracked: boolean
+}
+
+/** Where a relationship stands against the cadence you set for it. */
+export function contactStatus(c: Connection, iso = todayISO()): ContactStatus {
+  const tracked = c.cadenceDays > 0
+  if (!c.lastContact) {
+    return { daysSince: null, dueIn: 0, due: tracked, tracked }
+  }
+  const daysSince = daysBetween(c.lastContact, iso)
+  const dueIn = c.cadenceDays - daysSince
+  return { daysSince, dueIn, due: tracked && dueIn <= 0, tracked }
+}
+
+export function contactsDue(state: AppState, iso = todayISO()): Connection[] {
+  return state.connections
+    .filter((c) => contactStatus(c, iso).due)
+    .sort((a, b) => contactStatus(a, iso).dueIn - contactStatus(b, iso).dueIn)
 }

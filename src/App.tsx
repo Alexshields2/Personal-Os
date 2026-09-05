@@ -5,10 +5,16 @@ import Money from './screens/Money'
 import Progress from './screens/Progress'
 import Review from './screens/Review'
 import Life from './screens/Life'
+import Learn from './screens/Learn'
+import Network from './screens/Network'
+import Patterns from './screens/Patterns'
 import Settings from './screens/Settings'
 import {
+  IconLearn,
   IconLife,
   IconMoney,
+  IconNetwork,
+  IconPatterns,
   IconProgress,
   IconReview,
   IconSettings,
@@ -18,23 +24,38 @@ import { PROTOCOL_DAYS } from './lib/config'
 import { useStore } from './lib/store'
 import { timeline } from './lib/selectors'
 
-type TabId = 'today' | 'money' | 'progress' | 'review' | 'life' | 'settings'
+type TabId =
+  | 'today'
+  | 'patterns'
+  | 'money'
+  | 'learn'
+  | 'network'
+  | 'life'
+  | 'progress'
+  | 'review'
+  | 'settings'
 
 const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
   { id: 'today', label: 'Today', Icon: IconToday },
+  { id: 'patterns', label: 'Patterns', Icon: IconPatterns },
   { id: 'money', label: 'Money', Icon: IconMoney },
+  { id: 'learn', label: 'Learn', Icon: IconLearn },
+  { id: 'network', label: 'Network', Icon: IconNetwork },
+  { id: 'life', label: 'Life', Icon: IconLife },
   { id: 'progress', label: 'Progress', Icon: IconProgress },
   { id: 'review', label: 'Review', Icon: IconReview },
-  { id: 'life', label: 'Life', Icon: IconLife },
   { id: 'settings', label: 'Settings', Icon: IconSettings },
 ]
 
 const SCREENS: Record<TabId, () => ReactElement> = {
   today: Today,
+  patterns: Patterns,
   money: Money,
+  learn: Learn,
+  network: Network,
+  life: Life,
   progress: Progress,
   review: Review,
-  life: Life,
   settings: Settings,
 }
 
@@ -54,7 +75,7 @@ export default function App() {
       <nav className="sidebar" aria-label="Sections">
         <div className="brand">
           <div className="t-cap" style={{ color: 'var(--accent)' }}>
-            Comeback protocol
+            Personal OS
           </div>
           <div className="t-title" style={{ marginTop: 4 }}>
             Day {t.day}

@@ -106,3 +106,27 @@ export const IconFlame = (p: P) => (
     <path d="M12 3s5 4.2 5 9a5 5 0 0 1-10 0c0-1.6.7-3 1.5-4 .2 1.4 1 2.3 1.8 2.3 1.3 0 1.6-2.6.7-4.3-.3-.6-.7-1.4-1-2z" />
   </svg>
 )
+
+export const IconLearn = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 5.2A1.7 1.7 0 0 1 5.7 3.5H11v16H5.7A1.7 1.7 0 0 0 4 21.2z" />
+    <path d="M20 5.2a1.7 1.7 0 0 0-1.7-1.7H13v16h5.3a1.7 1.7 0 0 1 1.7 1.7z" />
+  </svg>
+)
+
+export const IconPatterns = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M4 8.5h11.5a4 4 0 0 1 0 8H8" />
+    <path d="M6.6 5.9 4 8.5l2.6 2.6" />
+    <path d="M10.4 13.9 7.8 16.5l2.6 2.6" />
+  </svg>
+)
+
+export const IconNetwork = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3.4 19.5a5.9 5.9 0 0 1 11.2 0" />
+    <circle cx="17.6" cy="6.4" r="2.4" />
+    <path d="M16.4 12.2a4.9 4.9 0 0 1 4.2 4.4" />
+  </svg>
+)

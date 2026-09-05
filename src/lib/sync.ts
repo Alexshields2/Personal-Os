@@ -44,7 +44,7 @@ export function useSync(): SyncState {
 
 /**
  * Whichever document was written last wins outright for the lists (ledger,
- * balances, goals, books…), because merging those by id would resurrect
+ * balances, goals, learning…), because merging those by id would resurrect
  * anything deleted on the other device.
  *
  * Days and weeks are merged by key instead: logging Tuesday on your phone and

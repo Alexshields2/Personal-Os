@@ -1,25 +1,34 @@
 import { useSyncExternalStore } from 'react'
 import {
   CHECKLIST,
-  DEFAULT_BOOKS,
+  CORE_PRIORITIES,
+  DEFAULT_BLOCKS,
   DEFAULT_GOALS,
+  DEFAULT_LEARNING,
+  DEFAULT_LOOPS,
   DEFAULT_REWARDS,
   DEFAULT_TARGETS,
   DEFAULT_UPKEEP,
+  MAX_PRIORITIES,
   MORNING,
   PROTOCOL_DAYS,
 } from './config'
-import { todayISO, isoForDay } from './date'
+import { addMinutes, todayISO, isoForDay } from './date'
+import { uid } from './format'
 import { EMPTY_METRICS, STATE_VERSION } from './types'
 import type {
   AppState,
   BalanceSnapshot,
-  Book,
   Connection,
   DayEntry,
   Goal,
+  LearnItem,
   LedgerEntry,
+  Lesson,
+  Loop,
+  Priority,
   Targets,
+  TimeBlock,
   Upkeep,
   WeekEntry,
 } from './types'
@@ -37,12 +46,39 @@ function initialState(): AppState {
     ledger: [],
     balances: [],
     payoutReceived: 0,
-    books: DEFAULT_BOOKS.map((b) => ({ ...b })),
+    learning: DEFAULT_LEARNING.map((b) => ({ ...b, lessons: [] })),
     goals: DEFAULT_GOALS.map((g) => ({ ...g })),
     connections: [],
     upkeep: DEFAULT_UPKEEP.map((u) => ({ ...u })),
+    loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
   }
+}
+
+/** v1 shape of the reading list, before books became one kind of learning. */
+interface LegacyBook {
+  id: string
+  title: string
+  status: 'reading' | 'done' | 'queued'
+  notes: string
+}
+
+/**
+ * v1 stored a flat `books` array. Fold it into `learning` so nothing read is
+ * lost; returns undefined when there is nothing to migrate.
+ */
+function migrateBooks(parsed: Partial<AppState> & { books?: LegacyBook[] }): LearnItem[] | undefined {
+  if (!parsed.books) return undefined
+  return parsed.books.map((b) => ({
+    id: b.id,
+    kind: 'book' as const,
+    title: b.title,
+    source: '',
+    status: b.status === 'reading' ? ('active' as const) : b.status,
+    date: '',
+    notes: b.notes ?? '',
+    lessons: [],
+  }))
 }
 
 /**
@@ -59,7 +95,15 @@ function hydrate(raw: string): AppState {
   }
   const days: Record<string, DayEntry> = {}
   for (const [k, v] of Object.entries(parsed.days ?? {})) {
-    days[k] = { ...emptyDay(k), ...v, metrics: { ...EMPTY_METRICS, ...(v?.metrics ?? {}) } }
+    days[k] = {
+      ...emptyDay(k),
+      ...v,
+      metrics: { ...EMPTY_METRICS, ...(v?.metrics ?? {}) },
+      priorities: v?.priorities ?? emptySlots(k),
+      blocks: v?.blocks ?? [],
+      loops: v?.loops ?? [],
+      answers: v?.answers ?? {},
+    }
   }
   return {
     ...base,
@@ -73,12 +117,38 @@ function hydrate(raw: string): AppState {
     ledger: parsed.ledger ?? [],
     balances: parsed.balances ?? [],
     payoutReceived: parsed.payoutReceived ?? 0,
-    books: parsed.books ?? base.books,
+    learning: parsed.learning ?? migrateBooks(parsed) ?? base.learning,
     goals: parsed.goals ?? base.goals,
-    connections: parsed.connections ?? base.connections,
+    connections: (parsed.connections ?? base.connections).map((c) => {
+      // v1 connections carried only name, why and status. Reading them as
+      // partial is what lets the defaults below survive the spread.
+      const legacy = c as Partial<Connection>
+      return {
+        role: '',
+        lastContact: '',
+        cadenceDays: 0,
+        notes: '',
+        ...legacy,
+      } as Connection
+    }),
     upkeep: parsed.upkeep ?? base.upkeep,
+    loops: parsed.loops ?? base.loops,
     rewards: parsed.rewards ?? base.rewards,
   }
+}
+
+/**
+ * Slot ids are derived from the date rather than random, because `emptyDay` is
+ * called during render for any day not yet logged — fresh ids each pass would
+ * remount the inputs and lose what was being typed.
+ */
+export function emptySlots(date: string, n = CORE_PRIORITIES): Priority[] {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `${date}-p${i + 1}`,
+    text: '',
+    done: false,
+    tag: 'acmr' as const,
+  }))
 }
 
 export function emptyDay(date: string): DayEntry {
@@ -91,6 +161,13 @@ export function emptyDay(date: string): DayEntry {
     biggestWin: '',
     biggestMistake: '',
     notes: '',
+    priorities: emptySlots(date),
+    blocks: [],
+    planned: false,
+    energy: 0,
+    lesson: '',
+    loops: [],
+    answers: {},
     closed: false,
   }
 }
@@ -203,6 +280,76 @@ export const actions = {
     })
   },
 
+  setPriorities(date: string, priorities: Priority[]) {
+    actions.updateDay(date, { priorities })
+  },
+
+  updatePriority(date: string, id: string, patch: Partial<Priority>) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.setPriorities(
+      date,
+      prev.priorities.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    )
+  },
+
+  addPriority(date: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    if (prev.priorities.length >= MAX_PRIORITIES) return
+    actions.setPriorities(date, [
+      ...prev.priorities,
+      { id: uid(), text: '', done: false, tag: 'acmr' },
+    ])
+  },
+
+  removePriority(date: string, id: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.setPriorities(
+      date,
+      prev.priorities.filter((p) => p.id !== id),
+    )
+  },
+
+  setBlocks(date: string, blocks: TimeBlock[]) {
+    // Kept in clock order so the plan always reads top-to-bottom as the day runs.
+    actions.updateDay(date, { blocks: [...blocks].sort((a, b) => a.start.localeCompare(b.start)) })
+  },
+
+  updateBlock(date: string, id: string, patch: Partial<TimeBlock>) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.setBlocks(
+      date,
+      prev.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+    )
+  },
+
+  addBlock(date: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const last = prev.blocks[prev.blocks.length - 1]
+    const start = last ? last.end : '09:00'
+    actions.setBlocks(date, [
+      ...prev.blocks,
+      { id: uid(), start, end: addMinutes(start, 60), label: '', tag: 'acmr' },
+    ])
+  },
+
+  removeBlock(date: string, id: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.setBlocks(
+      date,
+      prev.blocks.filter((b) => b.id !== id),
+    )
+  },
+
+  /** Lay the default shape over an empty day so there's something to edit. */
+  seedBlocks(date: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    if (prev.blocks.length > 0) return
+    actions.setBlocks(
+      date,
+      DEFAULT_BLOCKS.map((b) => ({ ...b, id: uid() })),
+    )
+  },
+
   updateWeek(weekStart: string, patch: Partial<WeekEntry>) {
     const prev = state.weeks[weekStart] ?? emptyWeek(weekStart)
     set({ ...state, weeks: { ...state.weeks, [weekStart]: { ...prev, ...patch } } })
@@ -232,8 +379,54 @@ export const actions = {
     set({ ...state, payoutReceived: Math.max(0, amount) })
   },
 
-  setBooks(books: Book[]) {
-    set({ ...state, books })
+  toggleLoop(date: string, id: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const on = prev.loops.includes(id)
+    actions.updateDay(date, {
+      loops: on ? prev.loops.filter((l) => l !== id) : [...prev.loops, id],
+    })
+  },
+
+  setAnswer(date: string, id: string, text: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, { answers: { ...prev.answers, [id]: text } })
+  },
+
+  setLoops(loops: Loop[]) {
+    set({ ...state, loops })
+  },
+
+  setLearning(learning: LearnItem[]) {
+    set({ ...state, learning })
+  },
+
+  updateLearnItem(id: string, patch: Partial<LearnItem>) {
+    set({
+      ...state,
+      learning: state.learning.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+    })
+  },
+
+  addLesson(itemId: string, lesson: Lesson) {
+    actions.updateLearnItem(itemId, {
+      lessons: [lesson, ...(state.learning.find((i) => i.id === itemId)?.lessons ?? [])],
+    })
+  },
+
+  updateLesson(itemId: string, lessonId: string, patch: Partial<Lesson>) {
+    const item = state.learning.find((i) => i.id === itemId)
+    if (!item) return
+    actions.updateLearnItem(itemId, {
+      lessons: item.lessons.map((l) => (l.id === lessonId ? { ...l, ...patch } : l)),
+    })
+  },
+
+  removeLesson(itemId: string, lessonId: string) {
+    const item = state.learning.find((i) => i.id === itemId)
+    if (!item) return
+    actions.updateLearnItem(itemId, {
+      lessons: item.lessons.filter((l) => l.id !== lessonId),
+    })
   },
 
   setGoals(goals: Goal[]) {
@@ -242,6 +435,18 @@ export const actions = {
 
   setConnections(connections: Connection[]) {
     set({ ...state, connections })
+  },
+
+  updateConnection(id: string, patch: Partial<Connection>) {
+    set({
+      ...state,
+      connections: state.connections.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    })
+  },
+
+  /** Log a real conversation, which is what restarts the cadence clock. */
+  logContact(id: string, iso = todayISO()) {
+    actions.updateConnection(id, { lastContact: iso })
   },
 
   setUpkeep(upkeep: Upkeep[]) {

@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 1
+export const STATE_VERSION = 2
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -35,6 +35,29 @@ export const EMPTY_METRICS: DayMetrics = {
   socialMin: 0,
 }
 
+/** Which part of the empire a priority belongs to. */
+export type PriorityTag = 'acmr' | 'onemedia' | 'life'
+
+/**
+ * One of the day's committed outcomes. Order is rank: the first is the day's
+ * one thing, and the rest fall in behind it.
+ */
+export interface Priority {
+  id: string
+  text: string
+  done: boolean
+  tag: PriorityTag
+}
+
+/** A planned block of the day. `start`/`end` are 'HH:MM', 24-hour. */
+export interface TimeBlock {
+  id: string
+  start: string
+  end: string
+  label: string
+  tag: PriorityTag
+}
+
 export interface DayEntry {
   /** ISO date, YYYY-MM-DD. Also the map key. */
   date: string
@@ -47,6 +70,20 @@ export interface DayEntry {
   biggestWin: string
   biggestMistake: string
   notes: string
+  /** The day's committed outcomes, ranked. Set in the morning, graded at night. */
+  priorities: Priority[]
+  /** The intended shape of the day. Optional — a plan works without it. */
+  blocks: TimeBlock[]
+  /** Set when the morning plan is committed, so an unplanned day is visible. */
+  planned: boolean
+  /** Subjective 1-5. 0 means unrated. */
+  energy: number
+  /** What today teaches tomorrow. */
+  lesson: string
+  /** Ids of the loops that ran today. The raw material for pattern detection. */
+  loops: string[]
+  /** Nightly question id -> answer. */
+  answers: Record<string, string>
   /** Set when the nightly scorecard is signed off. */
   closed: boolean
 }
@@ -101,11 +138,42 @@ export interface WeekEntry {
   planned: boolean
 }
 
-export interface Book {
+/** A named failure pattern. Editable, because the real ones are personal. */
+export interface Loop {
   id: string
+  label: string
+  note: string
+  /** Retired loops stop being offered but keep their history. */
+  archived: boolean
+}
+
+export type LearnKind = 'book' | 'course' | 'event'
+export type LearnStatus = 'queued' | 'active' | 'done'
+
+/**
+ * One extracted lesson. `action` is what makes it worth capturing — a lesson
+ * with no action is a highlight, and highlights change nothing.
+ */
+export interface Lesson {
+  id: string
+  date: string
+  text: string
+  action: string
+  applied: boolean
+}
+
+/** A book, course or event, and everything taken from it. */
+export interface LearnItem {
+  id: string
+  kind: LearnKind
   title: string
-  status: 'reading' | 'done' | 'queued'
+  /** Author, provider or host. */
+  source: string
+  status: LearnStatus
+  /** ISO date. For an event, the date it happened. */
+  date: string
   notes: string
+  lessons: Lesson[]
 }
 
 export interface Goal {
@@ -117,14 +185,24 @@ export interface Goal {
   done: boolean
 }
 
-export type ConnectionStatus = 'target' | 'reachedOut' | 'connected'
+export type ConnectionStatus = 'inner' | 'connected' | 'reachedOut' | 'target'
 
-/** Someone worth knowing, and where that stands. */
+/**
+ * Someone worth knowing, where that stands, and when you last actually spoke.
+ * `cadenceDays` is what turns a list of names into a system — 0 means the
+ * relationship runs on its own and shouldn't nag.
+ */
 export interface Connection {
   id: string
   name: string
+  /** What they do, or where they sit. */
+  role: string
   why: string
   status: ConnectionStatus
+  /** ISO date of the last real contact. Empty means never. */
+  lastContact: string
+  cadenceDays: number
+  notes: string
 }
 
 /** A recurring upkeep task — haircut every 14 days, and anything like it. */
@@ -168,9 +246,10 @@ export interface AppState {
   balances: BalanceSnapshot[]
   /** Cash actually landed in the personal account. Gates the rewards. */
   payoutReceived: number
-  books: Book[]
+  learning: LearnItem[]
   goals: Goal[]
   connections: Connection[]
   upkeep: Upkeep[]
+  loops: Loop[]
   rewards: { id: string; label: string; detail: string }[]
 }

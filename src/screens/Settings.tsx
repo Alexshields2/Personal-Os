@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
-import { Card, Field, NumberField, SectionTitle } from '../components/ui'
+import { Card, Empty, Field, NumberField, SectionTitle } from '../components/ui'
 import SyncCard from '../components/SyncCard'
 import { useSync } from '../lib/sync'
 import { METRICS, PROTOCOL_DAYS } from '../lib/config'
+import { IconPlus, IconTrash } from '../components/icons'
+import { uid } from '../lib/format'
 import { formatWithYear, isoForDay } from '../lib/date'
 import { euroCompact } from '../lib/format'
 import { actions, exportJSON, useStore } from '../lib/store'
@@ -24,7 +26,7 @@ export default function Settings() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `126-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `personal-os-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
     flash('Backup downloaded.')
@@ -34,7 +36,7 @@ export default function Settings() {
     try {
       const parsed = JSON.parse(await file.text()) as AppState
       if (!parsed || typeof parsed !== 'object' || !('days' in parsed)) {
-        flash("That file isn't a 126 backup.")
+        flash("That file isn't a Personal OS backup.")
         return
       }
       if (!confirm('Replace everything currently stored with this backup?')) return
@@ -135,6 +137,8 @@ export default function Settings() {
         </div>
       </Card>
 
+      <Loops />
+
       <SectionTitle title="Your data" />
       <Card className="card-pad">
         <p className="t-foot" style={{ marginBottom: 14 }}>
@@ -192,5 +196,91 @@ export default function Settings() {
         126 days. Head down. Same inputs. Every day.
       </p>
     </div>
+  )
+}
+
+// --------------------------------------------------------------------- loops
+
+/**
+ * The loop list is the one piece of config that has to be personal — a generic
+ * failure pattern never gets ticked, and an untagged loop is invisible to the
+ * pattern engine. Archiving rather than deleting keeps the history readable.
+ */
+function Loops() {
+  const state = useStore()
+  const [label, setLabel] = useState('')
+
+  const add = () => {
+    if (!label.trim()) return
+    actions.setLoops([
+      ...state.loops,
+      { id: uid(), label: label.trim(), note: '', archived: false },
+    ])
+    setLabel('')
+  }
+
+  const active = state.loops.filter((l) => !l.archived)
+
+  return (
+    <>
+      <SectionTitle
+        title="Loops"
+        action={<span className="t-foot muted">{active.length} active</span>}
+      />
+      <Card>
+        {state.loops.length === 0 ? (
+          <Empty>No loops. Add the patterns you actually run.</Empty>
+        ) : (
+          <div className="rows">
+            {state.loops.map((l) => (
+              <div className="row" key={l.id}>
+                <span className="row-main">
+                  <span className="row-title" style={{ opacity: l.archived ? 0.5 : 1 }}>
+                    {l.label}
+                  </span>
+                  <span className="row-sub">{l.archived ? 'Archived' : l.note || 'Active'}</span>
+                </span>
+                <button
+                  className="btn btn-quiet btn-sm"
+                  onClick={() => actions.setLoops(
+                    state.loops.map((x) => (x.id === l.id ? { ...x, archived: !x.archived } : x)),
+                  )}
+                >
+                  {l.archived ? 'Restore' : 'Archive'}
+                </button>
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => {
+                    if (confirm(`Delete "${l.label}"? Days already tagged with it lose that tag.`))
+                      actions.setLoops(state.loops.filter((x) => x.id !== l.id))
+                  }}
+                  aria-label="Delete loop"
+                >
+                  <IconTrash style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          style={{ display: 'flex', gap: 8, padding: 13, borderTop: '1px solid var(--hairline)' }}
+        >
+          <input
+            className="input"
+            placeholder="Add a loop you actually run"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+          <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add loop">
+            <IconPlus style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Archiving keeps a loop out of the nightly list without erasing the days it already
+        explains. Deleting removes it from those days too.
+      </p>
+    </>
   )
 }
