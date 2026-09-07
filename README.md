@@ -33,9 +33,24 @@ npm test
 ```
 
 The engines are covered: scoring, the plan loop, the pattern detection, the
-oscillation, the life-map roll-up, the pipeline, goal key results and the money
-selectors. They are what the app is *for* — a wrong derived number is worse than
-a missing one, because it still looks like data — so the tests gate the deploy.
+oscillation, the life-map roll-up, the pipeline, goal key results, the trackers,
+the calendar repeats and the money selectors. They are what the app is *for* — a
+wrong derived number is worse than a missing one, because it still looks like
+data — so the tests gate the deploy.
+
+The same run enforces performance budgets against a year of days, 300 tasks and
+80 deals. Everything derived runs in under a millisecond there, and a whole
+screen's worth together is about 3ms; the budgets sit far enough above that to
+survive a slow CI box while still catching anything that goes quadratic. The
+figures from the last run land in `perf-report.json`.
+
+## Offline
+
+The app works with no network at all, not just without sync. A service worker
+caches the shell and the built assets, so it opens on a plane once it has been
+opened once. Built assets carry a content hash and are served cache-first;
+`index.html` is fetched network-first and falls back to its cached copy, which
+is what lets a new deploy be picked up while an offline launch still works.
 
 ## Sync across devices (optional)
 
