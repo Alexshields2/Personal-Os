@@ -24,6 +24,7 @@ import type {
   AppState,
   BalanceSnapshot,
   Bill,
+  CalendarEvent,
   Client,
   Connection,
   DayEntry,
@@ -71,6 +72,7 @@ function initialState(): AppState {
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    events: [],
     vision: { ...DEFAULT_VISION, columns: DEFAULT_VISION.columns.map((c) => ({ ...c, images: [] })) },
     trackers: DEFAULT_TRACKERS.map((t) => ({ ...t })),
     bills: [],
@@ -213,6 +215,7 @@ function hydrate(raw: string): AppState {
     loops: parsed.loops ?? base.loops,
     domains: parsed.domains ?? base.domains,
     links: parsed.links ?? base.links,
+    events: parsed.events ?? [],
     vision: parsed.vision ?? base.vision,
     trackers: parsed.trackers ?? base.trackers,
     bills: parsed.bills ?? [],
@@ -571,6 +574,24 @@ export const actions = {
 
   setLinks(links: DomainLink[]) {
     set({ ...state, links })
+  },
+
+  // ------------------------------------------------------------ calendar
+
+  setEvents(events: CalendarEvent[]) {
+    set({ ...state, events })
+  },
+
+  addEvent(event: CalendarEvent) {
+    set({ ...state, events: [...state.events, event] })
+  },
+
+  updateEvent(id: string, patch: Partial<CalendarEvent>) {
+    set({ ...state, events: state.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })
+  },
+
+  removeEvent(id: string) {
+    set({ ...state, events: state.events.filter((e) => e.id !== id) })
   },
 
   // -------------------------------------------------------------- vision
@@ -974,6 +995,12 @@ export const actions = {
           return { ...c, ...(filled[c.id] ?? {}) }
         }),
       },
+      events: [
+        { id: 'se1', title: "Caoimhe's birthday", date: addDays(today, 26), time: '', durationMin: 0, repeat: 'yearly', tag: 'life', notes: '', remindDays: 14 },
+        { id: 'se2', title: 'Kavanagh renewal call', date: addDays(today, 11), time: '10:00', durationMin: 45, repeat: 'none', tag: 'consulting', notes: 'Start the expansion conversation before they do.', remindDays: 7 },
+        { id: 'se3', title: 'Quarterly dinner I host', date: addDays(today, 40), time: '19:30', durationMin: 180, repeat: 'monthly', tag: 'life', notes: '', remindDays: 10 },
+        { id: 'se4', title: 'Weekly review', date: addDays(today, 1), time: '17:00', durationMin: 60, repeat: 'weekly', tag: 'life', notes: '', remindDays: 1 },
+      ],
       ledger: [
         { id: 'sl1', date: at(14), entity: 'consulting', kind: 'revenue', amount: 36_000, note: 'Doyle Group' },
         { id: 'sl2', date: at(12), entity: 'consulting', kind: 'cashCollected', amount: 18_000, note: 'Doyle deposit' },

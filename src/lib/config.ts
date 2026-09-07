@@ -719,6 +719,18 @@ export const TASK_PRIORITY_LABEL: Record<number, string> = {
 /** Quick estimates, in minutes. Anything longer belongs in a project. */
 export const ESTIMATE_STEPS = [15, 30, 45, 60, 90, 120, 180, 240]
 
+// ---------------------------------------------------------------- calendar
+
+export const REPEAT_LABEL: Record<string, string> = {
+  none: 'Once',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+  yearly: 'Yearly',
+}
+
+/** How far ahead the agenda looks by default. */
+export const AGENDA_DAYS = 30
+
 // ------------------------------------------------------------------ vision
 
 /**
@@ -797,6 +809,7 @@ export const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: 'home', label: 'Home', blurb: 'What needs you right now' },
   { id: 'today', label: 'Today', blurb: 'Plan, log and review the day' },
   { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },
+  { id: 'calendar', label: 'Calendar', blurb: "Events, and what's coming" },
   { id: 'patterns', label: 'Patterns', blurb: 'Loops, breakdowns, your two versions' },
   { id: 'map', label: 'Map', blurb: 'The life tree and its causes' },
   { id: 'money', label: 'Money', blurb: 'Balances, net worth, the ledger' },

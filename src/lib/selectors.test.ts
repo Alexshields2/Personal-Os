@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CHECKLIST } from './config'
 import { addDays } from './date'
 import {
+  agenda,
   boardBounds,
   breakdownSignals,
   carriedPriorities,
@@ -10,11 +11,13 @@ import {
   domainPath,
   domainScores,
   domainSubtree,
+  eventFallsOn,
   goalProgress,
   isLogged,
   keyResultProgress,
   layoutDomains,
   loopStats,
+  monthGrid,
   oscillation,
   pipeline,
   planEffect,
@@ -24,6 +27,7 @@ import {
   taskQueue,
   trackerHit,
   trackerStats,
+  upcomingEvents,
   upkeepStatus,
   weakestStandards,
   weekdayScores,
@@ -783,5 +787,118 @@ describe('trackers', () => {
     const stat = trackerStats(state, TODAY)[0]
     expect(stat.streak).toBe(3)
     expect(stat.hit).toBe(true)
+  })
+})
+
+describe('calendar repeats', () => {
+  const ev = (over: Partial<import('./types').CalendarEvent> = {}) => ({
+    id: 'e',
+    title: 'Thing',
+    date: '2026-01-15',
+    time: '',
+    durationMin: 0,
+    repeat: 'none' as const,
+    tag: 'life' as const,
+    notes: '',
+    remindDays: 3,
+    ...over,
+  })
+
+  it('lands a one-off only on its own date', () => {
+    const e = ev()
+    expect(eventFallsOn(e, '2026-01-15')).toBe(true)
+    expect(eventFallsOn(e, '2026-01-16')).toBe(false)
+    expect(eventFallsOn(e, '2027-01-15')).toBe(false)
+  })
+
+  it('never falls before it starts', () => {
+    const e = ev({ repeat: 'yearly' })
+    expect(eventFallsOn(e, '2025-01-15')).toBe(false)
+  })
+
+  it('repeats weekly on the same weekday', () => {
+    // 2026-01-15 is a Thursday.
+    const e = ev({ repeat: 'weekly' })
+    expect(eventFallsOn(e, '2026-01-22')).toBe(true)
+    expect(eventFallsOn(e, '2026-01-23')).toBe(false)
+  })
+
+  it('repeats yearly, and survives a leap day', () => {
+    const birthday = ev({ date: '2024-02-29', repeat: 'yearly' })
+    expect(eventFallsOn(birthday, '2028-02-29')).toBe(true)
+    // 2027 has no 29th, so it lands on the 28th rather than vanishing.
+    expect(eventFallsOn(birthday, '2027-02-28')).toBe(true)
+    expect(eventFallsOn(birthday, '2027-03-01')).toBe(false)
+  })
+
+  it('clamps a monthly repeat to the last day of a short month', () => {
+    const e = ev({ date: '2026-01-31', repeat: 'monthly' })
+    expect(eventFallsOn(e, '2026-03-31')).toBe(true)
+    // February stops at the 28th, so that is where it lands.
+    expect(eventFallsOn(e, '2026-02-28')).toBe(true)
+    expect(eventFallsOn(e, '2026-02-27')).toBe(false)
+  })
+})
+
+describe('agenda', () => {
+  it('lists only the days that have something on them', () => {
+    const state = makeState({
+      events: [
+        {
+          id: 'e1',
+          title: 'Dentist',
+          date: addDays(TODAY, 2),
+          time: '09:00',
+          durationMin: 30,
+          repeat: 'none',
+          tag: 'life',
+          notes: '',
+          remindDays: 3,
+        },
+      ],
+      tasks: [task('t1', { scheduled: addDays(TODAY, 2) }), task('t2', { due: addDays(TODAY, 5) })],
+    })
+    const list = agenda(state, TODAY, 10)
+    expect(list.map((d) => d.date)).toEqual([addDays(TODAY, 2), addDays(TODAY, 5)])
+    expect(list[0].events).toHaveLength(1)
+    expect(list[0].scheduled).toHaveLength(1)
+    expect(list[1].due).toHaveLength(1)
+  })
+
+  it('does not list a task twice when it is scheduled on the day it is due', () => {
+    const state = makeState({
+      tasks: [task('t', { scheduled: addDays(TODAY, 1), due: addDays(TODAY, 1) })],
+    })
+    const day = agenda(state, TODAY, 5)[0]
+    expect(day.scheduled).toHaveLength(1)
+    expect(day.due).toHaveLength(0)
+  })
+
+  it('only surfaces an event once it is inside its reminder window', () => {
+    const far = {
+      id: 'e',
+      title: 'Renewal',
+      date: addDays(TODAY, 20),
+      time: '',
+      durationMin: 0,
+      repeat: 'none' as const,
+      tag: 'life' as const,
+      notes: '',
+      remindDays: 3,
+    }
+    expect(upcomingEvents(makeState({ events: [far] }), TODAY, 30)).toHaveLength(0)
+    const near = { ...far, date: addDays(TODAY, 2) }
+    expect(upcomingEvents(makeState({ events: [near] }), TODAY, 30)).toHaveLength(1)
+  })
+})
+
+describe('monthGrid', () => {
+  it('returns six Monday-first weeks around the anchor month', () => {
+    const cells = monthGrid(makeState(), '2026-03-15', TODAY)
+    expect(cells).toHaveLength(42)
+    // 1 March 2026 is a Sunday, so a Monday-first grid opens on 23 February.
+    expect(cells[0].date).toBe('2026-02-23')
+    expect(cells[0].inMonth).toBe(false)
+    expect(cells.filter((c) => c.inMonth)).toHaveLength(31)
   })
 })

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { IconPlus } from './icons'
+import InlineAdd from './InlineAdd'
 import { actions, useStore } from '../lib/store'
 import {
   NODE_H,
@@ -42,6 +42,7 @@ export default function Board({
   const scores = useMemo(() => domainScores(state), [state])
   const series = useMemo(() => domainSeries(state), [state])
   const placed = useMemo(() => layoutDomains(state.domains), [state.domains])
+  const byId = useMemo(() => new Map(state.domains.map((d) => [d.id, d])), [state.domains])
 
   const fit = useCallback(() => {
     const el = wrapRef.current
@@ -67,6 +68,29 @@ export default function Board({
     if (fitted.current) return
     fitted.current = true
     fit()
+  }, [fit])
+
+  /**
+   * Refit when the canvas itself changes size. Without this, a board fitted at
+   * desktop width stays at that zoom and pan when the window narrows to a
+   * phone, and every node ends up outside the visible area — an empty grid
+   * where the map should be.
+   *
+   * Only a real width change counts: a soft keyboard opening changes the height
+   * and would otherwise throw away a pan the user had just made by hand.
+   */
+  const lastWidth = useRef(0)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth
+      if (Math.abs(w - lastWidth.current) < 40) return
+      lastWidth.current = w
+      fit()
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
   }, [fit])
 
   const toBoard = (clientX: number, clientY: number) => {
@@ -174,17 +198,12 @@ export default function Board({
         >
           Tidy
         </button>
-        <button
-          className="btn btn-sm"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => {
-            const label = prompt('Name the branch')?.trim()
-            if (label) actions.addDomain(selected ?? 'root', label)
-          }}
-        >
-          <IconPlus style={{ width: 14, height: 14 }} />
-          Branch
-        </button>
+        <InlineAdd
+          className="board-add"
+          label="Branch"
+          placeholder={`New branch under ${byId.get(selected ?? 'root')?.label ?? 'Alex'}`}
+          onAdd={(label) => actions.addDomain(selected ?? 'root', label)}
+        />
       </div>
 
       <div

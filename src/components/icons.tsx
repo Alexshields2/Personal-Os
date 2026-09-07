@@ -173,3 +173,10 @@ export const IconVision = (p: P) => (
     <circle cx="8.6" cy="8.8" r="1.4" />
   </svg>
 )
+
+export const IconCalendar = (p: P) => (
+  <svg {...base} {...p}>
+    <rect x="3.2" y="5" width="17.6" height="15.8" rx="2" />
+    <path d="M3.2 9.6h17.6M8.2 3.2v3.6M15.8 3.2v3.6" />
+  </svg>
+)

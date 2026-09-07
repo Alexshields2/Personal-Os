@@ -22,6 +22,7 @@ import {
   daysBetween,
   fromISO,
   isoForDay,
+  toISO,
   todayISO,
   weekStartISO,
 } from './date'
@@ -29,6 +30,7 @@ import type {
   AccountId,
   AppState,
   Bill,
+  CalendarEvent,
   Client,
   Connection,
   DayEntry,
@@ -2013,4 +2015,113 @@ export function durationLabel(minutes: number): string {
   if (h === 0) return `${m}m`
   if (m === 0) return `${h}h`
   return `${h}h ${m}m`
+}
+
+// ---------------------------------------------------------------------------
+// The calendar
+//
+// Repeats are computed, never stored as copies. Editing a birthday should
+// change every year of it, and a year of stored duplicates is a year of rows
+// that quietly drift out of step with the one you edited.
+
+/** Whether a repeating event lands on `date`. */
+export function eventFallsOn(event: CalendarEvent, date: string): boolean {
+  if (event.date === date) return true
+  if (event.repeat === 'none' || date < event.date) return false
+
+  const start = fromISO(event.date)
+  const on = fromISO(date)
+
+  if (event.repeat === 'weekly') return start.getDay() === on.getDay()
+  if (event.repeat === 'monthly') {
+    // The 31st doesn't exist in every month; fall back to the last day.
+    const last = new Date(on.getFullYear(), on.getMonth() + 1, 0).getDate()
+    return on.getDate() === Math.min(start.getDate(), last)
+  }
+  // Yearly. 29 February lands on the 28th in a year that hasn't got one.
+  const sameMonth = start.getMonth() === on.getMonth()
+  if (!sameMonth) return false
+  const last = new Date(on.getFullYear(), on.getMonth() + 1, 0).getDate()
+  return on.getDate() === Math.min(start.getDate(), last)
+}
+
+export function eventsOn(state: AppState, date: string): CalendarEvent[] {
+  return state.events
+    .filter((e) => eventFallsOn(e, date))
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'))
+}
+
+export interface AgendaEntry {
+  date: string
+  daysAway: number
+  events: CalendarEvent[]
+  /** Tasks planned for that day. */
+  scheduled: Task[]
+  /** Tasks owed that day. */
+  due: Task[]
+  bills: Bill[]
+}
+
+/** The next `days` days that actually have something on them. */
+export function agenda(state: AppState, iso = todayISO(), days = 30): AgendaEntry[] {
+  const out: AgendaEntry[] = []
+  for (let i = 0; i < days; i++) {
+    const date = addDays(iso, i)
+    const events = eventsOn(state, date)
+    const scheduled = state.tasks.filter((t) => !t.done && t.scheduled === date)
+    const due = state.tasks.filter((t) => !t.done && t.due === date && t.scheduled !== date)
+    const bills = state.bills.filter((b) => b.nextDue === date)
+    if (events.length || scheduled.length || due.length || bills.length) {
+      out.push({ date, daysAway: i, events, scheduled, due, bills })
+    }
+  }
+  return out
+}
+
+/** Events close enough to need saying out loud, soonest first. */
+export function upcomingEvents(
+  state: AppState,
+  iso = todayISO(),
+  horizon = 14,
+): { event: CalendarEvent; date: string; daysAway: number }[] {
+  const out: { event: CalendarEvent; date: string; daysAway: number }[] = []
+  for (let i = 0; i <= horizon; i++) {
+    const date = addDays(iso, i)
+    for (const event of eventsOn(state, date)) {
+      // An event with a reminder window only surfaces once inside it.
+      if (i <= Math.max(event.remindDays, 0)) out.push({ event, date, daysAway: i })
+    }
+  }
+  return out.sort((a, b) => a.daysAway - b.daysAway)
+}
+
+export interface MonthCell {
+  date: string
+  inMonth: boolean
+  isToday: boolean
+  events: CalendarEvent[]
+  taskCount: number
+  billCount: number
+}
+
+/** Six weeks of cells, Monday-first, covering the month `anchor` sits in. */
+export function monthGrid(state: AppState, anchor: string, iso = todayISO()): MonthCell[] {
+  const d = fromISO(anchor)
+  const first = new Date(d.getFullYear(), d.getMonth(), 1)
+  const back = first.getDay() === 0 ? 6 : first.getDay() - 1
+  const start = addDays(toISO(first), -back)
+
+  return Array.from({ length: 42 }, (_, i) => {
+    const date = addDays(start, i)
+    const cell = fromISO(date)
+    return {
+      date,
+      inMonth: cell.getMonth() === d.getMonth(),
+      isToday: date === iso,
+      events: eventsOn(state, date),
+      taskCount: state.tasks.filter((t) => !t.done && (t.scheduled === date || t.due === date))
+        .length,
+      billCount: state.bills.filter((b) => b.nextDue === date).length,
+    }
+  })
 }

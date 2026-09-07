@@ -1475,6 +1475,8 @@ kbd {
   align-items: center;
   gap: 8px;
   padding: 0 0 10px;
+  /* Five controls plus a field don't fit a phone in one row. */
+  flex-wrap: wrap;
 }
 
 .board-zoom {
@@ -2172,4 +2174,190 @@ kbd {
   background: rgba(0, 0, 0, 0.55);
   border-radius: 6px;
   padding: 3px;
+}
+
+/* =========================================================================
+   Calendar
+   ========================================================================= */
+
+.cal-dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 11px 8px 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--hairline);
+  border-top: 1px solid var(--hairline);
+}
+
+.cal-cell {
+  background: var(--surface-1);
+  min-height: 62px;
+  padding: 6px 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s var(--ease);
+}
+
+.cal-cell:hover {
+  background: var(--surface-2);
+}
+
+.cal-cell[data-out='true'] .cal-num {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.cal-cell[data-today='true'] .cal-num {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 50%;
+}
+
+.cal-num {
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+}
+
+.cal-marks {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Three marks, told apart by fill rather than colour. */
+.cal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-primary);
+}
+
+.cal-dot-task {
+  background: transparent;
+  border: 1px solid var(--text-secondary);
+}
+
+.cal-dot-bill {
+  background: var(--text-muted);
+  border-radius: 1px;
+}
+
+/* Agenda */
+.agenda-day {
+  padding: 13px 15px;
+  border-top: 1px solid var(--hairline);
+}
+
+.agenda-day:first-child {
+  border-top: none;
+}
+
+.agenda-date {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.agenda-when {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.006em;
+}
+
+.agenda-items {
+  display: grid;
+  gap: 6px;
+}
+
+.agenda-item {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--fill-soft);
+  font-size: 14px;
+}
+
+.agenda-item:hover {
+  background: var(--fill-soft-hover);
+}
+
+.agenda-quiet {
+  background: transparent;
+  border: 1px solid var(--hairline);
+}
+
+.agenda-time {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agenda-main {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* Inline add — the field that replaces a window.prompt */
+.inline-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px;
+  border-radius: var(--r-sm);
+  border: 1px dashed var(--hairline-strong);
+  color: var(--text-muted);
+  font-size: 12px;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.inline-add:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.inline-add-open .input {
+  font-size: 16px;
+}
+
+/* The map's toolbar version sits at the end of the row. */
+.board-add,
+.board-add.inline-add-open {
+  margin-left: auto;
+  min-width: 132px;
+}
+
+@media (max-width: 560px) {
+  .board-add,
+  .board-add.inline-add-open {
+    margin-left: 0;
+    min-width: 0;
+    flex: 1;
+  }
 }

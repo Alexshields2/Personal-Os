@@ -13,9 +13,11 @@ import Patterns from './screens/Patterns'
 import LifeMap from './screens/Map'
 import Goals from './screens/Goals'
 import Work from './screens/Work'
+import Calendar from './screens/Calendar'
 import Settings from './screens/Settings'
 import {
   IconAlex,
+  IconCalendar,
   IconHome,
   IconLearn,
   IconLife,
@@ -42,6 +44,7 @@ type TabId =
   | 'home'
   | 'today'
   | 'work'
+  | 'calendar'
   | 'patterns'
   | 'map'
   | 'money'
@@ -58,6 +61,7 @@ const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGEleme
   { id: 'home', label: 'Home', Icon: IconHome },
   { id: 'today', label: 'Today', Icon: IconToday },
   { id: 'work', label: 'Work', Icon: IconWork },
+  { id: 'calendar', label: 'Calendar', Icon: IconCalendar },
   { id: 'patterns', label: 'Patterns', Icon: IconPatterns },
   { id: 'map', label: 'Map', Icon: IconMap },
   { id: 'money', label: 'Money', Icon: IconMoney },
@@ -87,6 +91,7 @@ const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
   home: Home,
   today: Today,
   work: Work,
+  calendar: Calendar,
   patterns: Patterns,
   map: LifeMap,
   money: Money,
@@ -108,6 +113,21 @@ export default function App() {
   // Jumping tabs should land at the top, the way a native push does.
   useEffect(() => {
     document.querySelector('.scroll')?.scrollTo({ top: 0 })
+    // Fifteen sections don't fit a phone's tab bar, so keep the current one in
+    // view — otherwise the selected tab sits off-screen with no way to tell.
+    // Deferred a frame: on the tab that is being selected, aria-selected is
+    // written in the same commit, and scrolling before paint measures the old
+    // position.
+    const raf = requestAnimationFrame(() => {
+      const active = document.querySelector<HTMLElement>('.tabbar [aria-selected="true"]')
+      const bar = document.querySelector<HTMLElement>('.tabbar')
+      if (!active || !bar) return
+      bar.scrollTo({
+        left: active.offsetLeft - (bar.clientWidth - active.offsetWidth) / 2,
+        behavior: 'smooth',
+      })
+    })
+    return () => cancelAnimationFrame(raf)
   }, [tab])
 
   // Cmd/Ctrl-K anywhere. Ignored while typing so it can't hijack a keystroke

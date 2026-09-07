@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Check, Field, Meter, Segmented, Sheet, TextField } from './ui'
-import { IconPlus, IconTrash } from './icons'
+import InlineAdd from './InlineAdd'
+import { IconTrash } from './icons'
 import { ESTIMATE_STEPS, PRIORITY_TAGS, TASK_PRIORITY_LABEL } from '../lib/config'
 import { addDays, formatShort, todayISO, weekStartISO } from '../lib/date'
 import { actions, newTask, useStore } from '../lib/store'
@@ -156,16 +157,12 @@ export default function WeekBoard() {
               {d.tasks.length === 0 && <div className="week-empty">Nothing planned</div>}
             </div>
 
-            <button
+            <InlineAdd
               className="week-add"
-              onClick={() => {
-                const title = prompt(`Add to ${DOW[i]}`)?.trim()
-                if (title) actions.addTask(newTask(title, { scheduled: d.date }))
-              }}
-            >
-              <IconPlus style={{ width: 13, height: 13 }} />
-              Add
-            </button>
+              label="Add"
+              placeholder={`Add to ${DOW[i]}`}
+              onAdd={(title) => actions.addTask(newTask(title, { scheduled: d.date }))}
+            />
           </div>
         ))}
       </div>

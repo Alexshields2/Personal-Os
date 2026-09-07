@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 5
+export const STATE_VERSION = 6
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -428,6 +428,29 @@ export interface Tracker {
   archived: boolean
 }
 
+// ---------------------------------------------------------------- calendar
+
+export type EventRepeat = 'none' | 'weekly' | 'monthly' | 'yearly'
+
+/**
+ * Something that happens on a date. Repeats are computed rather than stored as
+ * copies, so editing a birthday changes every year of it rather than one.
+ */
+export interface CalendarEvent {
+  id: string
+  title: string
+  /** ISO date of the first occurrence. */
+  date: string
+  /** 'HH:MM'. Empty means it takes the whole day. */
+  time: string
+  durationMin: number
+  repeat: EventRepeat
+  tag: PriorityTag
+  notes: string
+  /** Days ahead it starts showing as coming up. 0 means on the day. */
+  remindDays: number
+}
+
 // ------------------------------------------------------------------ vision
 
 /** One picture on the board. `src` is a data URI or a plain URL. */
@@ -515,6 +538,7 @@ export interface AppState {
   loops: Loop[]
   domains: DomainNode[]
   links: DomainLink[]
+  events: CalendarEvent[]
   vision: Vision
   trackers: Tracker[]
   bills: Bill[]

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Field, Sheet, TextField } from '../components/ui'
+import InlineAdd from '../components/InlineAdd'
 import { IconPlus, IconTrash } from '../components/icons'
 import { VISION_IMAGE_MAX_PX, VISION_IMAGE_QUALITY } from '../lib/config'
 import { actions, useStore } from '../lib/store'
@@ -66,16 +67,12 @@ export default function VisionBoard() {
           <ColumnCard key={col.id} column={col} onEdit={() => setEditing(col.id)} />
         ))}
 
-        <button
+        <InlineAdd
           className="vision-add"
-          onClick={() => {
-            const title = prompt('Name the column')?.trim()
-            if (title) actions.addVisionColumn(title)
-          }}
-        >
-          <IconPlus style={{ width: 18, height: 18 }} />
-          Add a column
-        </button>
+          label="Add a column"
+          placeholder="Name it"
+          onAdd={(title) => actions.addVisionColumn(title)}
+        />
       </div>
 
       {editing && <ColumnSheet id={editing} onClose={() => setEditing(null)} />}

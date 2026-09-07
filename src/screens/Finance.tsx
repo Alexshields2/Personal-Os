@@ -64,13 +64,30 @@ export default function Finance() {
 
 function Bills() {
   const state = useStore()
-  const book = useMemo(() => billBook(state), [state])
+  const [purse, setPurse] = useState<Purse | 'all'>('all')
+  const book = useMemo(
+    () => billBook(state, purse === 'all' ? undefined : purse),
+    [state, purse],
+  )
   const [adding, setAdding] = useState(false)
 
   const purses: Purse[] = ['consulting', 'onemedia', 'personal']
 
   return (
     <>
+      <div style={{ marginBottom: 12 }}>
+        <Segmented
+          value={purse}
+          onChange={setPurse}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'consulting', label: 'Consulting.ie' },
+            { value: 'onemedia', label: '1Media' },
+            { value: 'personal', label: 'Personal' },
+          ]}
+        />
+      </div>
+
       <div className="grid-3">
         <Stat label="Going out" value={euroCompact(book.monthly)} sub="every month" />
         <Stat label="A year of it" value={euroCompact(book.annual)} />
