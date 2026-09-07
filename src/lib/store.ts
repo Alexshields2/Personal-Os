@@ -45,6 +45,7 @@ import type {
   Loop,
   Priority,
   ShapeBlock,
+  Transaction,
   Targets,
   Theme,
   TimeBlock,
@@ -76,6 +77,7 @@ function initialState(): AppState {
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    transactions: [],
     events: [],
     vision: { ...DEFAULT_VISION, columns: DEFAULT_VISION.columns.map((c) => ({ ...c, images: [] })) },
     // Empty by default — nothing is assumed about anyone's day. The starter
@@ -262,6 +264,7 @@ function hydrate(raw: string): AppState {
     loops: parsed.loops ?? base.loops,
     domains: parsed.domains ?? base.domains,
     links: parsed.links ?? base.links,
+    transactions: parsed.transactions ?? [],
     events: parsed.events ?? [],
     vision: parsed.vision ?? base.vision,
     dayShape: parsed.dayShape ?? base.dayShape,
@@ -645,6 +648,56 @@ export const actions = {
 
   setLinks(links: DomainLink[]) {
     set({ ...state, links })
+  },
+
+  // -------------------------------------------------------- transactions
+
+  /**
+   * Bulk import, deduplicated against what's already there. A transaction is
+   * treated as the same one if its date, amount and description all match —
+   * good enough for a bank export, where that combination is effectively
+   * unique, and it's what lets re-importing an overlapping statement be safe
+   * rather than something you have to be careful about.
+   */
+  importTransactions(
+    rows: Omit<Transaction, 'id' | 'category' | 'notes' | 'importBatch'>[],
+    batch: string,
+  ) {
+    const seen = new Set(
+      state.transactions.map((t) => `${t.date}|${t.amount}|${t.description}`),
+    )
+    const fresh = rows.filter((r) => !seen.has(`${r.date}|${r.amount}|${r.description}`))
+    const added = fresh.map((r) => ({
+      ...r,
+      id: uid(),
+      category: '' as const,
+      notes: '',
+      importBatch: batch,
+    }))
+    set({ ...state, transactions: [...added, ...state.transactions] })
+    return added.length
+  },
+
+  categoriseTransaction(id: string, category: Transaction['category']) {
+    set({
+      ...state,
+      transactions: state.transactions.map((t) => (t.id === id ? { ...t, category } : t)),
+    })
+  },
+
+  setTransactionAccount(id: string, account: Transaction['account']) {
+    set({
+      ...state,
+      transactions: state.transactions.map((t) => (t.id === id ? { ...t, account } : t)),
+    })
+  },
+
+  removeTransaction(id: string) {
+    set({ ...state, transactions: state.transactions.filter((t) => t.id !== id) })
+  },
+
+  clearImportBatch(batch: string) {
+    set({ ...state, transactions: state.transactions.filter((t) => t.importBatch !== batch) })
   },
 
   // ------------------------------------------------------------ calendar

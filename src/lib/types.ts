@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 10
+export const STATE_VERSION = 11
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -481,6 +481,28 @@ export interface Tracker {
   archived: boolean
 }
 
+// ------------------------------------------------------------- transactions
+
+export type TxCategory = 'personal' | 'consulting' | 'onemedia' | ''
+
+/**
+ * One bank line, imported from a statement. `amount` is signed — positive is
+ * money in, negative is money out — so a spend total is just a sum with no
+ * separate direction field to keep in sync.
+ */
+export interface Transaction {
+  id: string
+  date: string
+  description: string
+  amount: number
+  account: AccountId | ''
+  /** '' means not yet gone through — the whole point of the log. */
+  category: TxCategory
+  notes: string
+  /** Which statement it came in on, so a re-import can't duplicate it. */
+  importBatch: string
+}
+
 // ---------------------------------------------------------------- calendar
 
 export type EventRepeat = 'none' | 'weekly' | 'monthly' | 'yearly'
@@ -591,6 +613,7 @@ export interface AppState {
   loops: Loop[]
   domains: DomainNode[]
   links: DomainLink[]
+  transactions: Transaction[]
   events: CalendarEvent[]
   vision: Vision
   trackers: Tracker[]

@@ -190,6 +190,7 @@ export function makeState(over: Partial<AppState> = {}): AppState {
     loops: DEFAULT_LOOPS.map((l) => ({ ...l })),
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
+    transactions: [],
     events: [],
     dayShape: [],
     morningRitual: [],

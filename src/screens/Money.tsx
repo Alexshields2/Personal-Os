@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Finance from './Finance'
+import Transactions from './Transactions'
 import {
   Card,
   Empty,
@@ -54,7 +55,7 @@ const SERIES_STYLE: Record<string, { color: string; dash?: string }> = {
 }
 
 export default function Money() {
-  const [section, setSection] = useState<'accounts' | 'depth'>('accounts')
+  const [section, setSection] = useState<'accounts' | 'depth' | 'transactions'>('accounts')
   return (
     <div className="screen wrap">
       <header className="page-head">
@@ -73,10 +74,13 @@ export default function Money() {
         options={[
           { value: 'accounts', label: 'Accounts & ledger' },
           { value: 'depth', label: 'Bills, sheet, invoices' },
+          { value: 'transactions', label: 'Transactions' },
         ]}
       />
 
-      {section === 'accounts' ? <Accounts /> : <Finance />}
+      {section === 'accounts' && <Accounts />}
+      {section === 'depth' && <Finance />}
+      {section === 'transactions' && <Transactions />}
     </div>
   )
 }

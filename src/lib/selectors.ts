@@ -52,6 +52,8 @@ import type {
   Purse,
   Task,
   Tracker,
+  Transaction,
+  TxCategory,
   LearnItem,
   Loop,
   MoneyEntity,
@@ -2400,4 +2402,60 @@ export function dueOverview(
   for (const item of items) byConfidence[item.confidence] += item.amount
 
   return { items, byConfidence, total: byConfidence.guaranteed + byConfidence.likely + byConfidence.needsPush }
+}
+
+// ---------------------------------------------------------------------------
+// Transactions
+//
+// The log is deliberately dumb: it imports, it filters, it lets you tag. All
+// the intelligence — runway, MRR, the ledger totals — stays where it already
+// lives, reading from the ledger you build by categorising these rows.
+
+/** Every distinct "YYYY-MM" a transaction falls in, most recent first. */
+export function transactionMonths(state: AppState): string[] {
+  const months = new Set(state.transactions.map((t) => t.date.slice(0, 7)))
+  return [...months].sort().reverse()
+}
+
+export function transactionsInMonth(
+  state: AppState,
+  month: string,
+  category?: TxCategory,
+): Transaction[] {
+  return state.transactions
+    .filter((t) => t.date.startsWith(month) && (category === undefined || t.category === category))
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+export interface MonthSpend {
+  month: string
+  in: number
+  out: number
+  net: number
+  byCategory: Record<'personal' | 'consulting' | 'onemedia' | 'uncategorised', number>
+  uncategorisedCount: number
+}
+
+/** What actually moved in a month, split by what you've tagged so far. */
+export function monthSpend(state: AppState, month: string): MonthSpend {
+  const rows = transactionsInMonth(state, month)
+  const byCategory = { personal: 0, consulting: 0, onemedia: 0, uncategorised: 0 }
+  let inTotal = 0
+  let outTotal = 0
+  for (const t of rows) {
+    if (t.amount >= 0) inTotal += t.amount
+    else {
+      outTotal += -t.amount
+      const key = t.category || 'uncategorised'
+      byCategory[key as keyof typeof byCategory] += -t.amount
+    }
+  }
+  return {
+    month,
+    in: inTotal,
+    out: outTotal,
+    net: inTotal - outTotal,
+    byCategory,
+    uncategorisedCount: rows.filter((t) => !t.category).length,
+  }
 }
