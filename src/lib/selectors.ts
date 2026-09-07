@@ -1,5 +1,4 @@
 import {
-  CHECKLIST,
   CLEAN_IDS,
   COMPOUNDING,
   CADENCE_PER_MONTH,
@@ -11,10 +10,8 @@ import {
   PILLARS,
   PURSE_LABEL,
   SECTIONS,
-  PROTOCOL_DAYS,
   STALE_DEAL_DAYS,
 } from './config'
-import type { ChecklistItem, PillarId } from './config'
 import {
   addDays,
   blockHours,
@@ -35,6 +32,7 @@ import type {
   AppState,
   Bill,
   CalendarEvent,
+  ChecklistItem,
   Client,
   Connection,
   DayEntry,
@@ -48,6 +46,7 @@ import type {
   KeyResult,
   LedgerKind,
   MetricKey,
+  PillarId,
   Project,
   Purse,
   Task,
@@ -102,26 +101,34 @@ export interface DayScore {
   won: boolean
 }
 
-export function scoreDay(day: DayEntry, targets: AppState['targets']): DayScore {
+export function scoreDay(
+  day: DayEntry,
+  targets: AppState['targets'],
+  checklist: ChecklistItem[],
+): DayScore {
   const pillars: PillarScore[] = PILLARS.map((p) => ({
     id: p.id,
     label: p.label,
     earned: 0,
-    possible: p.points,
+    possible: checklist.filter((c) => c.pillar === p.id).reduce((s, c) => s + c.points, 0),
   }))
   const byId = new Map(pillars.map((p) => [p.id, p]))
   let done = 0
 
-  for (const item of CHECKLIST) {
+  for (const item of checklist) {
     if (isItemDone(item, day, targets)) {
       byId.get(item.pillar)!.earned += item.points
       done++
     }
   }
 
-  const score = pillars.reduce((s, p) => s + p.earned, 0)
+  const earned = pillars.reduce((s, p) => s + p.earned, 0)
+  const possible = pillars.reduce((s, p) => s + p.possible, 0)
+  // Normalised to 0-100 so the score stays meaningful whatever the checklist's
+  // total adds up to now — points no longer have to sum to exactly 100.
+  const score = possible > 0 ? Math.round((earned / possible) * 100) : 0
   const clean = CLEAN_IDS.every((id) => day.checks[id])
-  return { score, pillars, done, total: CHECKLIST.length, clean, won: score >= 80 }
+  return { score, pillars, done, total: checklist.length, clean, won: score >= 80 }
 }
 
 /** An untouched day scores 0 but shouldn't be graded as a loss until logged. */
@@ -148,22 +155,23 @@ export interface Timeline {
 }
 
 export function timeline(state: AppState, iso = todayISO()): Timeline {
+  const protocolDays = state.targets.protocolDays
   const raw = dayNumber(state.startDate, iso)
-  const day = Math.min(PROTOCOL_DAYS, Math.max(1, raw))
+  const day = Math.min(protocolDays, Math.max(1, raw))
   return {
     day,
     rawDay: raw,
-    remaining: Math.max(0, PROTOCOL_DAYS - day),
-    elapsedPct: (day / PROTOCOL_DAYS) * 100,
+    remaining: Math.max(0, protocolDays - day),
+    elapsedPct: (day / protocolDays) * 100,
     started: raw >= 1,
-    finished: raw > PROTOCOL_DAYS,
-    endDate: isoForDay(state.startDate, PROTOCOL_DAYS),
+    finished: raw > protocolDays,
+    endDate: isoForDay(state.startDate, protocolDays),
   }
 }
 
 /** Every protocol date in order, whether or not it has an entry. */
 export function protocolDates(state: AppState): string[] {
-  return Array.from({ length: PROTOCOL_DAYS }, (_, i) => isoForDay(state.startDate, i + 1))
+  return Array.from({ length: state.targets.protocolDays }, (_, i) => isoForDay(state.startDate, i + 1))
 }
 
 export interface DayCell {
@@ -182,7 +190,7 @@ export function dayCells(state: AppState, iso = todayISO()): DayCell[] {
     return {
       date,
       day: i + 1,
-      score: logged ? scoreDay(entry, state.targets).score : 0,
+      score: logged ? scoreDay(entry, state.targets, state.checklist).score : 0,
       logged,
       future: i + 1 > todayNum,
     }
@@ -194,10 +202,10 @@ export function currentStreak(state: AppState, iso = todayISO()): number {
   let streak = 0
   let cursor = iso
   if (!isLogged(state.days[cursor])) cursor = addDays(cursor, -1)
-  for (let i = 0; i < PROTOCOL_DAYS + 1; i++) {
+  for (let i = 0; i < state.targets.protocolDays + 1; i++) {
     const entry = state.days[cursor]
     if (!isLogged(entry)) break
-    if (scoreDay(entry, state.targets).score < 80) break
+    if (scoreDay(entry, state.targets, state.checklist).score < 80) break
     streak++
     cursor = addDays(cursor, -1)
   }
@@ -212,7 +220,7 @@ export function loggedDays(state: AppState): DayEntry[] {
 export function averageScore(state: AppState): number {
   const days = loggedDays(state)
   if (!days.length) return 0
-  return days.reduce((s, d) => s + scoreDay(d, state.targets).score, 0) / days.length
+  return days.reduce((s, d) => s + scoreDay(d, state.targets, state.checklist).score, 0) / days.length
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +241,7 @@ export interface CompoundResult {
 
 export function compounding(state: AppState, iso = todayISO()): CompoundResult[] {
   const days = loggedDays(state)
-  const elapsed = Math.min(PROTOCOL_DAYS, Math.max(0, dayNumber(state.startDate, iso)))
+  const elapsed = Math.min(state.targets.protocolDays, Math.max(0, dayNumber(state.startDate, iso)))
 
   return COMPOUNDING.map((spec) => {
     let value = 0
@@ -265,7 +273,7 @@ export function compounding(state: AppState, iso = todayISO()): CompoundResult[]
       pct: Math.max(0, Math.min(100, pct)),
       invert,
       note: spec.note,
-      pace: (spec.target / PROTOCOL_DAYS) * elapsed,
+      pace: (spec.target / state.targets.protocolDays) * elapsed,
     }
   })
 }
@@ -599,7 +607,7 @@ export interface WeakStandard {
 export function weakestStandards(state: AppState): WeakStandard[] {
   const days = loggedDays(state)
   if (days.length < MIN_SAMPLE) return []
-  return CHECKLIST.map((item) => {
+  return state.checklist.map((item) => {
     const missed = days.filter((d) => !isItemDone(item, d, state.targets)).length
     return {
       id: item.id,
@@ -698,8 +706,8 @@ export interface MetricGap {
  */
 export function breakdownSignals(state: AppState): MetricGap[] {
   const days = loggedDays(state)
-  const winning = days.filter((d) => scoreDay(d, state.targets).score >= 80)
-  const losing = days.filter((d) => scoreDay(d, state.targets).score < 50)
+  const winning = days.filter((d) => scoreDay(d, state.targets, state.checklist).score >= 80)
+  const losing = days.filter((d) => scoreDay(d, state.targets, state.checklist).score < 50)
   if (winning.length < 3 || losing.length < 3) return []
 
   const mean = (list: DayEntry[], key: string) =>
@@ -741,7 +749,7 @@ export function weekdayScores(state: AppState): WeekdayScore[] {
   }))
   for (const day of loggedDays(state)) {
     const b = buckets[fromISO(day.date).getDay()]
-    b.total += scoreDay(day, state.targets).score
+    b.total += scoreDay(day, state.targets, state.checklist).score
     b.n++
   }
   return buckets.map((b, dow) => ({
@@ -768,7 +776,7 @@ export function planEffect(state: AppState): PlanEffect {
   const withPlan = days.filter((d) => planStatus(d).set > 0)
   const without = days.filter((d) => planStatus(d).set === 0)
   const avg = (list: DayEntry[]) =>
-    list.length ? list.reduce((s, d) => s + scoreDay(d, state.targets).score, 0) / list.length : 0
+    list.length ? list.reduce((s, d) => s + scoreDay(d, state.targets, state.checklist).score, 0) / list.length : 0
   const plannedAvg = avg(withPlan)
   const unplannedAvg = avg(without)
   return {
@@ -918,7 +926,7 @@ export function domainScores(
     if (days.length === 0) return null
     const parts: number[] = []
     for (const id of node.checkIds) {
-      const item = CHECKLIST.find((c) => c.id === id)
+      const item = state.checklist.find((c) => c.id === id)
       if (!item) continue
       parts.push(
         (days.filter((d) => isItemDone(item, d, state.targets)).length / days.length) * 100,
@@ -1078,7 +1086,7 @@ export function oscillation(state: AppState, iso = todayISO(), window = 90): Osc
     return {
       date,
       logged: isLogged(day),
-      score: isLogged(day) ? scoreDay(day, state.targets).score : 0,
+      score: isLogged(day) ? scoreDay(day, state.targets, state.checklist).score : 0,
     }
   })
 
@@ -1824,7 +1832,7 @@ export function domainSeries(
   const ownDay = (node: DomainNode, day: DayEntry): number | null => {
     const parts: number[] = []
     for (const id of node.checkIds) {
-      const item = CHECKLIST.find((c) => c.id === id)
+      const item = state.checklist.find((c) => c.id === id)
       if (item) parts.push(isItemDone(item, day, state.targets) ? 100 : 0)
     }
     for (const key of node.metricKeys) {

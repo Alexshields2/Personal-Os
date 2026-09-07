@@ -5,6 +5,7 @@
  */
 
 import {
+  DEFAULT_CHECKLIST,
   DEFAULT_DOMAINS,
   DEFAULT_LINKS,
   DEFAULT_LOOPS,
@@ -207,6 +208,7 @@ export function makeState(over: Partial<AppState> = {}): AppState {
     projects: [],
     tasks: [],
     rewards: [],
+    checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
     ...over,
   }
 }

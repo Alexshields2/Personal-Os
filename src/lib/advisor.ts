@@ -12,7 +12,7 @@
  * action is a fact you already knew.
  */
 
-import { CHECKLIST, PURSE_LABEL, STALE_DEAL_DAYS } from './config'
+import { PURSE_LABEL, STALE_DEAL_DAYS } from './config'
 import { addDays, daysBetween, todayISO } from './date'
 import { euro, euroCompact, num } from './format'
 import {
@@ -466,7 +466,7 @@ export function standardRates(state: AppState, iso = todayISO(), window = 28) {
   for (let i = 0; i < window; i++) dates.push(addDays(iso, -i))
   const days = dates.map((d) => state.days[d]).filter(isLogged)
   if (days.length === 0) return []
-  return CHECKLIST.map((item) => ({
+  return state.checklist.map((item) => ({
     id: item.id,
     label: item.label,
     pillar: item.pillar,

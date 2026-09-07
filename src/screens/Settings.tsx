@@ -3,7 +3,7 @@ import { Card, Empty, Field, NumberField, SectionTitle, Segmented } from '../com
 import { IconPlus, IconTrash } from '../components/icons'
 import SyncCard from '../components/SyncCard'
 import { useSync } from '../lib/sync'
-import { METRICS, PRIORITY_TAGS, PROTOCOL_DAYS } from '../lib/config'
+import { METRICS, PILLARS, PRIORITY_TAGS } from '../lib/config'
 import { uid } from '../lib/format'
 import { formatWithYear, isoForDay } from '../lib/date'
 import { euroCompact } from '../lib/format'
@@ -11,6 +11,9 @@ import { actions, exportJSON, useStore } from '../lib/store'
 import type {
   AppState,
   BlockKind as ShapeBlockKind,
+  ChecklistItem,
+  MetricKey,
+  PillarId,
   PriorityTag as ShapeBlockTag,
   Targets,
   Theme,
@@ -83,10 +86,17 @@ export default function Settings() {
             onChange={(e) => e.target.value && actions.setStartDate(e.target.value)}
           />
         </Field>
+        <div style={{ marginTop: 14 }}>
+          <NumberField
+            label="Length of the protocol (days)"
+            value={state.targets.protocolDays}
+            onChange={(v) => actions.setTargets({ protocolDays: Math.max(1, Math.round(v)) })}
+          />
+        </div>
         <p className="t-foot" style={{ marginTop: 10 }}>
-          Day {PROTOCOL_DAYS} lands on{' '}
+          Day {state.targets.protocolDays} lands on{' '}
           <strong style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-            {formatWithYear(isoForDay(state.startDate, PROTOCOL_DAYS))}
+            {formatWithYear(isoForDay(state.startDate, state.targets.protocolDays))}
           </strong>
           .
         </p>
@@ -144,6 +154,8 @@ export default function Settings() {
           ))}
         </div>
       </Card>
+
+      <ChecklistEditor />
 
       <SectionTitle title="Capacity" />
       <Card className="card-pad">
@@ -471,6 +483,154 @@ function Loops() {
       <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
         Archiving keeps a loop out of the nightly list without erasing the days it already
         explains. Deleting removes it from those days too.
+      </p>
+    </>
+  )
+}
+
+// ------------------------------------------------------------ checklist editor
+
+const PILLAR_OPTIONS = PILLARS.map((p) => p.id)
+
+/**
+ * The standards the day is actually scored against — "10 hours in office",
+ * "Sleep target", all of it. Used to be a fixed list; now it's data, so a
+ * standard that doesn't fit your life can be reworded, reweighted or deleted
+ * instead of silently ignored forever.
+ */
+function ChecklistEditor() {
+  const state = useStore()
+  const [label, setLabel] = useState('')
+  const [pillar, setPillar] = useState<PillarId>('business')
+
+  const update = (id: string, patch: Partial<ChecklistItem>) => {
+    actions.setChecklist(state.checklist.map((c) => (c.id === id ? { ...c, ...patch } : c)))
+  }
+
+  const add = () => {
+    if (!label.trim()) return
+    const item: ChecklistItem = { id: uid(), label: label.trim(), pillar, points: 1 }
+    actions.setChecklist([...state.checklist, item])
+    setLabel('')
+  }
+
+  const totalByPillar = (p: PillarId) =>
+    state.checklist.filter((c) => c.pillar === p).reduce((s, c) => s + c.points, 0)
+  const total = state.checklist.reduce((s, c) => s + c.points, 0)
+
+  return (
+    <>
+      <SectionTitle
+        title="Standards"
+        action={<span className="t-foot muted">{total} points</span>}
+      />
+      <Card>
+        {state.checklist.length === 0 ? (
+          <Empty>Nothing set. What actually earns points on a good day?</Empty>
+        ) : (
+          <div className="rows">
+            {state.checklist.map((c) => (
+              <div key={c.id} className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                <input
+                  className="input input-plain"
+                  style={{ flex: '1 1 160px' }}
+                  value={c.label}
+                  onChange={(e) => update(c.id, { label: e.target.value })}
+                />
+                <select
+                  className="input"
+                  style={{ width: 120, flex: 'none' }}
+                  value={c.pillar}
+                  onChange={(e) => update(c.id, { pillar: e.target.value as PillarId })}
+                >
+                  {PILLAR_OPTIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {PILLARS.find((x) => x.id === p)?.label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="input"
+                  type="number"
+                  style={{ width: 64, flex: 'none' }}
+                  value={c.points}
+                  onChange={(e) => update(c.id, { points: Math.max(0, Number(e.target.value) || 0) })}
+                />
+                <select
+                  className="input"
+                  style={{ width: 150, flex: 'none' }}
+                  value={c.metric ?? ''}
+                  onChange={(e) =>
+                    update(c.id, { metric: (e.target.value || undefined) as MetricKey | undefined })
+                  }
+                >
+                  <option value="">Manual check</option>
+                  {METRICS.map((m) => (
+                    <option key={m.key} value={m.key}>
+                      Tied to: {m.label}
+                    </option>
+                  ))}
+                </select>
+                {c.metric && (
+                  <label
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+                    className="dim"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(c.invert)}
+                      onChange={(e) => update(c.id, { invert: e.target.checked })}
+                    />
+                    Ceiling, not floor
+                  </label>
+                )}
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => {
+                    if (confirm(`Delete "${c.label}"? Days already logged against it lose that credit.`))
+                      actions.setChecklist(state.checklist.filter((x) => x.id !== c.id))
+                  }}
+                  aria-label="Delete standard"
+                >
+                  <IconTrash style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 13, borderTop: '1px solid var(--hairline)' }}
+        >
+          <input
+            className="input"
+            style={{ flex: '1 1 160px' }}
+            placeholder="Add a standard"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+          <select
+            className="input"
+            style={{ width: 120, flex: 'none' }}
+            value={pillar}
+            onChange={(e) => setPillar(e.target.value as PillarId)}
+          >
+            {PILLAR_OPTIONS.map((p) => (
+              <option key={p} value={p}>
+                {PILLARS.find((x) => x.id === p)?.label}
+              </option>
+            ))}
+          </select>
+          <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add standard">
+            <IconPlus style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        {PILLARS.map((p) => `${p.label} ${totalByPillar(p.id)}`).join(' · ')} — the score is
+        normalised to 100 regardless of what this adds up to, so reweighting never breaks it.
+        "Tied to" links a standard to a number you log elsewhere (like sleep hours) instead of a
+        manual tick.
       </p>
     </>
   )

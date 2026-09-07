@@ -1,7 +1,7 @@
 import { Card, Meter, Ring, SectionTitle, Stat } from '../components/ui'
 import { DayGrid } from '../components/charts'
 import { IconCheck, IconWarn } from '../components/icons'
-import { MILESTONES, PROTOCOL_DAYS } from '../lib/config'
+import { MILESTONES } from '../lib/config'
 import { formatWithYear, todayISO } from '../lib/date'
 import { compact, num } from '../lib/format'
 import { useStore } from '../lib/store'
@@ -51,7 +51,7 @@ export default function Progress() {
               {t.day}
             </div>
             <div className="t-cap" style={{ marginTop: 2 }}>
-              of {PROTOCOL_DAYS}
+              of {state.targets.protocolDays}
             </div>
           </Ring>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -186,7 +186,7 @@ export default function Progress() {
         <Stat
           label="Reclaimed vs 3h/day scrolling"
           value={`${Math.round(
-            (3 * 60 * Math.min(t.day, PROTOCOL_DAYS) -
+            (3 * 60 * Math.min(t.day, state.targets.protocolDays) -
               logged.reduce((s, d) => s + d.metrics.socialMin, 0)) /
               60,
           )}h`}
@@ -195,13 +195,13 @@ export default function Progress() {
         <Stat
           label="Days without broadcasting"
           value={`${logged.filter((d) => d.checks['no_posting']).length}`}
-          sub={`of ${PROTOCOL_DAYS}`}
+          sub={`of ${state.targets.protocolDays}`}
         />
       </div>
 
       <p className="t-foot muted" style={{ textAlign: 'center', marginTop: 22 }}>
-        {t.day < PROTOCOL_DAYS
-          ? `${PROTOCOL_DAYS - t.day} days until it's undeniable.`
+        {t.day < state.targets.protocolDays
+          ? `${state.targets.protocolDays - t.day} days until it's undeniable.`
           : 'Where the fuck has he been.'}
       </p>
       <p className="t-foot muted" style={{ textAlign: 'center', marginTop: 4 }}>

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Card, CardHead, Empty, Meter, Ring, SectionTitle, Stat } from '../components/ui'
 import { Sparkline, SwingChart } from '../components/charts'
 import { IconFlame, IconWarn } from '../components/icons'
-import { PILLARS, PROTOCOL_DAYS } from '../lib/config'
+import { PILLARS } from '../lib/config'
 import { addDays, formatLong, todayISO } from '../lib/date'
 import { euroCompact, num } from '../lib/format'
 import { briefing } from '../lib/advisor'
@@ -53,7 +53,7 @@ export default function Alex({ onNavigate }: { onNavigate?: (tab: string) => voi
   const run = priorityRun(state)
 
   const day = state.days[today] ?? emptyDay(today)
-  const score = scoreDay(day, state.targets)
+  const score = scoreDay(day, state.targets, state.checklist)
   const plan = planStatus(day)
   const streak = currentStreak(state, today)
   const logged = loggedDays(state)
@@ -62,7 +62,7 @@ export default function Alex({ onNavigate }: { onNavigate?: (tab: string) => voi
     const out: number[] = []
     for (let i = 29; i >= 0; i--) {
       const d = state.days[addDays(today, -i)]
-      out.push(isLogged(d) ? scoreDay(d, state.targets).score : 0)
+      out.push(isLogged(d) ? scoreDay(d, state.targets, state.checklist).score : 0)
     }
     return out
   }, [state.days, state.targets, today])
@@ -222,7 +222,7 @@ export default function Alex({ onNavigate }: { onNavigate?: (tab: string) => voi
           value={run.daysPlanned ? `${Math.round(run.oneThingRate)}%` : '—'}
           sub={`${run.oneThingHit}/${run.daysPlanned} planned days`}
         />
-        <Stat label="Days logged" value={String(logged.length)} sub={`of ${PROTOCOL_DAYS}`} />
+        <Stat label="Days logged" value={String(logged.length)} sub={`of ${state.targets.protocolDays}`} />
       </div>
 
       <div className="grid-3" style={{ marginTop: 12 }}>

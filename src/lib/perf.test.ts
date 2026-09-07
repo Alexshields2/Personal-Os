@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs'
 import { afterAll, describe, expect, it } from 'vitest'
-import { CHECKLIST } from './config'
+import { DEFAULT_CHECKLIST } from './config'
 import { addDays } from './date'
 import { briefing } from './advisor'
 import {
@@ -40,7 +40,7 @@ const YEAR = 365
 
 /** A full year of logged days, which is more than the protocol will ever hold. */
 function yearOfDays() {
-  const manual = CHECKLIST.filter((c) => !c.metric && c.id !== 'training').map((c) => c.id)
+  const manual = DEFAULT_CHECKLIST.filter((c) => !c.metric && c.id !== 'training').map((c) => c.id)
   return Array.from({ length: YEAR }, (_, i) => {
     const date = addDays(TODAY, -(YEAR - 1 - i))
     const q = (Math.sin(i / 3.3) * 0.5 + 0.5) * 0.8 + 0.1

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import {
-  CHECKLIST,
+  DEFAULT_CHECKLIST,
   CORE_PRIORITIES,
   DEAL_STAGES,
   DEFAULT_BLOCKS,
@@ -95,6 +95,7 @@ function initialState(): AppState {
     projects: [],
     tasks: [],
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
+    checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
   }
 }
 
@@ -310,6 +311,7 @@ function hydrate(raw: string): AppState {
       } as Task
     }),
     rewards: parsed.rewards ?? base.rewards,
+    checklist: parsed.checklist ?? base.checklist,
   }
 }
 
@@ -606,6 +608,10 @@ export const actions = {
 
   setRewards(rewards: AppState['rewards']) {
     set({ ...state, rewards })
+  },
+
+  setChecklist(checklist: AppState['checklist']) {
+    set({ ...state, checklist })
   },
 
   toggleLoop(date: string, id: string) {
@@ -1072,7 +1078,7 @@ export const actions = {
 
     const today = todayISO()
     const at = (back: number) => addDays(today, -back)
-    const manual = CHECKLIST.filter((c) => !c.metric && c.id !== 'training').map((c) => c.id)
+    const manual = state.checklist.filter((c) => !c.metric && c.id !== 'training').map((c) => c.id)
     const days: Record<string, DayEntry> = {}
 
     for (let i = 60; i >= 1; i--) {

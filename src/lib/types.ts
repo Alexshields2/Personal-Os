@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 12
+export const STATE_VERSION = 13
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -19,6 +19,21 @@ export interface DayMetrics {
 }
 
 export type MetricKey = keyof DayMetrics
+
+export type PillarId = 'business' | 'body' | 'mind' | 'discipline'
+
+/** One standard the day is scored against — a check, or a metric hitting its target. */
+export interface ChecklistItem {
+  id: string
+  label: string
+  pillar: PillarId
+  points: number
+  /** When set, ticking is driven by the metric hitting its target. */
+  metric?: MetricKey
+  /** Metric target is a ceiling to stay under rather than a floor to clear. */
+  invert?: boolean
+  hint?: string
+}
 
 export const EMPTY_METRICS: DayMetrics = {
   consultingHours: 0,
@@ -344,6 +359,8 @@ export interface Targets {
   netWorth: number
   /** Minutes of real work a day can hold. The line the week is planned against. */
   dailyCapacityMin: number
+  /** Length of the protocol, in days. The one number everything else counts against. */
+  protocolDays: number
 }
 
 // ---------------------------------------------------------------------- work
@@ -654,4 +671,6 @@ export interface AppState {
   projects: Project[]
   tasks: Task[]
   rewards: { id: string; label: string; detail: string }[]
+  /** The standards the day is scored against. Editable — add, reweight, remove. */
+  checklist: ChecklistItem[]
 }

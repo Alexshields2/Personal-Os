@@ -1,6 +1,8 @@
 import type {
   AccountId,
   BillCadence,
+  ChecklistItem,
+  PillarId,
   Purse,
   ShapeBlock,
   Tracker,
@@ -37,9 +39,8 @@ export const DEFAULT_TARGETS: Targets = {
   bodyweightKg: 95,
   netWorth: 5_000_000,
   dailyCapacityMin: 480,
+  protocolDays: PROTOCOL_DAYS,
 }
-
-export type PillarId = 'business' | 'body' | 'mind' | 'discipline'
 
 export const PILLARS: { id: PillarId; label: string; points: number }[] = [
   { id: 'business', label: 'Business', points: 30 },
@@ -48,20 +49,13 @@ export const PILLARS: { id: PillarId; label: string; points: number }[] = [
   { id: 'discipline', label: 'Discipline', points: 20 },
 ]
 
-export interface ChecklistItem {
-  id: string
-  label: string
-  pillar: PillarId
-  points: number
-  /** When set, ticking is driven by the metric hitting its target. */
-  metric?: MetricKey
-  /** Metric target is a ceiling to stay under rather than a floor to clear. */
-  invert?: boolean
-  hint?: string
-}
-
-/** Points per pillar sum to that pillar's allocation; all four sum to 100. */
-export const CHECKLIST: ChecklistItem[] = [
+/**
+ * Points per pillar summed to that pillar's allocation when this was a fixed
+ * list; now that it's editable (`state.checklist`), this is only the seed a
+ * fresh install starts from — the real total is whatever the checklist adds
+ * up to, computed live in `scoreDay`.
+ */
+export const DEFAULT_CHECKLIST: ChecklistItem[] = [
   // Business — 30
   {
     id: 'consulting_hours',

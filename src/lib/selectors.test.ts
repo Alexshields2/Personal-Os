@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHECKLIST } from './config'
+import { DEFAULT_CHECKLIST } from './config'
 import { addDays } from './date'
 import {
   agenda,
@@ -50,7 +50,7 @@ const TODAY = '2026-03-01'
 
 /** All the non-metric checklist ids, for building a maximum-scoring day. */
 const MANUAL_CHECKS = Object.fromEntries(
-  CHECKLIST.filter((c) => !c.metric && c.id !== 'training').map((c) => [c.id, true]),
+  DEFAULT_CHECKLIST.filter((c) => !c.metric && c.id !== 'training').map((c) => [c.id, true]),
 )
 
 function perfectDay(date: string) {
@@ -65,7 +65,8 @@ function perfectDay(date: string) {
 
 describe('scoreDay', () => {
   it('scores a perfect day at 100', () => {
-    expect(scoreDay(perfectDay('2026-01-01'), makeState().targets).score).toBe(100)
+    const s0 = makeState()
+    expect(scoreDay(perfectDay('2026-01-01'), s0.targets, s0.checklist).score).toBe(100)
   })
 
   it('floors an empty day at the inverted standards, which zero satisfies', () => {
@@ -74,16 +75,17 @@ describe('scoreDay', () => {
     // you genuinely didn't scroll — and it never reaches an average, because
     // every aggregate gates on isLogged first. Asserted here so the floor
     // moves only when someone means to move it.
-    const floor = CHECKLIST.filter((c) => c.invert).reduce((s, c) => s + c.points, 0)
-    expect(scoreDay(day('2026-01-01'), makeState().targets).score).toBe(floor)
+    const floor = DEFAULT_CHECKLIST.filter((c) => c.invert).reduce((s, c) => s + c.points, 0)
+    const s0 = makeState()
+    expect(scoreDay(day('2026-01-01'), s0.targets, s0.checklist).score).toBe(floor)
   })
 
   it('grades a metric row off the number, not a separate tick', () => {
     const state = makeState()
     const under = day('2026-01-01', { metrics: { ...perfectMetrics(), protein: 100 } })
     const at = day('2026-01-01', { metrics: perfectMetrics() })
-    expect(scoreDay(under, state.targets).score).toBeLessThan(
-      scoreDay(at, state.targets).score,
+    expect(scoreDay(under, state.targets, state.checklist).score).toBeLessThan(
+      scoreDay(at, state.targets, state.checklist).score,
     )
   })
 
@@ -91,8 +93,8 @@ describe('scoreDay', () => {
     const state = makeState()
     const quiet = day('2026-01-01', { metrics: { ...perfectMetrics(), socialMin: 5 } })
     const loud = day('2026-01-01', { metrics: { ...perfectMetrics(), socialMin: 400 } })
-    expect(scoreDay(quiet, state.targets).score).toBeGreaterThan(
-      scoreDay(loud, state.targets).score,
+    expect(scoreDay(quiet, state.targets, state.checklist).score).toBeGreaterThan(
+      scoreDay(loud, state.targets, state.checklist).score,
     )
   })
 
@@ -103,11 +105,11 @@ describe('scoreDay', () => {
       checks: { ...MANUAL_CHECKS },
       restDay: true,
     })
-    expect(scoreDay(rest, state.targets).score).toBe(100)
+    expect(scoreDay(rest, state.targets, state.checklist).score).toBe(100)
   })
 
   it('pillar points always sum to 100', () => {
-    const total = CHECKLIST.reduce((s, c) => s + c.points, 0)
+    const total = DEFAULT_CHECKLIST.reduce((s, c) => s + c.points, 0)
     expect(total).toBe(100)
   })
 })

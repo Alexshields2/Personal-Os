@@ -29,7 +29,7 @@ export default function Review() {
   const scored = days
     .map((d) => state.days[d])
     .filter(isLogged)
-    .map((d) => scoreDay(d, state.targets).score)
+    .map((d) => scoreDay(d, state.targets, state.checklist).score)
   const weekScore = scored.length ? scored.reduce((s, v) => s + v, 0) / scored.length : 0
 
   const set = (patch: Partial<typeof week>) => actions.updateWeek(weekStart, patch)
@@ -84,7 +84,7 @@ export default function Review() {
         <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
           {days.map((d) => {
             const entry = state.days[d]
-            const s = isLogged(entry) ? scoreDay(entry, state.targets).score : 0
+            const s = isLogged(entry) ? scoreDay(entry, state.targets, state.checklist).score : 0
             return (
               <div key={d} style={{ flex: 1, textAlign: 'center' }}>
                 {/* Absolute fill rather than a flex child: percentage heights

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Card, CardHead, Check, Empty, Meter, Ring, SectionTitle } from '../components/ui'
 import { IconFlame, IconPlus, IconWarn } from '../components/icons'
-import { PRIORITY_TAGS, PROTOCOL_DAYS, STALE_DEAL_DAYS } from '../lib/config'
+import { PRIORITY_TAGS, STALE_DEAL_DAYS } from '../lib/config'
 import { formatLong, todayISO } from '../lib/date'
 import { euroCompact } from '../lib/format'
 import { actions, emptyDay, newTask, useStore } from '../lib/store'
@@ -32,7 +32,7 @@ export default function Home() {
   const today = todayISO()
   const day = state.days[today] ?? emptyDay(today)
   const plan = planStatus(day)
-  const score = scoreDay(day, state.targets)
+  const score = scoreDay(day, state.targets, state.checklist)
   const t = timeline(state)
   const streak = currentStreak(state, today)
 
@@ -58,7 +58,7 @@ export default function Home() {
       <header className="page-head">
         <div className="eyebrow">
           <span className="t-cap" style={{ color: 'var(--accent)' }}>
-            Day {t.day} of {PROTOCOL_DAYS}
+            Day {t.day} of {state.targets.protocolDays}
           </span>
           {streak > 0 && (
             <span className="pill pill-accent">

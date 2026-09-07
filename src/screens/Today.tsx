@@ -15,7 +15,6 @@ import { Sparkline } from '../components/charts'
 import TrackerSheet from '../components/TrackerSheet'
 import { IconChevron, IconFlame, IconPlus, IconTrash } from '../components/icons'
 import {
-  CHECKLIST,
   CORE_QUESTIONS,
   ENERGY_LABEL,
   MAX_PRIORITIES,
@@ -23,10 +22,9 @@ import {
   PILLARS,
   PRIORITY_RANK,
   PRIORITY_TAGS,
-  PROTOCOL_DAYS,
   ROTATING_QUESTIONS,
 } from '../lib/config'
-import type { ChecklistItem, PillarId } from '../lib/config'
+import type { ChecklistItem, PillarId } from '../lib/types'
 import { addDays, blockHours, dayNumber, formatLong, fromISO, todayISO } from '../lib/date'
 import { dayIntent } from '../lib/nav'
 import { num } from '../lib/format'
@@ -58,7 +56,7 @@ export default function Today() {
   )
 
   const day = state.days[date] ?? emptyDay(date)
-  const score = scoreDay(day, state.targets)
+  const score = scoreDay(day, state.targets, state.checklist)
   const plan = planStatus(day)
   const dayNo = dayNumber(state.startDate, date)
   const streak = currentStreak(state, todayISO())
@@ -67,19 +65,19 @@ export default function Today() {
     const out: number[] = []
     for (let i = 13; i >= 0; i--) {
       const d = state.days[addDays(date, -i)]
-      out.push(isLogged(d) ? scoreDay(d, state.targets).score : 0)
+      out.push(isLogged(d) ? scoreDay(d, state.targets, state.checklist).score : 0)
     }
     return out
   }, [state.days, state.targets, date])
 
-  const inWindow = dayNo >= 1 && dayNo <= PROTOCOL_DAYS
+  const inWindow = dayNo >= 1 && dayNo <= state.targets.protocolDays
 
   return (
     <div className="screen wrap">
       <header className="page-head">
         <div className="eyebrow">
           <span className="t-cap" style={{ color: 'var(--accent)' }}>
-            {inWindow ? `Day ${dayNo} of ${PROTOCOL_DAYS}` : 'Outside the protocol window'}
+            {inWindow ? `Day ${dayNo} of ${state.targets.protocolDays}` : 'Outside the protocol window'}
           </span>
           {streak > 0 && (
             <span className="pill pill-accent">
@@ -949,7 +947,7 @@ function PillarCard({
   day: DayEntry
   state: AppState
 }) {
-  const items = CHECKLIST.filter((i) => i.pillar === pillar)
+  const items = state.checklist.filter((i) => i.pillar === pillar)
   const earned = items.reduce(
     (s, i) => s + (isItemDone(i, day, state.targets) ? i.points : 0),
     0,

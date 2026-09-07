@@ -13,7 +13,7 @@ import {
 import Board from '../components/Board'
 import MapFocus from '../components/MapFocus'
 import { IconChevron, IconPlus, IconTrash, IconWarn } from '../components/icons'
-import { CHECKLIST, LINK_WEIGHT_LABEL, METRIC_BY_KEY } from '../lib/config'
+import { LINK_WEIGHT_LABEL, METRIC_BY_KEY } from '../lib/config'
 import { actions, useStore } from '../lib/store'
 import { domainEdges, domainOrder, domainPath, domainScores, loopStats } from '../lib/selectors'
 
@@ -422,7 +422,7 @@ function NodeSheet({ id, onClose }: { id: string; onClose: () => void }) {
               Standards
             </div>
             <div className="chips">
-              {CHECKLIST.map((c) => (
+              {state.checklist.map((c) => (
                 <button
                   key={c.id}
                   className="chip chip-sm"
