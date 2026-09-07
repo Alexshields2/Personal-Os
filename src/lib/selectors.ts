@@ -28,7 +28,7 @@ import {
   weekStartISO,
 } from './date'
 import { euro } from './format'
-import { ONEMEDIA_ACCOUNTS, PERSONAL_ACCOUNTS } from './types'
+import { ACCOUNT_OWNER, ONEMEDIA_ACCOUNTS, PERSONAL_ACCOUNTS } from './types'
 import type {
   AccountId,
   BlockKind,
@@ -305,7 +305,7 @@ const ZERO_TOTALS: EntityTotals = {
   payout: 0,
 }
 
-export function entityTotals(state: AppState, entity: MoneyEntity): EntityTotals {
+export function entityTotals(state: AppState, entity: Purse): EntityTotals {
   const out = { ...ZERO_TOTALS }
   for (const e of state.ledger) {
     if (e.entity !== entity) continue
@@ -1265,6 +1265,43 @@ export function taskQueue(state: AppState, iso = todayISO()): TaskQueue {
     done: state.tasks.filter((t) => t.done),
     openCount: open.length,
   }
+}
+
+/**
+ * Everything that touched a given day — scheduled for it or finished on it —
+ * so the day-end review can put every task in front of you once, rather than
+ * you having to remember what you did.
+ */
+export function tasksTouchedOn(state: AppState, date: string): Task[] {
+  return state.tasks.filter((t) => t.scheduled === date || t.doneDate === date)
+}
+
+export interface GoalContribution {
+  goalId: string
+  label: string
+  count: number
+}
+
+/**
+ * Cause and effect, the honest version: not a model guessing what a task was
+ * "for", just a straight count of what got tagged against each goal, over a
+ * date range. Untagged work shows up too, on purpose — it's the fastest way
+ * to see how much of the day isn't moving anything.
+ */
+export function goalContribution(state: AppState, from: string, to: string): GoalContribution[] {
+  const counts = new Map<string, number>()
+  for (const t of state.tasks) {
+    if (!t.doneDate || t.doneDate < from || t.doneDate > to) continue
+    counts.set(t.goalId, (counts.get(t.goalId) ?? 0) + 1)
+  }
+  const titleById = new Map(state.goals.map((g) => [g.id, g.title]))
+  return [...counts.entries()]
+    .map(([goalId, count]) => ({
+      goalId,
+      label: goalId ? (titleById.get(goalId) ?? 'Deleted goal') : 'Untagged',
+      count,
+    }))
+    .sort((a, b) => b.count - a.count)
 }
 
 export interface ProjectProgress {
@@ -2402,6 +2439,38 @@ export function dueOverview(
   for (const item of items) byConfidence[item.confidence] += item.amount
 
   return { items, byConfidence, total: byConfidence.guaranteed + byConfidence.likely + byConfidence.needsPush }
+}
+
+// ---------------------------------------------------------------------------
+// Reimbursements
+//
+// An expense is tagged with who it's *for* (entity) and which account it
+// actually came out of. Most of the time those agree. When they don't — a
+// 1Media cost paid from a personal card, a personal buy that went through
+// the consulting account — that gap is money owed back, and this is the only
+// place that gap gets computed, so it never needs a manual "IOU" entry.
+
+export interface Reimbursement {
+  from: Purse
+  to: Purse
+  amount: number
+}
+
+export function reimbursements(state: AppState): Reimbursement[] {
+  const totals = new Map<string, number>()
+  for (const e of state.ledger) {
+    if (e.kind !== 'expense' || !e.account) continue
+    const owner = ACCOUNT_OWNER[e.account]
+    if (!owner || owner === e.entity) continue
+    const key = `${e.entity}|${owner}`
+    totals.set(key, (totals.get(key) ?? 0) + e.amount)
+  }
+  return [...totals.entries()]
+    .map(([key, amount]) => {
+      const [from, to] = key.split('|') as [Purse, Purse]
+      return { from, to, amount }
+    })
+    .sort((a, b) => b.amount - a.amount)
 }
 
 // ---------------------------------------------------------------------------

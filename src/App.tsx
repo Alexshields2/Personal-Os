@@ -34,9 +34,9 @@ import {
 } from './components/icons'
 import Palette from './components/Palette'
 import QuickAdd from './components/QuickAdd'
-import { PROTOCOL_DAYS, SECTIONS } from './lib/config'
+import { SECTIONS } from './lib/config'
 import { useStore } from './lib/store'
-import { timeline } from './lib/selectors'
+import { formatLong, todayISO } from './lib/date'
 
 type TabId =
   | 'alex'
@@ -55,22 +55,28 @@ type TabId =
   | 'review'
   | 'settings'
 
-const TABS: { id: TabId; label: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
-  { id: 'alex', label: 'Alex', Icon: IconAlex },
-  { id: 'vision', label: 'Vision', Icon: IconVision },
-  { id: 'home', label: 'Home', Icon: IconHome },
-  { id: 'today', label: 'Today', Icon: IconToday },
-  { id: 'work', label: 'Work', Icon: IconWork },
-  { id: 'calendar', label: 'Calendar', Icon: IconCalendar },
-  { id: 'patterns', label: 'Patterns', Icon: IconPatterns },
-  { id: 'map', label: 'Map', Icon: IconMap },
-  { id: 'money', label: 'Money', Icon: IconMoney },
-  { id: 'learn', label: 'Learn', Icon: IconLearn },
-  { id: 'network', label: 'Network', Icon: IconNetwork },
-  { id: 'goals', label: 'Goals', Icon: IconLife },
-  { id: 'progress', label: 'Progress', Icon: IconProgress },
-  { id: 'review', label: 'Review', Icon: IconReview },
-  { id: 'settings', label: 'Settings', Icon: IconSettings },
+/**
+ * Grouped so the sidebar reads as a handful of clusters, not fifteen flat
+ * items — "Today" for daily use, "Business" for the two companies' running
+ * numbers, "Life" for everything personal, "Review" for looking back, and
+ * "System" for the one settings screen. Order here is the order shown.
+ */
+const TABS: { id: TabId; label: string; group: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { id: 'alex', label: 'Alex', group: 'Today', Icon: IconAlex },
+  { id: 'today', label: 'Today', group: 'Today', Icon: IconToday },
+  { id: 'home', label: 'Home', group: 'Today', Icon: IconHome },
+  { id: 'work', label: 'Work', group: 'Business', Icon: IconWork },
+  { id: 'money', label: 'Money', group: 'Business', Icon: IconMoney },
+  { id: 'calendar', label: 'Calendar', group: 'Business', Icon: IconCalendar },
+  { id: 'map', label: 'Map', group: 'Life', Icon: IconMap },
+  { id: 'goals', label: 'Goals', group: 'Life', Icon: IconLife },
+  { id: 'learn', label: 'Learn', group: 'Life', Icon: IconLearn },
+  { id: 'network', label: 'Network', group: 'Life', Icon: IconNetwork },
+  { id: 'vision', label: 'Vision', group: 'Life', Icon: IconVision },
+  { id: 'patterns', label: 'Patterns', group: 'Review', Icon: IconPatterns },
+  { id: 'progress', label: 'Progress', group: 'Review', Icon: IconProgress },
+  { id: 'review', label: 'Review', group: 'Review', Icon: IconReview },
+  { id: 'settings', label: 'Settings', group: 'System', Icon: IconSettings },
 ]
 
 // The nav order lives in SECTIONS so search and the shell cannot disagree.
@@ -107,7 +113,6 @@ export default function App() {
   const [tab, setTab] = useState<TabId>('alex')
   const [paletteOpen, setPaletteOpen] = useState(false)
   const state = useStore()
-  const t = timeline(state)
   const Screen = SCREENS[tab]
 
   // Jumping tabs should land at the top, the way a native push does.
@@ -159,27 +164,26 @@ export default function App() {
             Personal OS
           </div>
           <div className="t-title" style={{ marginTop: 4 }}>
-            Day {t.day}
-            <span className="muted" style={{ fontWeight: 400 }}>
-              /{PROTOCOL_DAYS}
-            </span>
+            {formatLong(todayISO())}
           </div>
         </div>
         <button className="palette-hint" onClick={() => setPaletteOpen(true)}>
           Search everything
           <kbd>⌘K</kbd>
         </button>
-        {TABS.map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            className="side-item"
-            role="tab"
-            aria-selected={tab === id}
-            onClick={() => setTab(id)}
-          >
-            <Icon />
-            {label}
-          </button>
+        {TABS.map(({ id, label, group, Icon }, i) => (
+          <div key={id}>
+            {group !== TABS[i - 1]?.group && <div className="side-group t-cap">{group}</div>}
+            <button
+              className="side-item"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+            >
+              <Icon />
+              {label}
+            </button>
+          </div>
         ))}
       </nav>
 

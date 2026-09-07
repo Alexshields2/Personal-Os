@@ -330,6 +330,9 @@ button {
   .sidebar .brand {
     padding: 0 12px 22px;
   }
+  .side-group {
+    padding: 16px 12px 4px;
+  }
   .side-item {
     display: flex;
     align-items: center;

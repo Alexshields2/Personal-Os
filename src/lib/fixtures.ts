@@ -89,6 +89,7 @@ export function task(id: string, over: Partial<Task> = {}): Task {
     kindHint: '',
     created: '2026-01-01',
     doneDate: '',
+    goalId: '',
     ...over,
   }
 }

@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 11
+export const STATE_VERSION = 12
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -117,6 +117,9 @@ export interface DayEntry {
 
 export type MoneyEntity = 'consulting' | 'onemedia'
 
+/** Who the money belongs to. Personal sits alongside the two businesses. */
+export type Purse = MoneyEntity | 'personal'
+
 /**
  * `netWorth` rides the same snapshot machinery as the bank accounts but is a
  * manual figure — it takes in property, investments and anything else that
@@ -152,13 +155,32 @@ export const ONEMEDIA_ACCOUNTS: AccountId[] = ['onemediaStripe', 'onemediaAib', 
 /** Personal runs two accounts too — AIB and Rev — same reasoning as 1Media. */
 export const PERSONAL_ACCOUNTS: AccountId[] = ['personalAib', 'personalRev']
 
+/**
+ * Which purse each account naturally belongs to. `netWorth` isn't a spending
+ * account, so it owns nothing here. Used to spot when an expense was paid
+ * from an account that isn't the entity's own — that gap is money owed back.
+ */
+export const ACCOUNT_OWNER: Partial<Record<AccountId, Purse>> = {
+  consultingBank: 'consulting',
+  onemediaStripe: 'onemedia',
+  onemediaAib: 'onemedia',
+  onemediaRev: 'onemedia',
+  personalAib: 'personal',
+  personalRev: 'personal',
+}
+
 export type LedgerKind = 'revenue' | 'cashCollected' | 'profit' | 'payout' | 'expense'
 
-/** A single money event, attributed to one business. */
+/**
+ * A single money event. `entity` is who it's *for* — a business or personal
+ * — which can differ from who the `account` belongs to: an expense for
+ * 1Media paid out of a personal account is still a 1Media expense, it just
+ * also means 1Media owes personal that amount back.
+ */
 export interface LedgerEntry {
   id: string
   date: string
-  entity: MoneyEntity
+  entity: Purse
   kind: LedgerKind
   amount: number
   note: string
@@ -401,12 +423,11 @@ export interface Task {
   kindHint: string
   created: string
   doneDate: string
+  /** Which goal this moves forward, if any. Empty means untagged. */
+  goalId: string
 }
 
 // ------------------------------------------------------------------- money
-
-/** Who the money belongs to. Personal sits alongside the two businesses. */
-export type Purse = MoneyEntity | 'personal'
 
 export type BillCadence = 'weekly' | 'monthly' | 'quarterly' | 'annual'
 

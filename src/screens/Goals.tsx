@@ -21,10 +21,10 @@ import {
   KIND_LABEL,
   METRICS,
 } from '../lib/config'
-import { formatShort, todayISO } from '../lib/date'
+import { addDays, formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, num, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
-import { goalBoard, goalProgress, upkeepStatus } from '../lib/selectors'
+import { goalBoard, goalContribution, goalProgress, upkeepStatus } from '../lib/selectors'
 import type { Goal, GoalHorizon, KeyResult, KeyResultSource } from '../lib/types'
 
 type View = 'goals' | 'upkeep'
@@ -89,6 +89,57 @@ export default function Goals() {
 
 // ------------------------------------------------------------------- ladder
 
+type CauseEffectPeriod = 'week' | 'month' | 'all'
+
+/**
+ * The effect side of the day-end log (Today → Review tags each task with a
+ * goal). No inference here — just what actually got tagged, counted and
+ * ranked, so it's obvious what's feeding a goal and what's dead weight.
+ */
+function CauseEffect() {
+  const state = useStore()
+  const [period, setPeriod] = useState<CauseEffectPeriod>('week')
+  const from =
+    period === 'week' ? addDays(todayISO(), -7) : period === 'month' ? addDays(todayISO(), -30) : '0000-01-01'
+  const rows = useMemo(
+    () => goalContribution(state, from, todayISO()),
+    [state, from],
+  )
+  const total = rows.reduce((s, r) => s + r.count, 0)
+
+  return (
+    <>
+      <SectionTitle title="What's feeding what" />
+      <Card className="card-pad">
+        <Segmented
+          value={period}
+          onChange={setPeriod}
+          options={[
+            { value: 'week', label: 'This week' },
+            { value: 'month', label: 'This month' },
+            { value: 'all', label: 'All time' },
+          ]}
+        />
+        {total === 0 ? (
+          <Empty>Nothing tagged yet. Tag tasks to a goal from Today's log as you finish them.</Empty>
+        ) : (
+          <div style={{ marginTop: 14 }}>
+            {rows.map((r) => (
+              <div key={r.goalId || 'untagged'} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                  <span className={r.goalId ? undefined : 'dim'}>{r.label}</span>
+                  <span className="t-num muted">{r.count}</span>
+                </div>
+                <Meter pct={total ? (r.count / total) * 100 : 0} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </>
+  )
+}
+
 function Ladder() {
   const state = useStore()
   const board = useMemo(() => goalBoard(state), [state])
@@ -97,6 +148,8 @@ function Ladder() {
 
   return (
     <>
+      <CauseEffect />
+
       {board.atRisk.length > 0 && (
         <>
           <SectionTitle

@@ -31,7 +31,14 @@ import { addDays, blockHours, dayNumber, formatLong, fromISO, todayISO } from '.
 import { dayIntent } from '../lib/nav'
 import { num } from '../lib/format'
 import { actions, emptyDay, emptySlots, newTask, useStore } from '../lib/store'
-import { currentStreak, isItemDone, isLogged, planStatus, scoreDay } from '../lib/selectors'
+import {
+  currentStreak,
+  isItemDone,
+  isLogged,
+  planStatus,
+  scoreDay,
+  tasksTouchedOn,
+} from '../lib/selectors'
 import type { AppState, DayEntry, Priority, Targets } from '../lib/types'
 
 /**
@@ -521,6 +528,31 @@ function CallsToday({ date }: { date: string }) {
 
 // --------------------------------------------------------------------- plan
 
+/** A one-line add row, reused under the morning and shutdown lists. */
+function AddRitualItem({ onAdd, placeholder }: { onAdd: (label: string) => void; placeholder: string }) {
+  const [label, setLabel] = useState('')
+  const add = () => {
+    if (!label.trim()) return
+    onAdd(label.trim())
+    setLabel('')
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, padding: 13, borderTop: '1px solid var(--hairline)' }}>
+      <input
+        className="input"
+        style={{ flex: 1 }}
+        placeholder={placeholder}
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && add()}
+      />
+      <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add">
+        <IconPlus style={{ width: 16, height: 16 }} />
+      </button>
+    </div>
+  )
+}
+
 function PlanView({
   date,
   day,
@@ -552,30 +584,39 @@ function PlanView({
       <Card>
         {ritual.length === 0 ? (
           <div style={{ padding: 14 }}>
-            <Empty>
-              Nothing set. Add what actually opens your day in Settings — this list is yours.
-            </Empty>
+            <Empty>Nothing set. Add what actually opens your day, right here.</Empty>
           </div>
         ) : (
           <div className="rows">
             {ritual.map((m) => (
-              <button
-                key={m.id}
-                className="row"
-                onClick={() => actions.toggleCheck(date, m.id)}
-                role="checkbox"
-                aria-checked={Boolean(day.checks[m.id])}
-              >
-                <Check on={Boolean(day.checks[m.id])} />
-                <span className="row-main">
-                  <span className="row-title" style={{ opacity: day.checks[m.id] ? 0.55 : 1 }}>
-                    {m.label}
-                  </span>
-                </span>
-              </button>
+              <div key={m.id} className="row">
+                <button
+                  onClick={() => actions.toggleCheck(date, m.id)}
+                  role="checkbox"
+                  aria-checked={Boolean(day.checks[m.id])}
+                  aria-label={m.label}
+                  style={{ display: 'flex' }}
+                >
+                  <Check on={Boolean(day.checks[m.id])} />
+                </button>
+                <input
+                  className="input input-plain row-main"
+                  style={{ opacity: day.checks[m.id] ? 0.55 : 1 }}
+                  value={m.label}
+                  onChange={(e) => actions.setMorningRitual(ritual.map((x) => (x.id === m.id ? { ...x, label: e.target.value } : x)))}
+                />
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => actions.removeMorningItem(m.id)}
+                  aria-label="Remove"
+                >
+                  <IconTrash style={{ width: 15, height: 15 }} />
+                </button>
+              </div>
             ))}
           </div>
         )}
+        <AddRitualItem onAdd={(label) => actions.addMorningItem(label)} placeholder="Add to the morning" />
       </Card>
 
       <div style={{ marginTop: 16 }}>
@@ -646,6 +687,61 @@ function LogView({ date, day, state }: { date: string; day: DayEntry; state: App
 
 // ------------------------------------------------------------------- review
 
+/**
+ * Every task that touched this day, in one place, each with a one-tap link
+ * to the goal it moved forward. This is the cause; goalContribution (read on
+ * Goals) is the effect — a straight count of what actually got tagged,
+ * nothing inferred.
+ */
+function DayLog({ date, state }: { date: string; state: AppState }) {
+  const tasks = tasksTouchedOn(state, date)
+  const openGoals = state.goals.filter((g) => !g.done)
+
+  return (
+    <>
+      <SectionTitle
+        title="Today's log"
+        action={<span className="t-foot muted">{tasks.length} task{tasks.length === 1 ? '' : 's'}</span>}
+      />
+      <Card>
+        {tasks.length === 0 ? (
+          <Empty>Nothing scheduled or finished today.</Empty>
+        ) : (
+          <div className="rows">
+            {tasks.map((t) => (
+              <div className="row" key={t.id}>
+                <span className="row-main">
+                  <span className="row-title" style={{ opacity: t.done ? 1 : 0.55 }}>
+                    {t.title}
+                  </span>
+                  <span className="row-sub">{t.done ? 'Done' : 'Not done'}</span>
+                </span>
+                <select
+                  className="input"
+                  style={{ width: 160, flex: 'none' }}
+                  value={t.goalId}
+                  onChange={(e) => actions.updateTask(t.id, { goalId: e.target.value })}
+                >
+                  <option value="">No goal</option>
+                  {openGoals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Tag what each one was actually for. Goals adds these up so you can see what's feeding
+        what, and what's just noise.
+      </p>
+    </>
+  )
+}
+
 function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
   const tomorrow = addDays(date, 1)
   const tomorrowDay = state.days[tomorrow] ?? emptyDay(tomorrow)
@@ -660,6 +756,8 @@ function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: 
       <PriorityCard date={date} day={day} mode="grade" />
 
       <TrackerSheet date={date} />
+
+      <DayLog date={date} state={state} />
 
       <SectionTitle title="Journal" />
       <Card className="card-pad">
@@ -786,24 +884,38 @@ function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: 
           {state.shutdownRitual.map((s) => {
             const on = Boolean(day.checks[s.id])
             return (
-              <button
-                key={s.id}
-                className="row"
-                onClick={() => actions.toggleCheck(date, s.id)}
-                role="checkbox"
-                aria-checked={on}
-              >
-                <Check on={on} />
-                <span className="row-main">
-                  <span className="row-title" style={{ opacity: on ? 0.55 : 1 }}>
-                    {s.label}
-                  </span>
-                  {s.hint && <span className="row-sub">{s.hint}</span>}
-                </span>
-              </button>
+              <div key={s.id} className="row">
+                <button
+                  onClick={() => actions.toggleCheck(date, s.id)}
+                  role="checkbox"
+                  aria-checked={on}
+                  aria-label={s.label}
+                  style={{ display: 'flex' }}
+                >
+                  <Check on={on} />
+                </button>
+                <input
+                  className="input input-plain row-main"
+                  style={{ opacity: on ? 0.55 : 1 }}
+                  value={s.label}
+                  onChange={(e) =>
+                    actions.setShutdownRitual(
+                      state.shutdownRitual.map((x) => (x.id === s.id ? { ...x, label: e.target.value } : x)),
+                    )
+                  }
+                />
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => actions.removeShutdownItem(s.id)}
+                  aria-label="Remove"
+                >
+                  <IconTrash style={{ width: 15, height: 15 }} />
+                </button>
+              </div>
             )
           })}
         </div>
+        <AddRitualItem onAdd={(label) => actions.addShutdownItem(label)} placeholder="Add to shutdown" />
       </Card>
 
       <div style={{ marginTop: 16 }}>

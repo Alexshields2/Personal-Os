@@ -196,6 +196,25 @@ function hydrate(raw: string): AppState {
       ),
     }
   }
+  // "Cash in bank" was a manual tracker that duplicated what the ledger
+  // already computes live from expense and cash-collected entries — it's
+  // gone, so nobody's left with a dead field asking to be re-entered by hand.
+  if ((parsed.version ?? 1) < 12) {
+    parsed = {
+      ...parsed,
+      trackers: (parsed.trackers ?? []).filter((t) => t.id !== 'tk_bank'),
+      days: Object.fromEntries(
+        Object.entries(parsed.days ?? {}).map(([k, v]) => {
+          if (!v?.trackers?.tk_bank && !v?.trackerNotes?.tk_bank) return [k, v]
+          const trackers = { ...v.trackers }
+          const trackerNotes = { ...v.trackerNotes }
+          delete trackers.tk_bank
+          delete trackerNotes.tk_bank
+          return [k, { ...v, trackers, trackerNotes }]
+        }),
+      ),
+    }
+  }
   const days: Record<string, DayEntry> = {}
   for (const [k, v] of Object.entries(parsed.days ?? {})) {
     days[k] = {
@@ -278,10 +297,17 @@ function hydrate(raw: string): AppState {
     clients: parsed.clients ?? [],
     deals: parsed.deals ?? [],
     projects: parsed.projects ?? [],
-    // Tasks predate scheduling, estimates and priority bands.
+    // Tasks predate scheduling, estimates, priority bands and goal tagging.
     tasks: (parsed.tasks ?? []).map((t) => {
       const legacy = t as Partial<Task>
-      return { scheduled: '', estimateMin: 0, priority: 2, kindHint: '', ...legacy } as Task
+      return {
+        scheduled: '',
+        estimateMin: 0,
+        priority: 2,
+        kindHint: '',
+        goalId: '',
+        ...legacy,
+      } as Task
     }),
     rewards: parsed.rewards ?? base.rewards,
   }
@@ -343,6 +369,7 @@ export function newTask(title: string, over: Partial<Task> = {}): Task {
     kindHint: '',
     created: todayISO(),
     doneDate: '',
+    goalId: '',
     ...over,
   }
 }
@@ -575,6 +602,10 @@ export const actions = {
 
   setPayoutReceived(amount: number) {
     set({ ...state, payoutReceived: Math.max(0, amount) })
+  },
+
+  setRewards(rewards: AppState['rewards']) {
+    set({ ...state, rewards })
   },
 
   toggleLoop(date: string, id: string) {
@@ -1130,11 +1161,11 @@ export const actions = {
         { id: 'sp1', entity: 'consulting', name: 'Sales page rebuild', clientId: '', status: 'active', due: addDays(today, 10), notes: '' },
       ],
       tasks: [
-        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), scheduled: at(3), estimateMin: 45, priority: 2, kindHint: '', created: at(6), doneDate: at(3) },
-        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), scheduled: today, estimateMin: 120, priority: 1, kindHint: '', created: at(6), doneDate: '' },
-        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, scheduled: today, estimateMin: 180, priority: 2, kindHint: '', created: at(2), doneDate: '' },
-        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', scheduled: '', estimateMin: 15, priority: 3, kindHint: '', created: at(9), doneDate: '' },
-        { id: 'st5', projectId: '', entity: 'consulting', title: 'Call Kavanagh re: renewal', done: false, due: '', scheduled: today, estimateMin: 15, priority: 1, kindHint: 'calls', created: at(1), doneDate: '' },
+        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), scheduled: at(3), estimateMin: 45, priority: 2, kindHint: '', created: at(6), doneDate: at(3), goalId: '' },
+        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), scheduled: today, estimateMin: 120, priority: 1, kindHint: '', created: at(6), doneDate: '', goalId: '' },
+        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, scheduled: today, estimateMin: 180, priority: 2, kindHint: '', created: at(2), doneDate: '', goalId: '' },
+        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', scheduled: '', estimateMin: 15, priority: 3, kindHint: '', created: at(9), doneDate: '', goalId: '' },
+        { id: 'st5', projectId: '', entity: 'consulting', title: 'Call Kavanagh re: renewal', done: false, due: '', scheduled: today, estimateMin: 15, priority: 1, kindHint: 'calls', created: at(1), doneDate: '', goalId: '' },
       ],
       bills: [
         { id: 'sx1', label: 'Office rent', amount: 4200, cadence: 'monthly', nextDue: addDays(today, 3), purse: 'consulting', category: 'Premises' },

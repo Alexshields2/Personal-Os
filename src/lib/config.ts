@@ -1,7 +1,7 @@
 import type {
   AccountId,
   BillCadence,
-  MoneyEntity,
+  Purse,
   ShapeBlock,
   Tracker,
   Vision,
@@ -433,9 +433,10 @@ export const DEFAULT_GOALS: Goal[] = [
 ]
 
 /** Where a business's day-to-day cash actually lands, by default. */
-export const DEFAULT_ACCOUNT_FOR_ENTITY: Record<MoneyEntity, AccountId> = {
+export const DEFAULT_ACCOUNT_FOR_ENTITY: Record<Purse, AccountId> = {
   consulting: 'consultingBank',
   onemedia: 'onemediaAib',
+  personal: 'personalAib',
 }
 
 export const KIND_LABEL: Record<string, string> = {
@@ -809,7 +810,6 @@ export const DEFAULT_TRACKERS: Tracker[] = [
   { id: 'tk_workdone', label: 'All work completed', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: false },
   { id: 'tk_schedule', label: 'Schedule updated', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: false },
   { id: 'tk_cash', label: 'Cash collected today', kind: 'number', unit: '€', target: 0, direction: 'atLeast', group: 'Work', archived: false },
-  { id: 'tk_bank', label: 'Cash in bank', kind: 'number', unit: '€', target: 0, direction: 'atLeast', group: 'Work', archived: false },
 
   // Truth. Uncomfortable on purpose — a ceiling of zero.
   { id: 'tk_lies', label: 'Lies told today', kind: 'number', unit: '', target: 0, direction: 'atMost', group: 'Truth', archived: false },
@@ -825,17 +825,17 @@ export const DEFAULT_TRACKERS: Tracker[] = [
  */
 export const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: 'alex', label: 'Alex', blurb: 'The overview, and what it adds up to' },
-  { id: 'vision', label: 'Vision', blurb: 'The year on one wall' },
-  { id: 'home', label: 'Home', blurb: 'What needs you right now' },
   { id: 'today', label: 'Today', blurb: 'Plan, log and review the day' },
+  { id: 'home', label: 'Home', blurb: 'What needs you right now' },
   { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },
-  { id: 'calendar', label: 'Calendar', blurb: "Events, and what's coming" },
-  { id: 'patterns', label: 'Patterns', blurb: 'Loops, breakdowns, your two versions' },
-  { id: 'map', label: 'Map', blurb: 'The life tree and its causes' },
   { id: 'money', label: 'Money', blurb: 'Balances, net worth, the ledger' },
+  { id: 'calendar', label: 'Calendar', blurb: "Events, and what's coming" },
+  { id: 'map', label: 'Map', blurb: 'The life tree and its causes' },
+  { id: 'goals', label: 'Goals', blurb: 'The ladder, and upkeep' },
   { id: 'learn', label: 'Learn', blurb: 'Books, courses, events and lessons' },
   { id: 'network', label: 'Network', blurb: 'People and contact cadence' },
-  { id: 'goals', label: 'Goals', blurb: 'The ladder, and upkeep' },
+  { id: 'vision', label: 'Vision', blurb: 'The year on one wall' },
+  { id: 'patterns', label: 'Patterns', blurb: 'Loops, breakdowns, your two versions' },
   { id: 'progress', label: 'Progress', blurb: 'The 126-day totals' },
   { id: 'review', label: 'Review', blurb: 'The Sunday page' },
   { id: 'settings', label: 'Settings', blurb: 'Targets, loops, appearance, sync' },

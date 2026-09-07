@@ -8,7 +8,15 @@ import { uid } from '../lib/format'
 import { formatWithYear, isoForDay } from '../lib/date'
 import { euroCompact } from '../lib/format'
 import { actions, exportJSON, useStore } from '../lib/store'
-import type { AppState, BlockKind as ShapeBlockKind, PriorityTag as ShapeBlockTag, Targets, Theme } from '../lib/types'
+import type {
+  AppState,
+  BlockKind as ShapeBlockKind,
+  PriorityTag as ShapeBlockTag,
+  Targets,
+  Theme,
+  Tracker,
+  TrackerKind,
+} from '../lib/types'
 
 export default function Settings() {
   const state = useStore()
@@ -202,6 +210,10 @@ export default function Settings() {
       />
 
       <DayShapeEditor />
+
+      <TrackerEditor />
+
+      <RewardEditor />
 
       <Loops />
 
@@ -459,6 +471,259 @@ function Loops() {
       <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
         Archiving keeps a loop out of the nightly list without erasing the days it already
         explains. Deleting removes it from those days too.
+      </p>
+    </>
+  )
+}
+
+// -------------------------------------------------------------- tracker editor
+
+const TRACKER_KIND_LABEL: Record<TrackerKind, string> = {
+  check: 'Check',
+  number: 'Number',
+  rating: 'Rating /10',
+  time: 'Time',
+  text: 'Text',
+}
+
+/**
+ * Everything watched on the daily tracker sheet — wake time, diet, cash
+ * collected, whatever — lives here as data, not code, so a field that
+ * doesn't earn its place (like the old "cash in bank" one) can just be
+ * deleted instead of asked for a code change.
+ */
+function TrackerEditor() {
+  const state = useStore()
+  const [label, setLabel] = useState('')
+  const [kind, setKind] = useState<TrackerKind>('check')
+
+  const update = (id: string, patch: Partial<Tracker>) => {
+    actions.setTrackers(state.trackers.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+  }
+
+  const add = () => {
+    if (!label.trim()) return
+    const t: Tracker = {
+      id: uid(),
+      label: label.trim(),
+      kind,
+      unit: kind === 'number' ? '' : '',
+      target: kind === 'rating' ? 7 : kind === 'time' ? 0 : 1,
+      direction: 'atLeast',
+      group: '',
+      archived: false,
+    }
+    actions.setTrackers([...state.trackers, t])
+    setLabel('')
+    setKind('check')
+  }
+
+  const active = state.trackers.filter((t) => !t.archived)
+
+  return (
+    <>
+      <SectionTitle
+        title="Trackers"
+        action={<span className="t-foot muted">{active.length} active</span>}
+      />
+      <Card>
+        {state.trackers.length === 0 ? (
+          <Empty>Nothing tracked. Add whatever you actually watch day to day.</Empty>
+        ) : (
+          <div className="rows">
+            {state.trackers.map((t) => (
+              <div
+                key={t.id}
+                className="row"
+                style={{ flexWrap: 'wrap', gap: 8, opacity: t.archived ? 0.5 : 1 }}
+              >
+                <input
+                  className="input input-plain"
+                  style={{ flex: '1 1 140px' }}
+                  value={t.label}
+                  onChange={(e) => update(t.id, { label: e.target.value })}
+                />
+                <input
+                  className="input"
+                  style={{ width: 100, flex: 'none' }}
+                  placeholder="Group"
+                  value={t.group}
+                  onChange={(e) => update(t.id, { group: e.target.value })}
+                />
+                <select
+                  className="input"
+                  style={{ width: 110, flex: 'none' }}
+                  value={t.kind}
+                  onChange={(e) => update(t.id, { kind: e.target.value as TrackerKind })}
+                >
+                  {(Object.keys(TRACKER_KIND_LABEL) as TrackerKind[]).map((k) => (
+                    <option key={k} value={k}>
+                      {TRACKER_KIND_LABEL[k]}
+                    </option>
+                  ))}
+                </select>
+                {(t.kind === 'number' || t.kind === 'rating' || t.kind === 'time') && (
+                  <input
+                    className="input"
+                    type="number"
+                    style={{ width: 76, flex: 'none' }}
+                    placeholder="Target"
+                    value={t.target}
+                    onChange={(e) => update(t.id, { target: Number(e.target.value) || 0 })}
+                  />
+                )}
+                {t.kind === 'number' && (
+                  <input
+                    className="input"
+                    style={{ width: 60, flex: 'none' }}
+                    placeholder="Unit"
+                    value={t.unit}
+                    onChange={(e) => update(t.id, { unit: e.target.value })}
+                  />
+                )}
+                {t.kind !== 'check' && t.kind !== 'text' && (
+                  <select
+                    className="input"
+                    style={{ width: 96, flex: 'none' }}
+                    value={t.direction}
+                    onChange={(e) =>
+                      update(t.id, { direction: e.target.value as 'atLeast' | 'atMost' })
+                    }
+                  >
+                    <option value="atLeast">At least</option>
+                    <option value="atMost">At most</option>
+                  </select>
+                )}
+                <button
+                  className="btn btn-quiet btn-sm"
+                  onClick={() => update(t.id, { archived: !t.archived })}
+                >
+                  {t.archived ? 'Restore' : 'Archive'}
+                </button>
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => {
+                    if (confirm(`Delete "${t.label}"? Days already logged against it lose that value.`))
+                      actions.setTrackers(state.trackers.filter((x) => x.id !== t.id))
+                  }}
+                  aria-label="Delete tracker"
+                >
+                  <IconTrash style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            padding: 13,
+            borderTop: '1px solid var(--hairline)',
+          }}
+        >
+          <input
+            className="input"
+            style={{ flex: '1 1 160px' }}
+            placeholder="Add a tracker"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+          <select
+            className="input"
+            style={{ width: 110, flex: 'none' }}
+            value={kind}
+            onChange={(e) => setKind(e.target.value as TrackerKind)}
+          >
+            {(Object.keys(TRACKER_KIND_LABEL) as TrackerKind[]).map((k) => (
+              <option key={k} value={k}>
+                {TRACKER_KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+          <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add tracker">
+            <IconPlus style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Archiving keeps a tracker out of the daily sheet without erasing what's already logged
+        against it. Deleting removes that history too.
+      </p>
+    </>
+  )
+}
+
+// -------------------------------------------------------------- reward editor
+
+/** What's waiting on the other side of the payout target, in Money. */
+function RewardEditor() {
+  const state = useStore()
+  const [label, setLabel] = useState('')
+
+  const update = (id: string, patch: { label?: string; detail?: string }) => {
+    actions.setRewards(state.rewards.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  }
+
+  const add = () => {
+    if (!label.trim()) return
+    actions.setRewards([...state.rewards, { id: uid(), label: label.trim(), detail: '' }])
+    setLabel('')
+  }
+
+  return (
+    <>
+      <SectionTitle title="Rewards" />
+      <Card>
+        {state.rewards.length === 0 ? (
+          <Empty>Nothing set. What's actually waiting on the other side of the target?</Empty>
+        ) : (
+          <div className="rows">
+            {state.rewards.map((r) => (
+              <div key={r.id} className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+                <input
+                  className="input input-plain"
+                  style={{ flex: '1 1 140px' }}
+                  value={r.label}
+                  onChange={(e) => update(r.id, { label: e.target.value })}
+                />
+                <input
+                  className="input"
+                  style={{ flex: '2 1 180px' }}
+                  placeholder="Detail"
+                  value={r.detail}
+                  onChange={(e) => update(r.id, { detail: e.target.value })}
+                />
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => actions.setRewards(state.rewards.filter((x) => x.id !== r.id))}
+                  aria-label="Delete reward"
+                >
+                  <IconTrash style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          style={{ display: 'flex', gap: 8, padding: 13, borderTop: '1px solid var(--hairline)' }}
+        >
+          <input
+            className="input"
+            placeholder="Add a reward"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+          <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add reward">
+            <IconPlus style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Unlocks together, against the personal payout target above.
       </p>
     </>
   )

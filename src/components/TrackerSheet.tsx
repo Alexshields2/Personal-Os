@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { Card, Check, Empty, SectionTitle, Stepper } from './ui'
+import { IconPlus, IconTrash } from './icons'
 import { actions, useStore } from '../lib/store'
+import { uid } from '../lib/format'
 import { trackerStats } from '../lib/selectors'
 import type { Tracker } from '../lib/types'
 
@@ -17,12 +20,15 @@ export default function TrackerSheet({ date }: { date: string }) {
 
   if (stats.length === 0) {
     return (
-      <Card>
-        <Empty>
-          No trackers yet. Add the handful you actually watch in Settings — a tracker you
-          didn't choose never gets ticked.
-        </Empty>
-      </Card>
+      <>
+        <SectionTitle title="The sheet" />
+        <Card>
+          <Empty>No trackers yet. Add the handful you actually watch, right here.</Empty>
+          <div style={{ padding: '0 14px 14px' }}>
+            <AddTracker />
+          </div>
+        </Card>
+      </>
     )
   }
 
@@ -59,6 +65,9 @@ export default function TrackerSheet({ date }: { date: string }) {
             </div>
           ))}
         </div>
+        <div style={{ padding: 13, borderTop: '1px solid var(--hairline)' }}>
+          <AddTracker />
+        </div>
       </Card>
     </>
   )
@@ -73,8 +82,17 @@ function TrackerRow({
 }) {
   // Read at the top: a hook behind a `kind === 'text'` branch would run on some
   // renders and not others.
-  const note = useStore().days[date]?.trackerNotes?.[stat.tracker.id] ?? ''
+  const state = useStore()
+  const note = state.days[date]?.trackerNotes?.[stat.tracker.id] ?? ''
   const { tracker, value, hit, streak, rate, average } = stat
+
+  const rename = (label: string) => {
+    actions.setTrackers(state.trackers.map((t) => (t.id === tracker.id ? { ...t, label } : t)))
+  }
+  const remove = () => {
+    if (confirm(`Delete "${tracker.label}"? Days already logged against it lose that value.`))
+      actions.setTrackers(state.trackers.filter((t) => t.id !== tracker.id))
+  }
 
   const sub = (() => {
     if (tracker.kind === 'text') return ''
@@ -88,7 +106,11 @@ function TrackerRow({
   return (
     <div className="tk-row" data-won={hit}>
       <span className="tk-main">
-        <span className="tk-label">{tracker.label}</span>
+        <input
+          className="input input-plain tk-label"
+          value={tracker.label}
+          onChange={(e) => rename(e.target.value)}
+        />
         {sub && <span className="tk-sub">{sub}</span>}
       </span>
 
@@ -127,6 +149,10 @@ function TrackerRow({
             aria-label={tracker.label}
           />
         )}
+
+        <button className="btn btn-quiet btn-danger btn-sm" onClick={remove} aria-label="Delete tracker">
+          <IconTrash style={{ width: 14, height: 14 }} />
+        </button>
       </span>
 
       {tracker.kind === 'rating' && (
@@ -186,4 +212,70 @@ export function minutesToTime(mins: number): string {
 export function timeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number)
   return (h || 0) * 60 + (m || 0)
+}
+
+const ADD_KIND_LABEL: Record<Tracker['kind'], string> = {
+  check: 'Check',
+  number: 'Number',
+  rating: 'Rating /10',
+  time: 'Time',
+  text: 'Text',
+}
+
+/**
+ * Add a tracker right where you use it — no trip to Settings. Settings still
+ * has the finer controls (group, target, direction) for when those matter;
+ * this is for the moment you notice you want to watch something new.
+ */
+function AddTracker() {
+  const state = useStore()
+  const [label, setLabel] = useState('')
+  const [kind, setKind] = useState<Tracker['kind']>('check')
+
+  const add = () => {
+    if (!label.trim()) return
+    actions.setTrackers([
+      ...state.trackers,
+      {
+        id: uid(),
+        label: label.trim(),
+        kind,
+        unit: '',
+        target: kind === 'rating' ? 7 : kind === 'time' ? 0 : 1,
+        direction: 'atLeast',
+        group: '',
+        archived: false,
+      },
+    ])
+    setLabel('')
+    setKind('check')
+  }
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <input
+        className="input"
+        style={{ flex: '1 1 160px' }}
+        placeholder="Add something to watch"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && add()}
+      />
+      <select
+        className="input"
+        style={{ width: 110, flex: 'none' }}
+        value={kind}
+        onChange={(e) => setKind(e.target.value as Tracker['kind'])}
+      >
+        {(Object.keys(ADD_KIND_LABEL) as Tracker['kind'][]).map((k) => (
+          <option key={k} value={k}>
+            {ADD_KIND_LABEL[k]}
+          </option>
+        ))}
+      </select>
+      <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add tracker">
+        <IconPlus style={{ width: 16, height: 16 }} />
+      </button>
+    </div>
+  )
 }

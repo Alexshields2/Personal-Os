@@ -16,7 +16,7 @@ import {
 import { BalanceChart } from '../components/charts'
 import type { Series } from '../components/charts'
 import { IconLock, IconPlus, IconTrash, IconUnlock } from '../components/icons'
-import { ACCOUNT_LABEL, ENTITY_LABEL, KIND_LABEL, MONTH_LABEL } from '../lib/config'
+import { ACCOUNT_LABEL, KIND_LABEL, MONTH_LABEL, PURSE_LABEL } from '../lib/config'
 import { formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, pct, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
@@ -31,12 +31,13 @@ import {
   monthToDate,
   dailyMoneyTable,
   clientBook,
+  reimbursements,
   rewardsUnlocked,
   yearToDate,
 } from '../lib/selectors'
-import { BANK_ACCOUNTS, ONEMEDIA_ACCOUNTS } from '../lib/types'
+import { ACCOUNT_OWNER, BANK_ACCOUNTS, ONEMEDIA_ACCOUNTS } from '../lib/types'
 import { DEFAULT_ACCOUNT_FOR_ENTITY } from '../lib/config'
-import type { AccountId, LedgerKind, MoneyEntity } from '../lib/types'
+import type { AccountId, LedgerKind, MoneyEntity, Purse } from '../lib/types'
 
 /**
  * Three categorical slots. The palette is monochrome, so each one carries a
@@ -87,7 +88,7 @@ export default function Money() {
 
 function Accounts() {
   const state = useStore()
-  const [entity, setEntity] = useState<MoneyEntity | 'all'>('all')
+  const [entity, setEntity] = useState<Purse | 'all'>('all')
   const [addLedger, setAddLedger] = useState(false)
   const [addBalance, setAddBalance] = useState(false)
   const [showDaily, setShowDaily] = useState(false)
@@ -99,17 +100,20 @@ function Accounts() {
 
   const consulting = entityTotals(state, 'consulting')
   const media = entityTotals(state, 'onemedia')
+  const personal = entityTotals(state, 'personal')
   const shown =
     entity === 'all'
       ? {
           revenue: consulting.revenue + media.revenue,
-          cashCollected: consulting.cashCollected + media.cashCollected,
+          cashCollected: consulting.cashCollected + media.cashCollected + personal.cashCollected,
           profit: consulting.profit + media.profit,
           payout: consulting.payout + media.payout,
         }
       : entity === 'consulting'
         ? consulting
-        : media
+        : entity === 'onemedia'
+          ? media
+          : personal
 
   const series: Series[] = BANK_ACCOUNTS.map((a) => ({
     id: a,
@@ -221,6 +225,8 @@ function Accounts() {
         are actually moving on.
       </p>
 
+      <OwedBack />
+
       <SectionTitle
         title="Daily table"
         action={
@@ -307,18 +313,43 @@ function Accounts() {
                   <IconLock style={{ width: 20, height: 20 }} />
                 )}
               </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="t-head vault-title">{r.label}</div>
-                <div className="row-sub">{r.detail}</div>
+              <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 4 }}>
+                <input
+                  className="input input-plain vault-title"
+                  style={{ fontWeight: 600 }}
+                  value={r.label}
+                  onChange={(e) =>
+                    actions.setRewards(
+                      state.rewards.map((x) => (x.id === r.id ? { ...x, label: e.target.value } : x)),
+                    )
+                  }
+                />
+                <input
+                  className="input input-plain row-sub"
+                  value={r.detail}
+                  onChange={(e) =>
+                    actions.setRewards(
+                      state.rewards.map((x) => (x.id === r.id ? { ...x, detail: e.target.value } : x)),
+                    )
+                  }
+                />
               </div>
               <span className="pill">{unlocked ? 'Unlocked' : 'Locked'}</span>
+              <button
+                className="btn btn-quiet btn-danger"
+                onClick={() => actions.setRewards(state.rewards.filter((x) => x.id !== r.id))}
+                aria-label="Remove reward"
+              >
+                <IconTrash style={{ width: 15, height: 15 }} />
+              </button>
             </div>
           </div>
         ))}
+        <AddReward />
         {!unlocked && (
           <p className="t-foot muted" style={{ padding: '2px 4px' }}>
-            {euro(state.targets.personalPayout - state.payoutReceived)} still to land. No €1M
-            payout, neither gets bought.
+            {euro(state.targets.personalPayout - state.payoutReceived)} still to land. Nothing on
+            this list gets bought until it does — change the target above if that's not right.
           </p>
         )}
       </div>
@@ -329,9 +360,10 @@ function Accounts() {
           value={entity}
           onChange={setEntity}
           options={[
-            { value: 'all', label: 'Both' },
+            { value: 'all', label: 'All' },
             { value: 'consulting', label: 'Consulting.ie' },
             { value: 'onemedia', label: '1Media' },
+            { value: 'personal', label: 'Personal' },
           ]}
         />
       </div>
@@ -358,13 +390,17 @@ function Accounts() {
                   className="dot"
                   style={{
                     background:
-                      e.entity === 'consulting' ? 'var(--series-consulting)' : 'var(--series-1media)',
+                      e.entity === 'consulting'
+                        ? 'var(--series-consulting)'
+                        : e.entity === 'onemedia'
+                          ? 'var(--series-1media)'
+                          : 'var(--series-personal)',
                   }}
                 />
                 <span className="row-main">
                   <span className="row-title">
                     {KIND_LABEL[e.kind]}
-                    <span className="muted"> · {ENTITY_LABEL[e.entity]}</span>
+                    <span className="muted"> · {PURSE_LABEL[e.entity]}</span>
                   </span>
                   <span className="row-sub">
                     {formatShort(e.date)}
@@ -391,17 +427,85 @@ function Accounts() {
   )
 }
 
+function AddReward() {
+  const state = useStore()
+  const [label, setLabel] = useState('')
+
+  const add = () => {
+    if (!label.trim()) return
+    actions.setRewards([...state.rewards, { id: uid(), label: label.trim(), detail: '' }])
+    setLabel('')
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 8, padding: '2px 4px' }}>
+      <input
+        className="input"
+        style={{ flex: 1 }}
+        placeholder="Add a reward"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && add()}
+      />
+      <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add reward">
+        <IconPlus style={{ width: 16, height: 16 }} />
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Every expense is tagged with who it's for and which account it actually
+ * came out of — when they differ, that gap is a debt, computed straight off
+ * those tags rather than a separate IOU someone has to remember to log.
+ */
+function OwedBack() {
+  const state = useStore()
+  const owed = reimbursements(state)
+  if (owed.length === 0) return null
+
+  return (
+    <>
+      <SectionTitle title="Needs to be paid back" />
+      <Card>
+        <div className="rows">
+          {owed.map((r) => (
+            <div className="row row-metric" key={`${r.from}-${r.to}`}>
+              <span className="row-main">
+                <span className="row-title">
+                  {PURSE_LABEL[r.from]} owes {PURSE_LABEL[r.to]}
+                </span>
+                <span className="row-sub">Paid from {PURSE_LABEL[r.to]}'s account, on {PURSE_LABEL[r.from]}'s behalf</span>
+              </span>
+              <span className="row-value" style={{ color: 'var(--warning)' }}>
+                {euro(r.amount)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </>
+  )
+}
+
+const PERSONAL_KINDS: LedgerKind[] = ['cashCollected', 'expense']
+const BUSINESS_KINDS: LedgerKind[] = ['revenue', 'cashCollected', 'expense', 'profit', 'payout']
+
 function LedgerSheet({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(todayISO())
-  const [entity, setEntity] = useState<MoneyEntity>('consulting')
+  const [entity, setEntity] = useState<Purse>('consulting')
   const [kind, setKind] = useState<LedgerKind>('revenue')
   const [amount, setAmount] = useState(0)
   const [note, setNote] = useState('')
   // Only cash actually moving in or out of an account needs one attributed —
   // revenue and profit are recognised amounts, not bank movements.
   const movesAnAccount = kind === 'cashCollected' || kind === 'expense'
-  const accountsForEntity: AccountId[] = entity === 'consulting' ? ['consultingBank'] : ONEMEDIA_ACCOUNTS
+  // Any account, for any entity — an expense "for" 1Media paid out of a
+  // personal card is still a 1Media expense. The mismatch between who it's
+  // for and whose account moved is exactly what turns into money owed back.
   const [account, setAccount] = useState<AccountId>(DEFAULT_ACCOUNT_FOR_ENTITY.consulting)
+  const owedTo = movesAnAccount ? ACCOUNT_OWNER[account] : undefined
+  const owesBack = owedTo && owedTo !== entity
 
   const save = () => {
     if (amount <= 0) return
@@ -422,13 +526,16 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
       <Field label="Business">
         <Segmented
           value={entity}
-          onChange={(next: MoneyEntity) => {
+          onChange={(next: Purse) => {
             setEntity(next)
             setAccount(DEFAULT_ACCOUNT_FOR_ENTITY[next])
+            const kinds = next === 'personal' ? PERSONAL_KINDS : BUSINESS_KINDS
+            if (!kinds.includes(kind)) setKind('expense')
           }}
           options={[
             { value: 'consulting', label: 'Consulting.ie' },
             { value: 'onemedia', label: '1Media' },
+            { value: 'personal', label: 'Personal' },
           ]}
         />
       </Field>
@@ -436,13 +543,10 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
         <Segmented
           value={kind}
           onChange={setKind}
-          options={[
-            { value: 'revenue', label: 'Revenue' },
-            { value: 'cashCollected', label: 'Cash in' },
-            { value: 'expense', label: 'Expense' },
-            { value: 'profit', label: 'Profit' },
-            { value: 'payout', label: 'Payout' },
-          ]}
+          options={(entity === 'personal' ? PERSONAL_KINDS : BUSINESS_KINDS).map((k) => ({
+            value: k,
+            label: KIND_LABEL[k],
+          }))}
         />
       </Field>
       {movesAnAccount && (
@@ -452,7 +556,7 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
             value={account}
             onChange={(e) => setAccount(e.target.value as AccountId)}
           >
-            {accountsForEntity.map((a) => (
+            {BANK_ACCOUNTS.map((a) => (
               <option key={a} value={a}>
                 {ACCOUNT_LABEL[a]}
               </option>
@@ -475,8 +579,9 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
       </button>
       {movesAnAccount && (
         <p className="t-foot muted" style={{ marginTop: 10 }}>
-          Cash in and expense move {ACCOUNT_LABEL[account]}'s balance immediately — the account
-          screens don't need a separate snapshot for today.
+          {owesBack
+            ? `Paid from ${ACCOUNT_LABEL[account]} — ${PURSE_LABEL[entity]} will show ${euroCompact(amount || 0)} owed back to ${PURSE_LABEL[owedTo]}.`
+            : `Cash in and expense move ${ACCOUNT_LABEL[account]}'s balance immediately — the account screens don't need a separate snapshot for today.`}
         </p>
       )}
     </Sheet>
