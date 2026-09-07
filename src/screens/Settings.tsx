@@ -1,14 +1,14 @@
 import { useRef, useState } from 'react'
 import { Card, Empty, Field, NumberField, SectionTitle, Segmented } from '../components/ui'
+import { IconPlus, IconTrash } from '../components/icons'
 import SyncCard from '../components/SyncCard'
 import { useSync } from '../lib/sync'
-import { METRICS, PROTOCOL_DAYS } from '../lib/config'
-import { IconPlus, IconTrash } from '../components/icons'
+import { METRICS, PRIORITY_TAGS, PROTOCOL_DAYS } from '../lib/config'
 import { uid } from '../lib/format'
 import { formatWithYear, isoForDay } from '../lib/date'
 import { euroCompact } from '../lib/format'
 import { actions, exportJSON, useStore } from '../lib/store'
-import type { AppState, Targets, Theme } from '../lib/types'
+import type { AppState, BlockKind as ShapeBlockKind, PriorityTag as ShapeBlockTag, Targets, Theme } from '../lib/types'
 
 export default function Settings() {
   const state = useStore()
@@ -168,6 +168,41 @@ export default function Settings() {
         </p>
       </Card>
 
+      <RitualEditor
+        title="Morning ritual"
+        hint="What actually opens your day — add, rename, remove anything."
+        items={state.morningRitual}
+        getLabel={(m) => m.label}
+        setLabel={(m, label) => ({ ...m, label })}
+        onAdd={(label) => actions.addMorningItem(label)}
+        onRemove={(id) => actions.removeMorningItem(id)}
+        onSave={(items) => actions.setMorningRitual(items)}
+      />
+
+      <RitualEditor
+        title="Shutdown ritual"
+        hint="The close-out, in your own words. “Tomorrow's three are set” always sits above this — it's computed, not a checklist item."
+        items={state.shutdownRitual}
+        getLabel={(s) => s.label}
+        setLabel={(s, label) => ({ ...s, label })}
+        onAdd={(label) => actions.addShutdownItem(label)}
+        onRemove={(id) => actions.removeShutdownItem(id)}
+        onSave={(items) => actions.setShutdownRitual(items)}
+      />
+
+      <RitualEditor
+        title="Nightly questions"
+        hint="Asked every Review. Falls back to the built-in four until you set your own."
+        items={state.nightlyQuestions}
+        getLabel={(q) => q.q}
+        setLabel={(q, label) => ({ ...q, q: label })}
+        onAdd={(q) => actions.addNightlyQuestion(q)}
+        onRemove={(id) => actions.removeNightlyQuestion(id)}
+        onSave={(items) => actions.setNightlyQuestions(items)}
+      />
+
+      <DayShapeEditor />
+
       <Loops />
 
       <SectionTitle title="Your data" />
@@ -228,6 +263,118 @@ export default function Settings() {
         126 days. Head down. Same inputs. Every day.
       </p>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------- day shape
+
+/**
+ * Your day, entirely in your own words. Nothing here is a default the app
+ * enforces — every block, time and label is added, edited and removed by
+ * hand, and the list starts empty until you fill it in.
+ */
+function DayShapeEditor() {
+  const state = useStore()
+
+  return (
+    <>
+      <SectionTitle
+        title="Shape of your day"
+        action={
+          <button className="btn btn-quiet btn-sm" onClick={actions.addShapeBlock}>
+            <IconPlus style={{ width: 14, height: 14 }} />
+            Add block
+          </button>
+        }
+      />
+      <Card>
+        {state.dayShape.length === 0 ? (
+          <div style={{ padding: 14 }}>
+            <Empty>
+              Nothing set. Add blocks one at a time, or start from a rough shape and change
+              everything about it.
+            </Empty>
+            <button
+              className="btn btn-sm"
+              style={{ marginTop: 10 }}
+              onClick={actions.useStarterShape}
+            >
+              Start from a suggestion
+            </button>
+          </div>
+        ) : (
+          <div className="rows">
+            {state.dayShape.map((b) => (
+              <div className="row row-metric" key={b.id}>
+                <input
+                  className="input input-time"
+                  type="time"
+                  value={b.start}
+                  onChange={(e) => actions.updateShapeBlock(b.id, { start: e.target.value })}
+                  aria-label="Start"
+                />
+                <input
+                  className="input input-time"
+                  type="time"
+                  value={b.end}
+                  onChange={(e) => actions.updateShapeBlock(b.id, { end: e.target.value })}
+                  aria-label="End"
+                />
+                <input
+                  className="input"
+                  style={{ flex: 1, minWidth: 90 }}
+                  value={b.label}
+                  placeholder="What happens here"
+                  onChange={(e) => actions.updateShapeBlock(b.id, { label: e.target.value })}
+                />
+                <select
+                  className="input"
+                  style={{ width: 108, flex: 'none' }}
+                  value={b.kind}
+                  onChange={(e) =>
+                    actions.updateShapeBlock(b.id, { kind: e.target.value as ShapeBlockKind })
+                  }
+                  aria-label="Kind"
+                >
+                  <option value="routine">Routine</option>
+                  <option value="deep">Deep work</option>
+                  <option value="calls">Calls</option>
+                  <option value="admin">Admin</option>
+                  <option value="break">Break</option>
+                  <option value="shutdown">Shutdown</option>
+                </select>
+                <select
+                  className="input"
+                  style={{ width: 96, flex: 'none' }}
+                  value={b.tag}
+                  onChange={(e) =>
+                    actions.updateShapeBlock(b.id, { tag: e.target.value as ShapeBlockTag })
+                  }
+                  aria-label="Belongs to"
+                >
+                  {PRIORITY_TAGS.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => actions.removeShapeBlock(b.id)}
+                  aria-label="Remove block"
+                >
+                  <IconTrash style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        "Deep work" and "Calls" blocks are what the daily planner fills with outstanding work —
+        everything else it leaves alone.
+      </p>
+    </>
   )
 }
 
@@ -312,6 +459,96 @@ function Loops() {
       <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
         Archiving keeps a loop out of the nightly list without erasing the days it already
         explains. Deleting removes it from those days too.
+      </p>
+    </>
+  )
+}
+
+// -------------------------------------------------------------- ritual editor
+
+/**
+ * One generic editor for the three "list of short text, with an id" rituals —
+ * morning, shutdown, nightly questions. Same shape, same edit rules, so one
+ * component instead of three nearly-identical ones.
+ */
+function RitualEditor<T extends { id: string }>({
+  title,
+  hint,
+  items,
+  getLabel,
+  setLabel,
+  onAdd,
+  onRemove,
+  onSave,
+}: {
+  title: string
+  hint: string
+  items: T[]
+  getLabel: (item: T) => string
+  setLabel: (item: T, label: string) => T
+  onAdd: (label: string) => void
+  onRemove: (id: string) => void
+  onSave: (items: T[]) => void
+}) {
+  const [draft, setDraft] = useState('')
+
+  const add = () => {
+    if (!draft.trim()) return
+    onAdd(draft.trim())
+    setDraft('')
+  }
+
+  return (
+    <>
+      <SectionTitle title={title} />
+      <Card>
+        {items.length === 0 ? (
+          <Empty>Nothing set. Falls back to the built-in list until you add your own.</Empty>
+        ) : (
+          <div className="rows">
+            {items.map((item) => (
+              <div className="row" key={item.id}>
+                <input
+                  className="input input-plain"
+                  style={{ flex: 1 }}
+                  value={getLabel(item)}
+                  onChange={(e) =>
+                    onSave(items.map((i) => (i.id === item.id ? setLabel(i, e.target.value) : i)))
+                  }
+                />
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => onRemove(item.id)}
+                  aria-label="Remove"
+                >
+                  <IconTrash style={{ width: 16, height: 16 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            padding: 13,
+            borderTop: items.length ? '1px solid var(--hairline)' : 'none',
+          }}
+        >
+          <input
+            className="input"
+            placeholder="Add one"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+          <button className="btn" onClick={add} disabled={!draft.trim()} aria-label="Add">
+            <IconPlus style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        {hint}
       </p>
     </>
   )

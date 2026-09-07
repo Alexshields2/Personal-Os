@@ -6,6 +6,7 @@ import { PILLARS, PROTOCOL_DAYS } from '../lib/config'
 import { addDays, formatLong, todayISO } from '../lib/date'
 import { euroCompact, num } from '../lib/format'
 import { briefing } from '../lib/advisor'
+import AskAlex from '../components/AskAlex'
 import { dayIntent } from '../lib/nav'
 import type { DayView } from '../lib/nav'
 import { emptyDay, useStore } from '../lib/store'
@@ -91,6 +92,8 @@ export default function Alex({ onNavigate }: { onNavigate?: (tab: string) => voi
       </header>
 
       <DayForms onNavigate={onNavigate} />
+
+      <AskAlex onNavigate={onNavigate} />
 
       {/* --------------------------------------------------- the briefing */}
 

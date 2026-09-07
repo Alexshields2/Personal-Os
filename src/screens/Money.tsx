@@ -24,11 +24,17 @@ import {
   accountHistory,
   businessTotal,
   entityTotals,
+  liveAccountBalance,
+  onemediaTotal,
+  personalTotal,
+  monthToDate,
+  dailyMoneyTable,
   clientBook,
   rewardsUnlocked,
   yearToDate,
 } from '../lib/selectors'
-import { BANK_ACCOUNTS } from '../lib/types'
+import { BANK_ACCOUNTS, ONEMEDIA_ACCOUNTS } from '../lib/types'
+import { DEFAULT_ACCOUNT_FOR_ENTITY } from '../lib/config'
 import type { AccountId, LedgerKind, MoneyEntity } from '../lib/types'
 
 /**
@@ -40,8 +46,11 @@ import type { AccountId, LedgerKind, MoneyEntity } from '../lib/types'
  */
 const SERIES_STYLE: Record<string, { color: string; dash?: string }> = {
   consultingBank: { color: 'var(--series-consulting)' },
-  onemediaBank: { color: 'var(--series-1media)', dash: '10 7' },
-  personalBank: { color: 'var(--series-personal)', dash: '2.5 6' },
+  onemediaStripe: { color: 'var(--series-1media)', dash: '10 7' },
+  onemediaAib: { color: 'var(--series-1media)', dash: '2 4' },
+  onemediaRev: { color: 'var(--series-1media)', dash: '1 3' },
+  personalAib: { color: 'var(--series-personal)', dash: '2.5 6' },
+  personalRev: { color: 'var(--series-personal)', dash: '1 5' },
 }
 
 export default function Money() {
@@ -77,10 +86,11 @@ function Accounts() {
   const [entity, setEntity] = useState<MoneyEntity | 'all'>('all')
   const [addLedger, setAddLedger] = useState(false)
   const [addBalance, setAddBalance] = useState(false)
+  const [showDaily, setShowDaily] = useState(false)
 
-  const consultingBank = accountBalance(state, 'consultingBank')
-  const onemediaBank = accountBalance(state, 'onemediaBank')
-  const personalBank = accountBalance(state, 'personalBank')
+  const consultingBank = liveAccountBalance(state, 'consultingBank')
+  const onemediaBank = onemediaTotal(state)
+  const personalBank = personalTotal(state)
   const unlocked = rewardsUnlocked(state)
 
   const consulting = entityTotals(state, 'consulting')
@@ -180,6 +190,42 @@ function Accounts() {
         Invoiced and collected are kept apart on purpose. Confusing the two is how a good year
         runs out of money.
       </p>
+
+      <SectionTitle title="This month" />
+      <Card>
+        {[
+          { label: 'Consulting.ie', m: monthToDate(state, 'consulting') },
+          { label: '1Media', m: monthToDate(state, 'onemedia') },
+        ].map((row) => (
+          <div className="insight" key={row.label}>
+            <div className="insight-head">
+              <span className="insight-title">{row.label}</span>
+              <span className="t-num" style={{ color: row.m.net >= 0 ? undefined : 'var(--warning)' }}>
+                {row.m.net >= 0 ? '+' : ''}
+                {euro(row.m.net)}
+              </span>
+            </div>
+            <div className="insight-body">
+              {euro(row.m.cashCollected)} in · {euro(row.m.expense)} out · {euro(row.m.revenue)}{' '}
+              invoiced
+            </div>
+          </div>
+        ))}
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Net is cash in less expense logged this month — the number the account balances above
+        are actually moving on.
+      </p>
+
+      <SectionTitle
+        title="Daily table"
+        action={
+          <button className="btn btn-quiet btn-sm" onClick={() => setShowDaily((v) => !v)}>
+            {showDaily ? 'Hide' : 'Show'}
+          </button>
+        }
+      />
+      {showDaily && <DailyTable />}
 
       <div className="grid-3" style={{ marginTop: 14 }}>
         <Stat label="1Media bank" value={euroCompact(onemediaBank)} sub={euro(onemediaBank)} />
@@ -347,11 +393,23 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<LedgerKind>('revenue')
   const [amount, setAmount] = useState(0)
   const [note, setNote] = useState('')
+  // Only cash actually moving in or out of an account needs one attributed —
+  // revenue and profit are recognised amounts, not bank movements.
+  const movesAnAccount = kind === 'cashCollected' || kind === 'expense'
+  const accountsForEntity: AccountId[] = entity === 'consulting' ? ['consultingBank'] : ONEMEDIA_ACCOUNTS
+  const [account, setAccount] = useState<AccountId>(DEFAULT_ACCOUNT_FOR_ENTITY.consulting)
 
   const save = () => {
-    if (amount > 0) {
-      actions.addLedger({ id: uid(), date, entity, kind, amount, note: note.trim() })
-    }
+    if (amount <= 0) return
+    actions.addLedger({
+      id: uid(),
+      date,
+      entity,
+      kind,
+      amount,
+      note: note.trim(),
+      account: movesAnAccount ? account : '',
+    })
     onClose()
   }
 
@@ -360,7 +418,10 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
       <Field label="Business">
         <Segmented
           value={entity}
-          onChange={setEntity}
+          onChange={(next: MoneyEntity) => {
+            setEntity(next)
+            setAccount(DEFAULT_ACCOUNT_FOR_ENTITY[next])
+          }}
           options={[
             { value: 'consulting', label: 'Consulting.ie' },
             { value: 'onemedia', label: '1Media' },
@@ -373,12 +434,28 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
           onChange={setKind}
           options={[
             { value: 'revenue', label: 'Revenue' },
-            { value: 'cashCollected', label: 'Cash' },
+            { value: 'cashCollected', label: 'Cash in' },
+            { value: 'expense', label: 'Expense' },
             { value: 'profit', label: 'Profit' },
             { value: 'payout', label: 'Payout' },
           ]}
         />
       </Field>
+      {movesAnAccount && (
+        <Field label="Account">
+          <select
+            className="input"
+            value={account}
+            onChange={(e) => setAccount(e.target.value as AccountId)}
+          >
+            {accountsForEntity.map((a) => (
+              <option key={a} value={a}>
+                {ACCOUNT_LABEL[a]}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
       <NumberField label="Amount (€)" value={amount} onChange={setAmount} placeholder="0" />
       <Field label="Date">
         <input
@@ -392,6 +469,12 @@ function LedgerSheet({ onClose }: { onClose: () => void }) {
       <button className="btn btn-primary btn-block" onClick={save} disabled={amount <= 0}>
         Save entry
       </button>
+      {movesAnAccount && (
+        <p className="t-foot muted" style={{ marginTop: 10 }}>
+          Cash in and expense move {ACCOUNT_LABEL[account]}'s balance immediately — the account
+          screens don't need a separate snapshot for today.
+        </p>
+      )}
     </Sheet>
   )
 }
@@ -401,8 +484,11 @@ function BalanceSheet({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(todayISO())
   const [values, setValues] = useState<Record<AccountId, number>>({
     consultingBank: accountBalance(state, 'consultingBank'),
-    onemediaBank: accountBalance(state, 'onemediaBank'),
-    personalBank: accountBalance(state, 'personalBank'),
+    onemediaStripe: accountBalance(state, 'onemediaStripe'),
+    onemediaAib: accountBalance(state, 'onemediaAib'),
+    onemediaRev: accountBalance(state, 'onemediaRev'),
+    personalAib: accountBalance(state, 'personalAib'),
+    personalRev: accountBalance(state, 'personalRev'),
     netWorth: accountBalance(state, 'netWorth'),
   })
 
@@ -437,6 +523,151 @@ function BalanceSheet({ onClose }: { onClose: () => void }) {
       </p>
       <button className="btn btn-primary btn-block" onClick={save}>
         Save balances
+      </button>
+    </Sheet>
+  )
+}
+
+// ----------------------------------------------------------------- daily table
+
+/**
+ * One row per day since 1 September, editable in place. Tapping a cell opens
+ * a quick entry rather than a full ledger form — this is for the habit of
+ * filling in a day's numbers as they happen, not for a one-off correction.
+ */
+function DailyTable() {
+  const state = useStore()
+  const [entity, setEntity] = useState<MoneyEntity>('consulting')
+  const from = `${todayISO().slice(0, 4)}-09-01`
+  const rows = dailyMoneyTable(state, entity, from < todayISO() ? from : todayISO(), todayISO())
+  const [editing, setEditing] = useState<{ date: string; kind: LedgerKind } | null>(null)
+
+  return (
+    <>
+      <div style={{ marginBottom: 10 }}>
+        <Segmented
+          value={entity}
+          onChange={setEntity}
+          options={[
+            { value: 'consulting', label: 'Consulting.ie' },
+            { value: 'onemedia', label: '1Media' },
+          ]}
+        />
+      </div>
+      <Card>
+        <div className="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Cash in</th>
+                <th>Expense</th>
+                <th>Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...rows].reverse().map((r) => (
+                <tr key={r.date}>
+                  <td className="d">{formatShort(r.date)}</td>
+                  <td>
+                    <button
+                      className="btn btn-quiet btn-sm"
+                      onClick={() => setEditing({ date: r.date, kind: 'cashCollected' })}
+                    >
+                      {r.cashCollected > 0 ? euro(r.cashCollected) : '+ add'}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-quiet btn-sm"
+                      onClick={() => setEditing({ date: r.date, kind: 'expense' })}
+                    >
+                      {r.expense > 0 ? euro(r.expense) : '+ add'}
+                    </button>
+                  </td>
+                  <td
+                    className="d"
+                    style={{ color: r.net > 0 ? undefined : r.net < 0 ? 'var(--warning)' : undefined }}
+                  >
+                    {r.net !== 0 ? `${r.net > 0 ? '+' : ''}${euro(r.net)}` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Tap a cell to log that day's number. Every entry lands in the ledger, attributed to{' '}
+        {ACCOUNT_LABEL[DEFAULT_ACCOUNT_FOR_ENTITY[entity]]} by default.
+      </p>
+
+      {editing && (
+        <DailyCellSheet
+          date={editing.date}
+          kind={editing.kind}
+          entity={entity}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </>
+  )
+}
+
+function DailyCellSheet({
+  date,
+  kind,
+  entity,
+  onClose,
+}: {
+  date: string
+  kind: LedgerKind
+  entity: MoneyEntity
+  onClose: () => void
+}) {
+  const [amount, setAmount] = useState(0)
+  const [note, setNote] = useState('')
+  const [account, setAccount] = useState<AccountId>(DEFAULT_ACCOUNT_FOR_ENTITY[entity])
+  const accountsForEntity: AccountId[] = entity === 'consulting' ? ['consultingBank'] : ONEMEDIA_ACCOUNTS
+
+  const save = () => {
+    if (amount <= 0) return
+    actions.addLedger({
+      id: uid(),
+      date,
+      entity,
+      kind,
+      amount,
+      note: note.trim(),
+      account,
+    })
+    onClose()
+  }
+
+  return (
+    <Sheet
+      title={`${kind === 'expense' ? 'Expense' : 'Cash in'} · ${formatShort(date)}`}
+      onClose={onClose}
+    >
+      <NumberField label="Amount (€)" value={amount} onChange={setAmount} placeholder="0" />
+      {accountsForEntity.length > 1 && (
+        <Field label="Account">
+          <select
+            className="input"
+            value={account}
+            onChange={(e) => setAccount(e.target.value as AccountId)}
+          >
+            {accountsForEntity.map((a) => (
+              <option key={a} value={a}>
+                {ACCOUNT_LABEL[a]}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      <TextField label="Note" value={note} onChange={setNote} placeholder="Optional" />
+      <button className="btn btn-primary btn-block" onClick={save} disabled={amount <= 0}>
+        Save
       </button>
     </Sheet>
   )

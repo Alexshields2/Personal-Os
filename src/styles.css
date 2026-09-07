@@ -2428,3 +2428,48 @@ button.edge {
 button.edge:hover {
   background: var(--fill-soft);
 }
+
+/* Due & confidence */
+.due-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--seq-track);
+}
+
+.due-bar i {
+  display: block;
+  height: 100%;
+}
+
+.due-guaranteed {
+  background: var(--won);
+}
+
+.due-likely {
+  background: var(--text-secondary);
+}
+
+.due-push {
+  background: var(--warning);
+}
+
+.due-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.due-dot-guaranteed {
+  background: var(--won);
+}
+
+.due-dot-likely {
+  background: var(--text-secondary);
+}
+
+.due-dot-needsPush {
+  background: var(--warning);
+}

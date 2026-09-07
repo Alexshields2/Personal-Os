@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 6
+export const STATE_VERSION = 10
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -49,6 +49,19 @@ export interface Priority {
   tag: PriorityTag
 }
 
+/** What a block is for. Drives what the planner puts in it. */
+export type BlockKind = 'routine' | 'deep' | 'calls' | 'admin' | 'shutdown' | 'break'
+
+/** One row of your day shape. No fixed hours — every field is yours to set. */
+export interface ShapeBlock {
+  id: string
+  start: string
+  end: string
+  label: string
+  tag: PriorityTag
+  kind: BlockKind
+}
+
 /** A planned block of the day. `start`/`end` are 'HH:MM', 24-hour. */
 export interface TimeBlock {
   id: string
@@ -56,6 +69,11 @@ export interface TimeBlock {
   end: string
   label: string
   tag: PriorityTag
+  kind: BlockKind
+  /** Tasks the planner put in here. Editable by hand afterwards. */
+  taskIds: string[]
+  /** True when the planner placed it, so a hand-made block is never overwritten. */
+  auto: boolean
 }
 
 export interface DayEntry {
@@ -104,9 +122,35 @@ export type MoneyEntity = 'consulting' | 'onemedia'
  * manual figure — it takes in property, investments and anything else that
  * never touches these three accounts, so it is never summed with them.
  */
-export type AccountId = 'consultingBank' | 'onemediaBank' | 'personalBank' | 'netWorth'
+/**
+ * 1Media alone runs three real accounts — Stripe, AIB business, Revolut
+ * business — so it gets three ids instead of one. `onemediaBank` still parses
+ * for anything stored before this split; hydrate folds it into the AIB
+ * balance, since that was the one operating account it stood for.
+ */
+export type AccountId =
+  | 'consultingBank'
+  | 'onemediaStripe'
+  | 'onemediaAib'
+  | 'onemediaRev'
+  | 'personalAib'
+  | 'personalRev'
+  | 'netWorth'
 
-export const BANK_ACCOUNTS: AccountId[] = ['consultingBank', 'onemediaBank', 'personalBank']
+export const BANK_ACCOUNTS: AccountId[] = [
+  'consultingBank',
+  'onemediaStripe',
+  'onemediaAib',
+  'onemediaRev',
+  'personalAib',
+  'personalRev',
+]
+
+/** The three that roll up into "1Media bank", for anywhere that wants one number. */
+export const ONEMEDIA_ACCOUNTS: AccountId[] = ['onemediaStripe', 'onemediaAib', 'onemediaRev']
+
+/** Personal runs two accounts too — AIB and Rev — same reasoning as 1Media. */
+export const PERSONAL_ACCOUNTS: AccountId[] = ['personalAib', 'personalRev']
 
 export type LedgerKind = 'revenue' | 'cashCollected' | 'profit' | 'payout' | 'expense'
 
@@ -118,6 +162,13 @@ export interface LedgerEntry {
   kind: LedgerKind
   amount: number
   note: string
+  /**
+   * Which real account cash-collected or expense actually moved. Empty means
+   * unattributed — revenue and profit entries don't move a bank balance, and
+   * older entries predate this field. Only a cashCollected or expense entry
+   * with an account set feeds the live balance.
+   */
+  account: AccountId | ''
 }
 
 /** A point-in-time bank reading. Latest per account is the current balance. */
@@ -346,6 +397,8 @@ export interface Task {
   /** How long you think it takes, in minutes. 0 means unestimated. */
   estimateMin: number
   priority: TaskPriority
+  /** Loose hint for what kind of work this is — currently only 'calls' is read anywhere. */
+  kindHint: string
   created: string
   doneDate: string
 }
@@ -541,6 +594,14 @@ export interface AppState {
   events: CalendarEvent[]
   vision: Vision
   trackers: Tracker[]
+  /** Your own day shape — start empty, edited entirely in Settings. */
+  dayShape: ShapeBlock[]
+  /** The six-tap morning ritual. Editable — add, rename, remove any of it. */
+  morningRitual: { id: string; label: string }[]
+  /** The end-of-day close-out. Same editing rules as the morning ritual. */
+  shutdownRitual: { id: string; label: string; hint: string }[]
+  /** The four questions asked every night, in your own words. */
+  nightlyQuestions: { id: string; q: string; hint: string }[]
   bills: Bill[]
   holdings: Holding[]
   invoices: Invoice[]

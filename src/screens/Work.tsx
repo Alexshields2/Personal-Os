@@ -14,6 +14,7 @@ import {
   TextField,
 } from '../components/ui'
 import WeekBoard from '../components/WeekBoard'
+import { DueOverview } from './Finance'
 import { IconChevron, IconPlus, IconTrash, IconWarn } from '../components/icons'
 import {
   CLIENT_STATUS_LABEL,
@@ -38,7 +39,7 @@ import type {
   Task,
 } from '../lib/types'
 
-type View = 'week' | 'tasks' | 'projects' | 'clients' | 'pipeline'
+type View = 'week' | 'tasks' | 'projects' | 'clients' | 'pipeline' | 'due'
 
 export default function Work() {
   const state = useStore()
@@ -91,6 +92,7 @@ export default function Work() {
             { value: 'projects', label: 'Projects' },
             { value: 'clients', label: 'Clients' },
             { value: 'pipeline', label: `Pipeline · ${pipe.open.length}` },
+            { value: 'due', label: 'Due' },
           ]}
         />
       </div>
@@ -100,6 +102,7 @@ export default function Work() {
       {view === 'projects' && <Projects />}
       {view === 'clients' && <Clients />}
       {view === 'pipeline' && <PipelineView />}
+      {view === 'due' && <DueOverview />}
     </div>
   )
 }

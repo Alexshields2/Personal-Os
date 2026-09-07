@@ -18,6 +18,7 @@ import type { ChecklistItem, PillarId } from './config'
 import {
   addDays,
   blockHours,
+  minutesOfDay,
   dayNumber,
   daysBetween,
   fromISO,
@@ -26,8 +27,11 @@ import {
   todayISO,
   weekStartISO,
 } from './date'
+import { euro } from './format'
+import { ONEMEDIA_ACCOUNTS, PERSONAL_ACCOUNTS } from './types'
 import type {
   AccountId,
+  BlockKind,
   AppState,
   Bill,
   CalendarEvent,
@@ -52,6 +56,8 @@ import type {
   Loop,
   MoneyEntity,
   Priority,
+  PriorityTag,
+  TimeBlock,
   Upkeep,
 } from './types'
 
@@ -339,7 +345,23 @@ export function accountHistory(
 }
 
 export function businessTotal(state: AppState): number {
-  return accountBalance(state, 'consultingBank') + accountBalance(state, 'onemediaBank')
+  return (
+    accountBalance(state, 'consultingBank') +
+    ONEMEDIA_ACCOUNTS.reduce((sum, id) => sum + accountBalance(state, id), 0)
+  )
+}
+
+/**
+ * All three 1Media accounts added together, live — each account's own
+ * snapshot carried forward by whatever has been logged against it since.
+ */
+export function onemediaTotal(state: AppState, iso = todayISO()): number {
+  return ONEMEDIA_ACCOUNTS.reduce((sum, id) => sum + liveAccountBalance(state, id, iso), 0)
+}
+
+/** Both personal accounts added together, live. */
+export function personalTotal(state: AppState, iso = todayISO()): number {
+  return PERSONAL_ACCOUNTS.reduce((sum, id) => sum + liveAccountBalance(state, id, iso), 0)
 }
 
 export function rewardsUnlocked(state: AppState): boolean {
@@ -1637,9 +1659,13 @@ export interface Runway {
 
 /** How long the cash lasts at the current outgoings. */
 export function runway(state: AppState, purse: Purse): Runway {
-  const account: AccountId =
-    purse === 'consulting' ? 'consultingBank' : purse === 'onemedia' ? 'onemediaBank' : 'personalBank'
-  const cash = accountBalance(state, account)
+  // 1Media has three accounts, not one, so its cash is the three added together.
+  const cash =
+    purse === 'consulting'
+      ? accountBalance(state, 'consultingBank')
+      : purse === 'personal'
+        ? personalTotal(state)
+        : onemediaTotal(state)
   const monthlyBurn = state.bills
     .filter((b) => b.purse === purse)
     .reduce((s, b) => s + monthlyCost(b), 0)
@@ -2124,4 +2150,254 @@ export function monthGrid(state: AppState, anchor: string, iso = todayISO()): Mo
       billCount: state.bills.filter((b) => b.nextDue === date).length,
     }
   })
+}
+
+// ---------------------------------------------------------------------------
+// The daily planner
+//
+// Deterministic, not AI: it reads what's actually outstanding and slots it
+// into the blocks you've already shaped your day into. A "deep work" block
+// gets your highest-priority undone tasks in that business; a "calls" block
+// gets anything overdue that looks like a call or a push; nothing touches a
+// block you've edited by hand.
+
+export interface PlannedBlock {
+  block: TimeBlock
+  tasks: Task[]
+  minutes: number
+  capacityMin: number
+  over: boolean
+}
+
+function blockCapacityMin(b: { start: string; end: string }): number {
+  return Math.max(0, minutesOfDay(b.end) - minutesOfDay(b.start))
+}
+
+/** Work items that read as "push forward" — invoices, stale deals, follow-ups. */
+export interface PushItem {
+  id: string
+  label: string
+  detail: string
+  kind: 'invoice' | 'deal' | 'task'
+  tab: string
+}
+
+export function pushForwardItems(state: AppState, iso = todayISO()): PushItem[] {
+  const out: PushItem[] = []
+  for (const inv of invoiceBook(state, undefined, iso).overdue) {
+    const client = state.clients.find((c) => c.id === inv.clientId)
+    out.push({
+      id: `inv-${inv.id}`,
+      label: `Chase ${inv.reference || 'invoice'}${client ? ` — ${client.name}` : ''}`,
+      detail: `${euro(inv.amount)} overdue`,
+      kind: 'invoice',
+      tab: 'money',
+    })
+  }
+  for (const deal of pipeline(state, undefined, iso).stale) {
+    out.push({
+      id: `deal-${deal.id}`,
+      label: `Push ${deal.name}`,
+      detail: deal.nextStep || 'No next step set',
+      kind: 'deal',
+      tab: 'work',
+    })
+  }
+  for (const t of state.tasks.filter((t) => !t.done && t.due && daysBetween(t.due, iso) > 0)) {
+    out.push({ id: `task-${t.id}`, label: t.title, detail: 'Overdue', kind: 'task', tab: 'work' })
+  }
+  return out
+}
+
+/**
+ * Fills a day's blocks from today's outstanding work, respecting whatever
+ * shape you've set. Only blocks the day doesn't already have hand-edited
+ * content in get touched — the planner adds, it never overwrites a block you
+ * changed yourself.
+ */
+export function planTasksForBlock(
+  state: AppState,
+  block: { tag: PriorityTag; kind: BlockKind },
+  iso = todayISO(),
+  exclude: Set<string> = new Set(),
+): Task[] {
+  const capacity = 0 // caller passes real capacity via blockCapacityMin
+  void capacity
+  const pool = state.tasks.filter(
+    (t) => !t.done && t.entity === block.tag && !exclude.has(t.id),
+  )
+  if (block.kind === 'calls' || block.kind === 'admin') {
+    // Anything overdue or due today first, then whatever's scheduled for today.
+    return pool
+      .filter((t) => t.scheduled === iso || (t.due && daysBetween(t.due, iso) >= 0))
+      .sort((a, b) => a.priority - b.priority || (a.due || '9999').localeCompare(b.due || '9999'))
+  }
+  if (block.kind === 'deep') {
+    return pool
+      .filter((t) => t.scheduled === iso || t.scheduled === '')
+      .sort((a, b) => a.priority - b.priority || b.estimateMin - a.estimateMin)
+  }
+  return []
+}
+
+export interface DayPlan {
+  blocks: PlannedBlock[]
+  push: PushItem[]
+}
+
+/** Reads the day's blocks and what's in each, without changing anything. */
+export function dayPlan(state: AppState, date: string): DayPlan {
+  const day = state.days[date]
+  const blocks = (day?.blocks ?? []).map((block) => {
+    const tasks = block.taskIds
+      .map((id) => state.tasks.find((t) => t.id === id))
+      .filter((t): t is Task => Boolean(t) && !t!.done)
+    const minutes = tasks.reduce((s, t) => s + (t.estimateMin || 30), 0)
+    const capacityMin = blockCapacityMin(block)
+    return { block, tasks, minutes, capacityMin, over: minutes > capacityMin && capacityMin > 0 }
+  })
+  return { blocks, push: pushForwardItems(state, date) }
+}
+
+// ---------------------------------------------------------------------------
+// This month, and the daily fillable table
+
+export interface MonthToDate {
+  month: string
+  revenue: number
+  cashCollected: number
+  expense: number
+  net: number
+}
+
+export function monthToDate(state: AppState, entity?: MoneyEntity, iso = todayISO()): MonthToDate {
+  const month = iso.slice(0, 7)
+  const rows = state.ledger.filter((e) => e.date.startsWith(month) && (!entity || e.entity === entity))
+  const sum = (kind: LedgerKind) => rows.filter((e) => e.kind === kind).reduce((s, e) => s + e.amount, 0)
+  const revenue = sum('revenue')
+  const cashCollected = sum('cashCollected')
+  const expense = sum('expense')
+  return { month, revenue, cashCollected, expense, net: cashCollected - expense }
+}
+
+export interface DailyMoneyRow {
+  date: string
+  revenue: number
+  cashCollected: number
+  expense: number
+  net: number
+}
+
+/** One row per day from `from` to `iso`, so it can be filled in day by day. */
+export function dailyMoneyTable(
+  state: AppState,
+  entity: MoneyEntity | undefined,
+  from: string,
+  iso = todayISO(),
+): DailyMoneyRow[] {
+  const days = Math.max(0, daysBetween(from, iso))
+  const rows: DailyMoneyRow[] = []
+  for (let i = days; i >= 0; i--) {
+    const date = addDays(iso, -i)
+    const entries = state.ledger.filter((e) => e.date === date && (!entity || e.entity === entity))
+    const sum = (kind: LedgerKind) =>
+      entries.filter((e) => e.kind === kind).reduce((s, e) => s + e.amount, 0)
+    const revenue = sum('revenue')
+    const cashCollected = sum('cashCollected')
+    const expense = sum('expense')
+    rows.push({ date, revenue, cashCollected, expense, net: cashCollected - expense })
+  }
+  return rows
+}
+
+/**
+ * Where an account actually stands right now: its latest manual snapshot,
+ * carried forward by every cash-collected and expense ledger entry logged
+ * since. This is what makes logging a day's revenue or expense move the
+ * balance without you having to type a new one in by hand — the snapshot is
+ * only ever the anchor, not the live number.
+ */
+export function liveAccountBalance(state: AppState, account: AccountId, iso = todayISO()): number {
+  const snaps = state.balances.filter((b) => b.account === account).sort((a, b) => a.date.localeCompare(b.date))
+  const latest = snaps[snaps.length - 1]
+  const anchor = latest?.amount ?? 0
+  const anchorDate = latest?.date ?? ''
+  const moved = state.ledger.filter(
+    (e) => e.account === account && e.date > anchorDate && e.date <= iso,
+  )
+  const delta = moved.reduce(
+    (s, e) => s + (e.kind === 'expense' ? -e.amount : e.kind === 'cashCollected' ? e.amount : 0),
+    0,
+  )
+  return anchor + delta
+}
+
+// ---------------------------------------------------------------------------
+// Due, and how sure of it you can be
+//
+// One list where "what's coming" actually lives, instead of split across
+// invoices and the pipeline. Confidence is a read on what's already there —
+// won and sent-not-overdue are guaranteed; a late-stage deal is likely; a
+// stale one or an overdue invoice needs a push, and the label says so.
+
+export type Confidence = 'guaranteed' | 'likely' | 'needsPush'
+
+export interface DueItem {
+  id: string
+  label: string
+  entity: MoneyEntity
+  amount: number
+  date: string
+  confidence: Confidence
+  source: 'invoice' | 'deal'
+}
+
+export function dueOverview(
+  state: AppState,
+  entity?: MoneyEntity,
+  iso = todayISO(),
+): { items: DueItem[]; byConfidence: Record<Confidence, number>; total: number } {
+  const items: DueItem[] = []
+
+  for (const inv of state.invoices) {
+    if (inv.status !== 'sent') continue
+    if (entity && inv.entity !== entity) continue
+    const late = inv.due ? daysBetween(inv.due, iso) > 0 : false
+    items.push({
+      id: `inv-${inv.id}`,
+      label: inv.reference || 'Invoice',
+      entity: inv.entity,
+      amount: inv.amount,
+      date: inv.due || iso,
+      confidence: late ? 'needsPush' : 'guaranteed',
+      source: 'invoice',
+    })
+  }
+
+  for (const deal of state.deals) {
+    if (!OPEN_STAGES.includes(deal.stage)) continue
+    if (entity && deal.entity !== entity) continue
+    const stale = !deal.moved || daysBetween(deal.moved, iso) >= STALE_DEAL_DAYS
+    const confidence: Confidence = stale
+      ? 'needsPush'
+      : deal.probability >= 60 || deal.stage === 'proposal'
+        ? 'likely'
+        : 'needsPush'
+    items.push({
+      id: `deal-${deal.id}`,
+      label: deal.name,
+      entity: deal.entity,
+      amount: deal.value,
+      date: deal.expectedClose || iso,
+      confidence,
+      source: 'deal',
+    })
+  }
+
+  items.sort((a, b) => a.date.localeCompare(b.date))
+
+  const byConfidence: Record<Confidence, number> = { guaranteed: 0, likely: 0, needsPush: 0 }
+  for (const item of items) byConfidence[item.confidence] += item.amount
+
+  return { items, byConfidence, total: byConfidence.guaranteed + byConfidence.likely + byConfidence.needsPush }
 }

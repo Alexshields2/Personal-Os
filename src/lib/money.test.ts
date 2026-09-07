@@ -3,12 +3,16 @@ import { addDays } from './date'
 import {
   balanceSheet,
   billBook,
+  dueOverview,
   invoiceBook,
+  liveAccountBalance,
   monthlyCost,
+  monthToDate,
+  onemediaTotal,
   runway,
   search,
 } from './selectors'
-import { client, deal, goal, makeState, task } from './fixtures'
+import { client, deal, goal, ledger, makeState, task } from './fixtures'
 import type { Bill, Holding, Invoice } from './types'
 
 const TODAY = '2026-03-01'
@@ -207,5 +211,101 @@ describe('search', () => {
 
   it('returns nothing for an empty query', () => {
     expect(search(makeState(), '   ')).toEqual([])
+  })
+})
+
+describe('liveAccountBalance', () => {
+  it('carries the latest snapshot forward by cash in and expense since it', () => {
+    const state = makeState({
+      balances: [{ id: 'b1', date: '2026-01-01', account: 'consultingBank', amount: 10_000 }],
+      ledger: [
+        ledger('l1', { date: '2026-01-05', kind: 'cashCollected', amount: 5000, account: 'consultingBank' }),
+        ledger('l2', { date: '2026-01-10', kind: 'expense', amount: 2000, account: 'consultingBank' }),
+        // Revenue is recognition, not cash — it must not move the balance.
+        ledger('l3', { date: '2026-01-12', kind: 'revenue', amount: 50_000, account: 'consultingBank' }),
+      ],
+    })
+    expect(liveAccountBalance(state, 'consultingBank', '2026-01-15')).toBe(13_000)
+  })
+
+  it('ignores movements attributed to a different account', () => {
+    const state = makeState({
+      balances: [{ id: 'b1', date: '2026-01-01', account: 'onemediaAib', amount: 1000 }],
+      ledger: [
+        ledger('l1', { date: '2026-01-05', kind: 'cashCollected', amount: 500, account: 'onemediaStripe' }),
+      ],
+    })
+    expect(liveAccountBalance(state, 'onemediaAib', '2026-01-10')).toBe(1000)
+  })
+
+  it('ignores a movement dated before the anchor snapshot', () => {
+    const state = makeState({
+      balances: [{ id: 'b1', date: '2026-01-10', account: 'consultingBank', amount: 5000 }],
+      ledger: [
+        ledger('l1', { date: '2026-01-05', kind: 'cashCollected', amount: 9000, account: 'consultingBank' }),
+      ],
+    })
+    expect(liveAccountBalance(state, 'consultingBank', '2026-01-15')).toBe(5000)
+  })
+})
+
+describe('onemediaTotal and personalTotal', () => {
+  it('sum every account under the business, live', () => {
+    const state = makeState({
+      balances: [
+        { id: 'b1', date: '2026-01-01', account: 'onemediaStripe', amount: 1000 },
+        { id: 'b2', date: '2026-01-01', account: 'onemediaAib', amount: 2000 },
+        { id: 'b3', date: '2026-01-01', account: 'onemediaRev', amount: 500 },
+      ],
+      ledger: [
+        ledger('l1', { date: '2026-01-05', kind: 'expense', amount: 300, account: 'onemediaAib' }),
+      ],
+    })
+    expect(onemediaTotal(state, '2026-01-10')).toBe(1000 + 2000 - 300 + 500)
+  })
+})
+
+describe('monthToDate', () => {
+  it('sums only entries in the given month, for one business', () => {
+    const state = makeState({
+      ledger: [
+        ledger('a', { date: '2026-03-05', entity: 'consulting', kind: 'cashCollected', amount: 4000 }),
+        ledger('b', { date: '2026-03-20', entity: 'consulting', kind: 'expense', amount: 1500 }),
+        ledger('c', { date: '2026-02-28', entity: 'consulting', kind: 'cashCollected', amount: 9000 }),
+        ledger('d', { date: '2026-03-06', entity: 'onemedia', kind: 'cashCollected', amount: 700 }),
+      ],
+    })
+    const m = monthToDate(state, 'consulting', '2026-03-25')
+    expect(m.cashCollected).toBe(4000)
+    expect(m.expense).toBe(1500)
+    expect(m.net).toBe(2500)
+  })
+})
+
+describe('dueOverview', () => {
+  it('buckets a sent, unexpired invoice as guaranteed and an overdue one as needs-push', () => {
+    const state = makeState({
+      invoices: [
+        invoice('ok', { status: 'sent', due: addDays(TODAY, 10), amount: 3000 }),
+        invoice('late', { status: 'sent', due: addDays(TODAY, -3), amount: 1000 }),
+        invoice('draft', { status: 'draft', amount: 5000 }),
+      ],
+    })
+    const due = dueOverview(state, undefined, TODAY)
+    expect(due.byConfidence.guaranteed).toBe(3000)
+    expect(due.byConfidence.needsPush).toBe(1000)
+    expect(due.items.map((i) => i.id).sort()).toEqual(['inv-late', 'inv-ok'])
+  })
+
+  it('rates a fresh, high-probability deal likely and a stale one needs-push', () => {
+    const state = makeState({
+      deals: [
+        deal('fresh', { stage: 'proposal', probability: 60, value: 20_000, moved: TODAY }),
+        deal('cold', { stage: 'lead', probability: 10, value: 5000, moved: addDays(TODAY, -30) }),
+      ],
+    })
+    const due = dueOverview(state, undefined, TODAY)
+    expect(due.byConfidence.likely).toBe(20_000)
+    expect(due.byConfidence.needsPush).toBe(5000)
   })
 })

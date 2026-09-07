@@ -22,7 +22,7 @@ import {
 import { daysBetween, formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, num, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
-import { balanceSheet, billBook, invoiceBook, monthlyCost, runway } from '../lib/selectors'
+import { balanceSheet, billBook, dueOverview, invoiceBook, monthlyCost, runway } from '../lib/selectors'
 import type {
   BillCadence,
   Holding,
@@ -719,5 +719,79 @@ function InvoiceSheet({ onClose }: { onClose: () => void }) {
         </button>
       </div>
     </Sheet>
+  )
+}
+
+// -------------------------------------------------------------------- due
+
+export function DueOverview() {
+  const state = useStore()
+  const [entity, setEntity] = useState<MoneyEntity | 'all'>('all')
+  const due = useMemo(
+    () => dueOverview(state, entity === 'all' ? undefined : entity),
+    [state, entity],
+  )
+
+  const pct = (n: number) => (due.total > 0 ? (n / due.total) * 100 : 0)
+
+  return (
+    <>
+      <div style={{ marginBottom: 12 }}>
+        <Segmented
+          value={entity}
+          onChange={setEntity}
+          options={[
+            { value: 'all', label: 'Both' },
+            { value: 'consulting', label: 'Consulting.ie' },
+            { value: 'onemedia', label: '1Media' },
+          ]}
+        />
+      </div>
+
+      <div className="grid-3">
+        <Stat label="Guaranteed" value={euroCompact(due.byConfidence.guaranteed)} />
+        <Stat label="Likely" value={euroCompact(due.byConfidence.likely)} />
+        <Stat
+          label="Needs push"
+          value={euroCompact(due.byConfidence.needsPush)}
+          accent={due.byConfidence.needsPush > 0 ? 'var(--warning)' : undefined}
+        />
+      </div>
+
+      {due.total > 0 && (
+        <div className="due-bar" style={{ marginTop: 12 }}>
+          <i className="due-guaranteed" style={{ width: `${pct(due.byConfidence.guaranteed)}%` }} />
+          <i className="due-likely" style={{ width: `${pct(due.byConfidence.likely)}%` }} />
+          <i className="due-push" style={{ width: `${pct(due.byConfidence.needsPush)}%` }} />
+        </div>
+      )}
+
+      <SectionTitle title={`${due.items.length} due`} />
+      <Card>
+        {due.items.length === 0 ? (
+          <Empty>Nothing outstanding.</Empty>
+        ) : (
+          <div className="rows">
+            {due.items.map((item) => (
+              <div className="row" key={item.id}>
+                <span className={`due-dot due-dot-${item.confidence}`} />
+                <span className="row-main">
+                  <span className="row-title">{item.label}</span>
+                  <span className="row-sub">
+                    {item.entity === 'consulting' ? 'Consulting.ie' : '1Media'} ·{' '}
+                    {formatShort(item.date)} · {item.source === 'invoice' ? 'invoice' : 'deal'}
+                  </span>
+                </span>
+                <span className="row-value">{euroCompact(item.amount)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Guaranteed: invoiced and not yet overdue. Likely: a live deal past halfway or with the
+        proposal out. Needs push: overdue, or nothing moved on it in a fortnight.
+      </p>
+    </>
   )
 }

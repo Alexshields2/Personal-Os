@@ -86,6 +86,7 @@ export function task(id: string, over: Partial<Task> = {}): Task {
     scheduled: '',
     estimateMin: 0,
     priority: 2,
+    kindHint: '',
     created: '2026-01-01',
     doneDate: '',
     ...over,
@@ -160,6 +161,7 @@ export function ledger(id: string, over: Partial<LedgerEntry> = {}): LedgerEntry
     kind: 'revenue',
     amount: 1000,
     note: '',
+    account: '',
     ...over,
   }
 }
@@ -189,6 +191,10 @@ export function makeState(over: Partial<AppState> = {}): AppState {
     domains: DEFAULT_DOMAINS.map((d) => ({ ...d })),
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
     events: [],
+    dayShape: [],
+    morningRitual: [],
+    shutdownRitual: [],
+    nightlyQuestions: [],
     vision: { title: 'Warplan', year: 2027, intro: '', columns: [] },
     trackers: [],
     bills: [],

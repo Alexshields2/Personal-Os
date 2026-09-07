@@ -20,19 +20,17 @@ import {
   ENERGY_LABEL,
   MAX_PRIORITIES,
   METRIC_BY_KEY,
-  MORNING,
   PILLARS,
   PRIORITY_RANK,
   PRIORITY_TAGS,
   PROTOCOL_DAYS,
   ROTATING_QUESTIONS,
-  SHUTDOWN,
 } from '../lib/config'
 import type { ChecklistItem, PillarId } from '../lib/config'
 import { addDays, blockHours, dayNumber, formatLong, fromISO, todayISO } from '../lib/date'
 import { dayIntent } from '../lib/nav'
 import { num } from '../lib/format'
-import { actions, emptyDay, emptySlots, useStore } from '../lib/store'
+import { actions, emptyDay, emptySlots, newTask, useStore } from '../lib/store'
 import { currentStreak, isItemDone, isLogged, planStatus, scoreDay } from '../lib/selectors'
 import type { AppState, DayEntry, Priority, Targets } from '../lib/types'
 
@@ -447,6 +445,80 @@ function BlockCard({ date, day }: { date: string; day: DayEntry }) {
   )
 }
 
+// ---------------------------------------------------------------- calls today
+
+/**
+ * Who needs a call today. Distinct from the shape of the day: a block says
+ * when you're on the phone, this says who's on the other end of it. Backed by
+ * ordinary tasks tagged "calls" and scheduled today, so it shows up
+ * everywhere else those do — Work, the calendar, the load line — for free.
+ */
+function CallsToday({ date }: { date: string }) {
+  const state = useStore()
+  const calls = state.tasks.filter(
+    (t) => !t.done && t.scheduled === date && t.kindHint === 'calls',
+  )
+  const [text, setText] = useState('')
+
+  const add = () => {
+    if (!text.trim()) return
+    actions.addTask(newTask(text.trim(), { scheduled: date, kindHint: 'calls' }))
+    setText('')
+  }
+
+  return (
+    <>
+      <SectionTitle title={`Calls today · ${calls.length}`} />
+      <Card>
+        {calls.length > 0 && (
+          <div className="rows">
+            {calls.map((t) => (
+              <div className="row" key={t.id}>
+                <button
+                  onClick={() => actions.toggleTask(t.id)}
+                  aria-label="Toggle call"
+                  style={{ display: 'flex' }}
+                >
+                  <Check on={t.done} />
+                </button>
+                <span className="row-main">
+                  <span className="row-title">{t.title}</span>
+                </span>
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => actions.removeTask(t.id)}
+                  aria-label="Remove"
+                >
+                  <IconTrash style={{ width: 15, height: 15 }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            padding: 13,
+            borderTop: calls.length ? '1px solid var(--hairline)' : 'none',
+          }}
+        >
+          <input
+            className="input"
+            placeholder="Who needs a call today"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+          <button className="btn" onClick={add} disabled={!text.trim()} aria-label="Add call">
+            <IconPlus style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
+      </Card>
+    </>
+  )
+}
+
 // --------------------------------------------------------------------- plan
 
 function PlanView({
@@ -458,8 +530,10 @@ function PlanView({
   day: DayEntry
   onDone: () => void
 }) {
+  const state = useStore()
   const plan = planStatus(day)
-  const morningDone = MORNING.filter((m) => day.checks[m.id]).length
+  const ritual = state.morningRitual
+  const morningDone = ritual.filter((m) => day.checks[m.id]).length
 
   return (
     <>
@@ -472,26 +546,36 @@ function PlanView({
       <SectionTitle title="Shape of the day" />
       <BlockCard date={date} day={day} />
 
-      <SectionTitle title={`Morning · ${morningDone}/${MORNING.length}`} />
+      <CallsToday date={date} />
+
+      <SectionTitle title={`Morning · ${morningDone}/${ritual.length}`} />
       <Card>
-        <div className="rows">
-          {MORNING.map((m) => (
-            <button
-              key={m.id}
-              className="row"
-              onClick={() => actions.toggleCheck(date, m.id)}
-              role="checkbox"
-              aria-checked={Boolean(day.checks[m.id])}
-            >
-              <Check on={Boolean(day.checks[m.id])} />
-              <span className="row-main">
-                <span className="row-title" style={{ opacity: day.checks[m.id] ? 0.55 : 1 }}>
-                  {m.label}
+        {ritual.length === 0 ? (
+          <div style={{ padding: 14 }}>
+            <Empty>
+              Nothing set. Add what actually opens your day in Settings — this list is yours.
+            </Empty>
+          </div>
+        ) : (
+          <div className="rows">
+            {ritual.map((m) => (
+              <button
+                key={m.id}
+                className="row"
+                onClick={() => actions.toggleCheck(date, m.id)}
+                role="checkbox"
+                aria-checked={Boolean(day.checks[m.id])}
+              >
+                <Check on={Boolean(day.checks[m.id])} />
+                <span className="row-main">
+                  <span className="row-title" style={{ opacity: day.checks[m.id] ? 0.55 : 1 }}>
+                    {m.label}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
+        )}
       </Card>
 
       <div style={{ marginTop: 16 }}>
@@ -567,7 +651,7 @@ function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: 
   const tomorrowDay = state.days[tomorrow] ?? emptyDay(tomorrow)
   const tomorrowSet = planStatus(tomorrowDay).set > 0
   const rotating = ROTATING_QUESTIONS[fromISO(date).getDay()]
-  const questions = [...CORE_QUESTIONS, rotating]
+  const questions = state.nightlyQuestions.length ? state.nightlyQuestions : [...CORE_QUESTIONS, rotating]
   const activeLoops = state.loops.filter((l) => !l.archived)
 
   return (
@@ -684,18 +768,32 @@ function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: 
       <SectionTitle title="Shutdown" />
       <Card>
         <div className="rows">
-          {SHUTDOWN.map((s) => {
-            const on = s.derived ? tomorrowSet : Boolean(day.checks[s.id])
+          {/* The one derived row — computed, so it stays fixed rather than editable. */}
+          <button
+            className="row"
+            role="checkbox"
+            aria-checked={tomorrowSet}
+            disabled
+          >
+            <Check on={tomorrowSet} locked />
+            <span className="row-main">
+              <span className="row-title" style={{ opacity: tomorrowSet ? 0.55 : 1 }}>
+                Tomorrow's three are set
+              </span>
+              <span className="row-sub">Filled in above</span>
+            </span>
+          </button>
+          {state.shutdownRitual.map((s) => {
+            const on = Boolean(day.checks[s.id])
             return (
               <button
                 key={s.id}
                 className="row"
-                onClick={() => !s.derived && actions.toggleCheck(date, s.id)}
+                onClick={() => actions.toggleCheck(date, s.id)}
                 role="checkbox"
                 aria-checked={on}
-                disabled={s.derived}
               >
-                <Check on={on} locked={s.derived} />
+                <Check on={on} />
                 <span className="row-main">
                   <span className="row-title" style={{ opacity: on ? 0.55 : 1 }}>
                     {s.label}

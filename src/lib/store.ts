@@ -11,11 +11,14 @@ import {
   DEFAULT_LOOPS,
   DEFAULT_TRACKERS,
   DEFAULT_VISION,
+  STARTER_SHAPE,
   DEFAULT_REWARDS,
   DEFAULT_TARGETS,
   DEFAULT_UPKEEP,
+  CORE_QUESTIONS,
   MAX_PRIORITIES,
   MORNING,
+  SHUTDOWN,
 } from './config'
 import { addDays, addMinutes, todayISO } from './date'
 import { uid } from './format'
@@ -41,6 +44,7 @@ import type {
   Lesson,
   Loop,
   Priority,
+  ShapeBlock,
   Targets,
   Theme,
   TimeBlock,
@@ -74,6 +78,12 @@ function initialState(): AppState {
     links: DEFAULT_LINKS.map((l) => ({ ...l })),
     events: [],
     vision: { ...DEFAULT_VISION, columns: DEFAULT_VISION.columns.map((c) => ({ ...c, images: [] })) },
+    // Empty by default — nothing is assumed about anyone's day. The starter
+    // shape is offered once, from Settings, never forced.
+    dayShape: [],
+    morningRitual: MORNING.map((m) => ({ ...m })),
+    shutdownRitual: SHUTDOWN.map((s) => ({ id: s.id, label: s.label, hint: s.hint ?? '' })),
+    nightlyQuestions: CORE_QUESTIONS.map((q) => ({ id: q.id, q: q.q, hint: q.hint ?? '' })),
     trackers: DEFAULT_TRACKERS.map((t) => ({ ...t })),
     bills: [],
     holdings: [],
@@ -159,6 +169,31 @@ function hydrate(raw: string): AppState {
   }
   // Runs before anything reads a key, so the rest of hydrate sees only new ids.
   if ((parsed.version ?? 1) < 3) parsed = migrateEntityIds(parsed)
+  // 1Media split from one account into three. The single old balance becomes
+  // the AIB one — the operating account it actually stood for — so nothing
+  // written before the split just vanishes.
+  if ((parsed.version ?? 1) < 8 && Array.isArray(parsed.balances)) {
+    parsed = {
+      ...parsed,
+      balances: parsed.balances.map((b) =>
+        (b as { account: string }).account === 'onemediaBank'
+          ? { ...b, account: 'onemediaAib' }
+          : b,
+      ),
+    }
+  }
+  // Personal split the same way — one account becomes two, and the old
+  // balance becomes the AIB one, the account it actually was.
+  if ((parsed.version ?? 1) < 9 && Array.isArray(parsed.balances)) {
+    parsed = {
+      ...parsed,
+      balances: parsed.balances.map((b) =>
+        (b as { account: string }).account === 'personalBank'
+          ? { ...b, account: 'personalAib' }
+          : b,
+      ),
+    }
+  }
   const days: Record<string, DayEntry> = {}
   for (const [k, v] of Object.entries(parsed.days ?? {})) {
     days[k] = {
@@ -166,7 +201,13 @@ function hydrate(raw: string): AppState {
       ...v,
       metrics: { ...EMPTY_METRICS, ...(v?.metrics ?? {}) },
       priorities: v?.priorities ?? emptySlots(k),
-      blocks: v?.blocks ?? [],
+      // Blocks predate kinds and task assignment. Read as partial: TS treats
+      // an already-typed TimeBlock as carrying those fields for real, so a
+      // plain spread after the defaults is flagged as overwriting itself.
+      blocks: (v?.blocks ?? []).map((b) => {
+        const legacy = b as Partial<TimeBlock>
+        return { kind: 'deep' as const, taskIds: [], auto: false, ...legacy } as TimeBlock
+      }),
       loops: v?.loops ?? [],
       answers: v?.answers ?? {},
       trackers: v?.trackers ?? {},
@@ -184,7 +225,13 @@ function hydrate(raw: string): AppState {
     targets: { ...base.targets, ...(parsed.targets ?? {}) },
     days,
     weeks: parsed.weeks ?? {},
-    ledger: parsed.ledger ?? [],
+    // Ledger entries predate account attribution — unattributed is correct
+    // for anything logged before this, since there is no way to know which
+    // account it touched.
+    ledger: (parsed.ledger ?? []).map((e) => {
+      const legacy = e as Partial<LedgerEntry>
+      return { account: '' as const, ...legacy } as LedgerEntry
+    }),
     balances: parsed.balances ?? [],
     payoutReceived: parsed.payoutReceived ?? 0,
     learning: parsed.learning ?? migrateBooks(parsed) ?? base.learning,
@@ -217,6 +264,10 @@ function hydrate(raw: string): AppState {
     links: parsed.links ?? base.links,
     events: parsed.events ?? [],
     vision: parsed.vision ?? base.vision,
+    dayShape: parsed.dayShape ?? base.dayShape,
+    morningRitual: parsed.morningRitual ?? base.morningRitual,
+    shutdownRitual: parsed.shutdownRitual ?? base.shutdownRitual,
+    nightlyQuestions: parsed.nightlyQuestions ?? base.nightlyQuestions,
     trackers: parsed.trackers ?? base.trackers,
     bills: parsed.bills ?? [],
     holdings: parsed.holdings ?? [],
@@ -227,7 +278,7 @@ function hydrate(raw: string): AppState {
     // Tasks predate scheduling, estimates and priority bands.
     tasks: (parsed.tasks ?? []).map((t) => {
       const legacy = t as Partial<Task>
-      return { scheduled: '', estimateMin: 0, priority: 2, ...legacy } as Task
+      return { scheduled: '', estimateMin: 0, priority: 2, kindHint: '', ...legacy } as Task
     }),
     rewards: parsed.rewards ?? base.rewards,
   }
@@ -286,6 +337,7 @@ export function newTask(title: string, over: Partial<Task> = {}): Task {
     scheduled: '',
     estimateMin: 0,
     priority: 2,
+    kindHint: '',
     created: todayISO(),
     doneDate: '',
     ...over,
@@ -452,7 +504,16 @@ export const actions = {
     const start = last ? last.end : '09:00'
     actions.setBlocks(date, [
       ...prev.blocks,
-      { id: uid(), start, end: addMinutes(start, 60), label: '', tag: 'consulting' },
+      {
+        id: uid(),
+        start,
+        end: addMinutes(start, 60),
+        label: '',
+        tag: 'consulting',
+        kind: 'deep',
+        taskIds: [],
+        auto: false,
+      },
     ])
   },
 
@@ -468,9 +529,19 @@ export const actions = {
   seedBlocks(date: string) {
     const prev = state.days[date] ?? emptyDay(date)
     if (prev.blocks.length > 0) return
+    const shape = state.dayShape.length ? state.dayShape : DEFAULT_BLOCKS.map((b) => ({ ...b, id: '' }))
     actions.setBlocks(
       date,
-      DEFAULT_BLOCKS.map((b) => ({ ...b, id: uid() })),
+      shape.map((b) => ({
+        id: uid(),
+        start: b.start,
+        end: b.end,
+        label: b.label,
+        tag: b.tag,
+        kind: b.kind,
+        taskIds: [],
+        auto: false,
+      })),
     )
   },
 
@@ -657,6 +728,74 @@ export const actions = {
   toggleTracker(date: string, id: string) {
     const prev = state.days[date] ?? emptyDay(date)
     actions.setTrackerValue(date, id, prev.trackers[id] ? 0 : 1)
+  },
+
+  // -------------------------------------------------------- editable rituals
+
+  setMorningRitual(items: { id: string; label: string }[]) {
+    set({ ...state, morningRitual: items })
+  },
+
+  addMorningItem(label: string) {
+    actions.setMorningRitual([...state.morningRitual, { id: uid(), label }])
+  },
+
+  removeMorningItem(id: string) {
+    actions.setMorningRitual(state.morningRitual.filter((m) => m.id !== id))
+  },
+
+  setShutdownRitual(items: { id: string; label: string; hint: string }[]) {
+    set({ ...state, shutdownRitual: items })
+  },
+
+  addShutdownItem(label: string) {
+    actions.setShutdownRitual([...state.shutdownRitual, { id: uid(), label, hint: '' }])
+  },
+
+  removeShutdownItem(id: string) {
+    actions.setShutdownRitual(state.shutdownRitual.filter((s) => s.id !== id))
+  },
+
+  setNightlyQuestions(items: { id: string; q: string; hint: string }[]) {
+    set({ ...state, nightlyQuestions: items })
+  },
+
+  addNightlyQuestion(q: string) {
+    actions.setNightlyQuestions([...state.nightlyQuestions, { id: uid(), q, hint: '' }])
+  },
+
+  removeNightlyQuestion(id: string) {
+    actions.setNightlyQuestions(state.nightlyQuestions.filter((q) => q.id !== id))
+  },
+
+  // ------------------------------------------------------------ day shape
+
+  setDayShape(dayShape: ShapeBlock[]) {
+    // Kept in clock order so it always reads top-to-bottom.
+    set({ ...state, dayShape: [...dayShape].sort((a, b) => a.start.localeCompare(b.start)) })
+  },
+
+  addShapeBlock() {
+    const last = state.dayShape[state.dayShape.length - 1]
+    const start = last ? last.end : '09:00'
+    actions.setDayShape([
+      ...state.dayShape,
+      { id: uid(), start, end: addMinutes(start, 60), label: '', tag: 'consulting', kind: 'deep' },
+    ])
+  },
+
+  updateShapeBlock(id: string, patch: Partial<ShapeBlock>) {
+    actions.setDayShape(state.dayShape.map((b) => (b.id === id ? { ...b, ...patch } : b)))
+  },
+
+  removeShapeBlock(id: string) {
+    actions.setDayShape(state.dayShape.filter((b) => b.id !== id))
+  },
+
+  /** Loads the suggested starting shape. Only offered while yours is empty. */
+  useStarterShape() {
+    if (state.dayShape.length > 0) return
+    actions.setDayShape(STARTER_SHAPE.map((b) => ({ ...b, id: uid() })) as ShapeBlock[])
   },
 
   // --------------------------------------------------------------- money
@@ -916,8 +1055,11 @@ export const actions = {
       days,
       balances: [
         { id: 'sb1', date: at(1), account: 'consultingBank', amount: 184_000 },
-        { id: 'sb2', date: at(1), account: 'onemediaBank', amount: 16_000 },
-        { id: 'sb3', date: at(1), account: 'personalBank', amount: 42_000 },
+        { id: 'sb2', date: at(1), account: 'onemediaStripe', amount: 4_200 },
+        { id: 'sb2b', date: at(1), account: 'onemediaAib', amount: 9_800 },
+        { id: 'sb2c', date: at(1), account: 'onemediaRev', amount: 2_000 },
+        { id: 'sb3', date: at(1), account: 'personalAib', amount: 30_000 },
+        { id: 'sb3b', date: at(1), account: 'personalRev', amount: 12_000 },
       ],
       clients: [
         { id: 'sc1', entity: 'consulting', name: 'Kavanagh Group', status: 'active', monthlyValue: 9500, since: at(300), renewal: addDays(today, 18), notes: '' },
@@ -935,10 +1077,11 @@ export const actions = {
         { id: 'sp1', entity: 'consulting', name: 'Sales page rebuild', clientId: '', status: 'active', due: addDays(today, 10), notes: '' },
       ],
       tasks: [
-        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), scheduled: at(3), estimateMin: 45, priority: 2, created: at(6), doneDate: at(3) },
-        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), scheduled: today, estimateMin: 120, priority: 1, created: at(6), doneDate: '' },
-        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, scheduled: today, estimateMin: 180, priority: 2, created: at(2), doneDate: '' },
-        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', scheduled: '', estimateMin: 15, priority: 3, created: at(9), doneDate: '' },
+        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), scheduled: at(3), estimateMin: 45, priority: 2, kindHint: '', created: at(6), doneDate: at(3) },
+        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), scheduled: today, estimateMin: 120, priority: 1, kindHint: '', created: at(6), doneDate: '' },
+        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, scheduled: today, estimateMin: 180, priority: 2, kindHint: '', created: at(2), doneDate: '' },
+        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', scheduled: '', estimateMin: 15, priority: 3, kindHint: '', created: at(9), doneDate: '' },
+        { id: 'st5', projectId: '', entity: 'consulting', title: 'Call Kavanagh re: renewal', done: false, due: '', scheduled: today, estimateMin: 15, priority: 1, kindHint: 'calls', created: at(1), doneDate: '' },
       ],
       bills: [
         { id: 'sx1', label: 'Office rent', amount: 4200, cadence: 'monthly', nextDue: addDays(today, 3), purse: 'consulting', category: 'Premises' },
@@ -1002,10 +1145,10 @@ export const actions = {
         { id: 'se4', title: 'Weekly review', date: addDays(today, 1), time: '17:00', durationMin: 60, repeat: 'weekly', tag: 'life', notes: '', remindDays: 1 },
       ],
       ledger: [
-        { id: 'sl1', date: at(14), entity: 'consulting', kind: 'revenue', amount: 36_000, note: 'Doyle Group' },
-        { id: 'sl2', date: at(12), entity: 'consulting', kind: 'cashCollected', amount: 18_000, note: 'Doyle deposit' },
-        { id: 'sl3', date: at(44), entity: 'consulting', kind: 'cashCollected', amount: 9500, note: 'INV-039' },
-        { id: 'sl4', date: at(30), entity: 'consulting', kind: 'payout', amount: 12_000, note: 'To personal' },
+        { id: 'sl1', date: at(14), entity: 'consulting', kind: 'revenue', amount: 36_000, note: 'Doyle Group', account: '' },
+        { id: 'sl2', date: at(12), entity: 'consulting', kind: 'cashCollected', amount: 18_000, note: 'Doyle deposit', account: 'consultingBank' },
+        { id: 'sl3', date: at(44), entity: 'consulting', kind: 'cashCollected', amount: 9500, note: 'INV-039', account: 'consultingBank' },
+        { id: 'sl4', date: at(30), entity: 'consulting', kind: 'payout', amount: 12_000, note: 'To personal', account: '' },
       ],
     })
     return true

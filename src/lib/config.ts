@@ -1,5 +1,8 @@
 import type {
+  AccountId,
   BillCadence,
+  MoneyEntity,
+  ShapeBlock,
   Tracker,
   Vision,
   DealStage,
@@ -329,8 +332,11 @@ export const ENTITY_LABEL: Record<string, string> = {
 
 export const ACCOUNT_LABEL: Record<string, string> = {
   consultingBank: 'Consulting.ie bank',
-  onemediaBank: '1Media bank',
-  personalBank: 'Personal bank',
+  onemediaStripe: '1Media — Stripe',
+  onemediaAib: '1Media — AIB business',
+  onemediaRev: '1Media — Rev business',
+  personalAib: 'Personal — AIB',
+  personalRev: 'Personal — Rev',
   netWorth: 'Net worth',
 }
 
@@ -426,6 +432,12 @@ export const DEFAULT_GOALS: Goal[] = [
   },
 ]
 
+/** Where a business's day-to-day cash actually lands, by default. */
+export const DEFAULT_ACCOUNT_FOR_ENTITY: Record<MoneyEntity, AccountId> = {
+  consulting: 'consultingBank',
+  onemedia: 'onemediaAib',
+}
+
 export const KIND_LABEL: Record<string, string> = {
   revenue: 'Revenue',
   cashCollected: 'Cash collected',
@@ -455,14 +467,22 @@ export const PRIORITY_TAG_LABEL: Record<PriorityTag, string> = {
 /** Rank labels for the first three slots. Slot 1 is the day's one thing. */
 export const PRIORITY_RANK = ['The one thing', 'Second', 'Third']
 
-/** Dropped in when a plan is started from scratch. Edit or delete freely. */
-export const DEFAULT_BLOCKS: { start: string; end: string; label: string; tag: PriorityTag }[] = [
-  { start: '07:00', end: '09:00', label: 'Morning routine + gym', tag: 'life' },
-  { start: '09:00', end: '12:00', label: 'Deep work — the one thing', tag: 'consulting' },
-  { start: '13:00', end: '17:00', label: 'Client work + sales', tag: 'consulting' },
-  { start: '17:00', end: '19:00', label: '1Media', tag: 'onemedia' },
-  { start: '21:00', end: '21:30', label: 'Shutdown + tomorrow’s plan', tag: 'life' },
+/**
+ * Nothing here is enforced — this is only what a brand-new shape starts from,
+ * a suggestion you're free to clear entirely. The real shape lives in
+ * `state.dayShape`, and every start, end, label and block is yours to edit,
+ * add or delete in Settings. No fixed 10-hour day, no fixed anything.
+ */
+export const STARTER_SHAPE: Omit<ShapeBlock, 'id'>[] = [
+  { start: '07:00', end: '08:00', label: 'Morning routine', tag: 'life', kind: 'routine' },
+  { start: '09:00', end: '12:00', label: 'Deep work', tag: 'consulting', kind: 'deep' },
+  { start: '13:00', end: '17:00', label: 'Client work', tag: 'consulting', kind: 'calls' },
+  { start: '17:00', end: '19:00', label: '1Media', tag: 'onemedia', kind: 'deep' },
+  { start: '21:00', end: '21:30', label: 'Shutdown', tag: 'life', kind: 'shutdown' },
 ]
+
+/** Kept for the older per-day editor, which still just wants start/end/label. */
+export const DEFAULT_BLOCKS = STARTER_SHAPE
 
 /**
  * The end-of-day ritual. Unscored, like MORNING — it closes the day rather
