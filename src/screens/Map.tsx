@@ -11,12 +11,13 @@ import {
   TextField,
 } from '../components/ui'
 import Board from '../components/Board'
+import MapFocus from '../components/MapFocus'
 import { IconChevron, IconPlus, IconTrash, IconWarn } from '../components/icons'
 import { CHECKLIST, LINK_WEIGHT_LABEL, METRIC_BY_KEY } from '../lib/config'
 import { actions, useStore } from '../lib/store'
 import { domainEdges, domainOrder, domainPath, domainScores, loopStats } from '../lib/selectors'
 
-type View = 'board' | 'tree' | 'links'
+type View = 'focus' | 'board' | 'tree' | 'links'
 
 /**
  * The life map. Alex at the root, domains under him, sub-domains under those —
@@ -26,7 +27,15 @@ type View = 'board' | 'tree' | 'links'
  */
 export default function LifeMap() {
   const state = useStore()
-  const [view, setView] = useState<View>('board')
+  // The board is unreadable on a phone — a 2,500px tree fits a 375px screen at
+  // 15%. Narrow screens start on the focus view, which walks the tree instead
+  // of surveying it. Both stay available either way.
+  const [view, setView] = useState<View>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 720px)').matches
+      ? 'focus'
+      : 'board',
+  )
+  const [focus, setFocus] = useState('root')
   const [open, setOpen] = useState<Set<string>>(() => new Set(['root', 'health', 'wealth']))
   const [selected, setSelected] = useState<string | null>(null)
 
@@ -78,12 +87,17 @@ export default function LifeMap() {
           value={view}
           onChange={setView}
           options={[
+            { value: 'focus', label: 'Focus' },
             { value: 'board', label: 'Board' },
             { value: 'tree', label: 'Outline' },
             { value: 'links', label: `Causes · ${state.links.length}` },
           ]}
         />
       </div>
+
+      {view === 'focus' && (
+        <MapFocus focus={focus} onFocus={setFocus} onOpen={setSelected} />
+      )}
 
       {view === 'board' && <Board selected={selected} onSelect={setSelected} />}
 

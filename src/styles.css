@@ -2361,3 +2361,70 @@ kbd {
     flex: 1;
   }
 }
+
+/* =========================================================================
+   Map — focus view
+   ========================================================================= */
+
+.focus-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.focus-crumbs button {
+  color: var(--text-secondary);
+  padding: 2px 0;
+}
+
+.focus-crumbs button:hover {
+  color: var(--text-primary);
+}
+
+/* The separator is drawn rather than typed, so it can't be selected or read. */
+.focus-crumbs button::after {
+  content: '›';
+  margin: 0 5px;
+  color: var(--text-muted);
+}
+
+.focus-crumbs [aria-current='page'] {
+  color: var(--text-primary);
+  font-weight: 550;
+}
+
+.focus-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.focus-score {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.focus-spark {
+  display: block;
+  width: 100%;
+  height: 26px;
+  margin-top: 12px;
+  overflow: visible;
+}
+
+button.edge {
+  width: 100%;
+  text-align: left;
+}
+
+button.edge:hover {
+  background: var(--fill-soft);
+}
