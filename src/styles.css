@@ -925,6 +925,25 @@ textarea.input {
   animation: screen-in 0.4s var(--ease) both;
 }
 
+/* Login wall — rendered instead of the app shell, so it can't assume any of
+   the sidebar/layout CSS is in scope. */
+.authgate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.authgate-card {
+  width: 100%;
+  max-width: 380px;
+  padding: 28px 26px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--hairline);
+  background: var(--fill-soft);
+}
+
 @keyframes screen-in {
   from {
     opacity: 0;

@@ -11,6 +11,12 @@ export interface SyncState {
   email: string | null
   lastSyncedAt: string | null
   error: string | null
+  /**
+   * False until the initial `getSession()` call resolves. The login wall
+   * waits on this so a signed-in user never sees a flash of the sign-in
+   * screen before their session is confirmed.
+   */
+  sessionChecked: boolean
 }
 
 let syncState: SyncState = {
@@ -19,6 +25,7 @@ let syncState: SyncState = {
   email: null,
   lastSyncedAt: null,
   error: null,
+  sessionChecked: !syncConfigured,
 }
 
 const listeners = new Set<() => void>()
@@ -145,6 +152,7 @@ export function initSync(): void {
 
   supabase.auth.getSession().then(({ data }) => {
     handleSession(data.session?.user?.id ?? null, data.session?.user?.email ?? null)
+    setSync({ sessionChecked: true })
   })
 
   supabase.auth.onAuthStateChange((_event, session) => {
