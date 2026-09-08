@@ -45,6 +45,11 @@
      legend — anything green is a win and nothing else ever is. */
   --good: #8a8a8a;
   --won: #30d158;
+  /* Execution traffic lights. The only place outside --won that carries hue:
+     a scorecard people scan in seconds needs it to be pre-attentive. */
+  --exec-hit: #30d158;
+  --exec-close: #ffb340;
+  --exec-miss: #ff5f57;
   --won-dim: rgba(48, 209, 88, 0.16);
   --warning: #ffffff;
   --critical: #ffffff;
@@ -104,6 +109,9 @@
 
   --good: #6e6e6e;
   --won: #1d8f38;
+  --exec-hit: #1d8f38;
+  --exec-close: #b46b00;
+  --exec-miss: #c9342b;
   --won-dim: rgba(29, 143, 56, 0.14);
   --warning: #000000;
   --critical: #000000;
@@ -2535,4 +2543,94 @@ button.edge:hover {
   flex: none;
   padding: 4px 6px;
   font-size: 12px;
+}
+
+
+/* ------------------------------------------------------- marketing tracker */
+.mk-score {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.mk-group + .mk-group {
+  border-top: 1px solid var(--hairline);
+}
+.mk-group-head {
+  padding: 12px 15px 6px;
+}
+.mk-row {
+  display: grid;
+  grid-template-columns: 1fr 76px 62px 96px;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 15px;
+}
+.mk-label {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mk-input {
+  text-align: right;
+  padding: 6px 9px;
+  font-size: 14px;
+}
+.mk-target {
+  font-size: 12px;
+}
+.mk-bar {
+  display: block;
+}
+.mk-progress-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  margin-bottom: 5px;
+  gap: 10px;
+}
+@media (max-width: 640px) {
+  .mk-row {
+    grid-template-columns: 1fr 68px 48px;
+  }
+  .mk-bar {
+    display: none;
+  }
+}
+
+/* The sheet. Wide on purpose — it is a spreadsheet, so it scrolls sideways. */
+.mk-sheet table {
+  font-size: 12px;
+}
+.mk-sheet th,
+.mk-sheet td {
+  white-space: nowrap;
+  padding: 5px 8px;
+  text-align: right;
+}
+.mk-sheet th:first-child,
+.mk-sheet td:first-child,
+.mk-sheet th:nth-child(2),
+.mk-sheet td:nth-child(2) {
+  text-align: left;
+}
+.mk-sticky {
+  position: sticky;
+  left: 0;
+  background: var(--surface-1);
+  z-index: 1;
+}
+.mk-sheet-row {
+  cursor: pointer;
+}
+.mk-sheet-row:hover td {
+  background: var(--fill-soft);
+}
+.mk-sheet-row[data-selected='true'] td {
+  background: var(--fill-soft-hover);
+}
+.mk-sheet-row[data-today='true'] td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
 }

@@ -5,6 +5,7 @@ import VisionBoard from './screens/VisionBoard'
 import Home from './screens/Home'
 import Today from './screens/Today'
 import Money from './screens/Money'
+import Marketing from './screens/Marketing'
 import Progress from './screens/Progress'
 import Review from './screens/Review'
 import Learn from './screens/Learn'
@@ -48,6 +49,7 @@ type TabId =
   | 'patterns'
   | 'map'
   | 'money'
+  | 'marketing'
   | 'learn'
   | 'network'
   | 'goals'
@@ -67,6 +69,7 @@ const TABS: { id: TabId; label: string; group: string; Icon: ComponentType<SVGPr
   { id: 'home', label: 'Home', group: 'Today', Icon: IconHome },
   { id: 'work', label: 'Work', group: 'Business', Icon: IconWork },
   { id: 'money', label: 'Money', group: 'Business', Icon: IconMoney },
+  { id: 'marketing', label: 'Marketing', group: 'Business', Icon: IconProgress },
   { id: 'calendar', label: 'Calendar', group: 'Business', Icon: IconCalendar },
   { id: 'map', label: 'Map', group: 'Life', Icon: IconMap },
   { id: 'goals', label: 'Goals', group: 'Life', Icon: IconLife },
@@ -101,6 +104,7 @@ const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
   patterns: Patterns,
   map: LifeMap,
   money: Money,
+  marketing: Marketing,
   learn: Learn,
   network: Network,
   goals: Goals,

@@ -22,6 +22,8 @@ import {
 } from './config'
 import { addDays, addMinutes, todayISO } from './date'
 import { uid } from './format'
+import { emptyMarketingDay } from './marketing'
+import type { MarketingDay } from './marketing'
 import { EMPTY_METRICS, STATE_VERSION } from './types'
 import type {
   AppState,
@@ -97,6 +99,7 @@ function initialState(): AppState {
     tasks: [],
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
+    marketing: { startDate: todayISO(), days: {} },
   }
 }
 
@@ -314,6 +317,10 @@ function hydrate(raw: string): AppState {
     }),
     rewards: parsed.rewards ?? base.rewards,
     checklist: parsed.checklist ?? base.checklist,
+    marketing: {
+      startDate: parsed.marketing?.startDate ?? base.marketing.startDate,
+      days: parsed.marketing?.days ?? {},
+    },
   }
 }
 
@@ -611,6 +618,26 @@ export const actions = {
 
   setRewards(rewards: AppState['rewards']) {
     set({ ...state, rewards })
+  },
+
+  /** One field of one marketing day. Absent days are created on first write. */
+  setMarketingField<K extends keyof MarketingDay>(
+    date: string,
+    key: K,
+    value: MarketingDay[K],
+  ) {
+    const prev = state.marketing.days[date] ?? emptyMarketingDay()
+    set({
+      ...state,
+      marketing: {
+        ...state.marketing,
+        days: { ...state.marketing.days, [date]: { ...prev, [key]: value } },
+      },
+    })
+  },
+
+  setMarketingStart(startDate: string) {
+    set({ ...state, marketing: { ...state.marketing, startDate } })
   },
 
   setChecklist(checklist: AppState['checklist']) {

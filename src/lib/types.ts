@@ -1,6 +1,8 @@
+import type { MarketingDay } from './marketing'
+
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 14
+export const STATE_VERSION = 15
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -684,6 +686,15 @@ export interface AppState {
   projects: Project[]
   tasks: Task[]
   rewards: { id: string; label: string; detail: string }[]
+  /**
+   * The 100-day marketing execution tracker. Keyed by ISO date; the campaign's
+   * working-day calendar is derived from `startDate`, so the 100 days shift
+   * with it rather than being pinned to stored day numbers.
+   */
+  marketing: {
+    startDate: string
+    days: Record<string, MarketingDay>
+  }
   /** The standards the day is scored against. Editable — add, reweight, remove. */
   checklist: ChecklistItem[]
 }

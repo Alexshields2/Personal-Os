@@ -823,6 +823,7 @@ export const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: 'home', label: 'Home', blurb: 'What needs you right now' },
   { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },
   { id: 'money', label: 'Money', blurb: 'Balances, net worth, the ledger' },
+  { id: 'marketing', label: 'Marketing', blurb: '100 days of execution, scored' },
   { id: 'calendar', label: 'Calendar', blurb: "Events, and what's coming" },
   { id: 'map', label: 'Map', blurb: 'The life tree and its causes' },
   { id: 'goals', label: 'Goals', blurb: 'The ladder, and upkeep' },
