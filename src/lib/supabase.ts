@@ -29,6 +29,10 @@ export const supabase: SupabaseClient | null =
       })
     : null
 
+// Temporary: surfaces the build-time env probe on the deployed bundle so the
+// deploy pipeline can be diagnosed from outside. Names only, never values.
+;(globalThis as unknown as Record<string, string>).__personalOsEnvProbe = __ENV_PROBE__
+
 export const syncConfigured = supabase !== null
 
 export const TABLE = 'app_state'
