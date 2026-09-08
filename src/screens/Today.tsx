@@ -118,6 +118,17 @@ export default function Today() {
         </p>
       </header>
 
+      {/* A day that hasn't happened has nothing to score — showing 2/100 for
+          tomorrow reads as a verdict rather than an empty form. */}
+      {future ? (
+        <Card className="card-pad">
+          <div className="t-cap">Planning ahead</div>
+          <div className="t-head" style={{ marginTop: 4 }}>{formatLong(date)}</div>
+          <p className="t-foot muted" style={{ marginTop: 6 }}>
+            Set the three and the shape now. It gets scored on the day, not before.
+          </p>
+        </Card>
+      ) : (
       <Card className="card-pad">
         <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
           <Ring pct={score.score} size={124} stroke={11}>
@@ -175,6 +186,7 @@ export default function Today() {
           </div>
         )}
       </Card>
+      )}
 
       <div style={{ marginTop: 18 }}>
         <Segmented
@@ -193,7 +205,12 @@ export default function Today() {
       </div>
 
       {activeView === 'plan' && (
-        <PlanView date={date} day={day} onDone={() => !future && setView('log')} />
+        <PlanView
+          date={date}
+          day={day}
+          onPickDate={setDate}
+          onDone={() => !future && setView('log')}
+        />
       )}
       {activeView === 'log' && <LogView date={date} day={day} state={state} />}
       {activeView === 'review' && <ReviewView date={date} day={day} state={state} />}
@@ -567,10 +584,12 @@ function PlanView({
   date,
   day,
   onDone,
+  onPickDate,
 }: {
   date: string
   day: DayEntry
   onDone: () => void
+  onPickDate: (date: string) => void
 }) {
   const state = useStore()
   const plan = planStatus(day)
@@ -579,6 +598,23 @@ function PlanView({
 
   return (
     <>
+      <div style={{ marginBottom: 16 }}>
+        <Segmented
+          value={date === todayISO() ? 'today' : date === addDays(todayISO(), 1) ? 'tomorrow' : 'other'}
+          onChange={(v: string) => {
+            if (v === 'today') onPickDate(todayISO())
+            if (v === 'tomorrow') onPickDate(addDays(todayISO(), 1))
+          }}
+          options={[
+            { value: 'today', label: 'Plan today' },
+            { value: 'tomorrow', label: 'Plan tomorrow' },
+            ...(date !== todayISO() && date !== addDays(todayISO(), 1)
+              ? [{ value: 'other', label: formatLong(date) }]
+              : []),
+          ]}
+        />
+      </div>
+
       <DayEdges
         date={date}
         ids={WAKE_IDS}
