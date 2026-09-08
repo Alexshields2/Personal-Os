@@ -7,12 +7,25 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // The key itself has two possible names too — Supabase renamed "anon key" to
 // "publishable key" on newer projects, and the integration follows whichever
 // naming the connected project actually uses.
-const url = (import.meta.env.VITE_SUPABASE_URL ?? import.meta.env.NEXT_PUBLIC_SUPABASE_URL) as
-  | string
-  | undefined
-const anonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY ??
-  import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) as string | undefined
+/**
+ * First value that is actually set. Deliberately not `??`: a variable defined
+ * as an empty string is "not configured", but `??` only falls through on
+ * null/undefined, so one blank entry would shadow every good fallback after
+ * it — which is exactly what an empty VITE_SUPABASE_URL did in production.
+ */
+function firstSet(...values: (string | undefined)[]): string | undefined {
+  return values.find((v) => typeof v === 'string' && v.trim() !== '')
+}
+
+const url = firstSet(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.NEXT_PUBLIC_SUPABASE_URL,
+)
+const anonKey = firstSet(
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+)
 
 /**
  * Null when the env vars aren't set, and every call site treats that as "run
