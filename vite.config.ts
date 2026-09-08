@@ -10,6 +10,7 @@ import react from '@vitejs/plugin-react'
 const ENV_PROBE = `ENVPROBE:${Object.keys(process.env)
   .filter((k) => /SUPABASE/i.test(k))
   .sort()
+  .map((k) => `${k}=len${(process.env[k] ?? '').length}`)
   .join(',')}:ENDPROBE`
 
 export default defineConfig({
