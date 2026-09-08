@@ -22,7 +22,7 @@ import {
 } from './config'
 import { addDays, addMinutes, todayISO } from './date'
 import { uid } from './format'
-import { emptyMarketingDay } from './marketing'
+import { emptyMarketingDay, nextWorkingDay } from './marketing'
 import type { MarketingDay } from './marketing'
 import { EMPTY_METRICS, STATE_VERSION } from './types'
 import type {
@@ -99,7 +99,7 @@ function initialState(): AppState {
     tasks: [],
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
-    marketing: { startDate: todayISO(), days: {} },
+    marketing: { startDate: nextWorkingDay(todayISO()), days: {} },
   }
 }
 

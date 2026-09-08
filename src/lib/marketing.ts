@@ -160,6 +160,15 @@ export function isWorkingDay(iso: string): boolean {
   return d !== 0 && d !== 6
 }
 
+/** The next Mon-Fri strictly after `iso`. A challenge is committed to before it starts. */
+export function nextWorkingDay(iso: string): string {
+  const d = fromISO(iso)
+  do {
+    d.setDate(d.getDate() + 1)
+  } while (!isWorkingDay(toISO(d)))
+  return toISO(d)
+}
+
 /** The 100 working dates of the campaign, in order. Index 0 is day 1. */
 export function workingDates(startDate: string, count = MARKETING_DAYS): string[] {
   const out: string[] = []

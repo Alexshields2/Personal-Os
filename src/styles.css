@@ -2634,3 +2634,19 @@ button.edge:hover {
 .mk-sheet-row[data-today='true'] td:first-child {
   box-shadow: inset 2px 0 0 var(--accent);
 }
+.mk-daynav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.mk-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.mk-filter > :first-child {
+  flex: 1 1 320px;
+}

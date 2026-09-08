@@ -97,7 +97,7 @@ export default function Marketing() {
         />
       </div>
 
-      {view === 'today' && <TodayView state={state} dayNo={dayNo} inCampaign={Boolean(todayRow)} />}
+      {view === 'today' && <TodayView state={state} campaign={campaign} />}
       {view === 'dashboard' && <DashboardView campaign={campaign} dayNo={dayNo} />}
       {view === 'sheet' && <SheetView campaign={campaign} state={state} />}
       {view === 'graphs' && <GraphsView campaign={campaign} />}
@@ -107,26 +107,30 @@ export default function Marketing() {
 
 // ------------------------------------------------------------------- today
 
-function TodayView({
-  state,
-  dayNo,
-  inCampaign,
-}: {
-  state: AppState
-  dayNo: number
-  inCampaign: boolean
-}) {
-  const date = todayISO()
+/**
+ * One day at a time. Defaults to today when today is a campaign day, and
+ * otherwise to the most recent one, so the view is never empty — and steps to
+ * any other day from there, because backfilling is the normal case.
+ */
+function TodayView({ state, campaign }: { state: AppState; campaign: Row[] }) {
+  const today = todayISO()
+  const fallback =
+    campaign.find((r) => r.date === today) ??
+    [...campaign].reverse().find((r) => r.date <= today) ??
+    campaign[0]
+  const [date, setDate] = useState(fallback?.date ?? today)
+
+  const idx = campaign.findIndex((r) => r.date === date)
+  const row = campaign[idx]
   const day = state.marketing.days[date] ?? emptyMarketingDay()
   const pct = dayExecution(day)
 
-  if (!inCampaign) {
+  if (!row) {
     return (
       <Card className="card-pad">
         <Empty>
-          Today isn't one of the campaign's 100 working days — it's either a weekend or outside
-          the window. Set the start date in the Sheet view, or use the sheet to fill in a
-          working day.
+          That date isn't one of the campaign's 100 working days. Set the start date in the
+          Sheet view.
         </Empty>
       </Card>
     )
@@ -135,13 +139,52 @@ function TodayView({
   return (
     <>
       <Card className="card-pad mk-score">
-        <div>
-          <div className="t-cap">Day {dayNo} of {MARKETING_DAYS}</div>
+        <div style={{ minWidth: 150 }}>
+          <div className="t-cap">
+            Day {row.n} of {MARKETING_DAYS}
+            {row.date === today && ' · today'}
+          </div>
           <div className="hero" style={{ color: colorFor(pct) }}>{Math.round(pct)}%</div>
-          <div className="t-foot muted">today's execution score</div>
+          <div className="t-foot muted">{formatShort(row.date)} execution score</div>
         </div>
         <div style={{ flex: 1, minWidth: 160 }}>
           <Meter pct={pct} color={colorFor(pct)} />
+        </div>
+        <div className="mk-daynav">
+          <button
+            className="btn btn-quiet btn-sm"
+            disabled={idx <= 0}
+            onClick={() => setDate(campaign[idx - 1].date)}
+            aria-label="Previous day"
+          >
+            ←
+          </button>
+          <select
+            className="input"
+            style={{ width: 132 }}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            aria-label="Jump to a campaign day"
+          >
+            {campaign.map((r) => (
+              <option key={r.date} value={r.date}>
+                Day {r.n} · {formatShort(r.date)}
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn btn-quiet btn-sm"
+            disabled={idx >= campaign.length - 1}
+            onClick={() => setDate(campaign[idx + 1].date)}
+            aria-label="Next day"
+          >
+            →
+          </button>
+          {row.date !== today && campaign.some((r) => r.date === today) && (
+            <button className="btn btn-sm" onClick={() => setDate(today)}>
+              Today
+            </button>
+          )}
         </div>
       </Card>
 
@@ -349,12 +392,34 @@ function DashboardView({ campaign, dayNo }: { campaign: Row[]; dayNo: number }) 
 
 // ------------------------------------------------------------------- sheet
 
+type SheetFilter = 'all' | 'logged' | 'perfect' | 'below' | 'blank'
+
 function SheetView({ campaign, state }: { campaign: Row[]; state: AppState }) {
   const today = todayISO()
   const [selected, setSelected] = useState<string | null>(
     campaign.find((r) => r.date === today)?.date ?? null,
   )
+  const [filter, setFilter] = useState<SheetFilter>('all')
+  const [query, setQuery] = useState('')
   const selectedDay = selected ? state.marketing.days[selected] ?? emptyMarketingDay() : null
+
+  // Day number or date text — one box, because "day 34" and "12 Nov" are the
+  // same question asked two ways.
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return campaign.filter((r) => {
+      if (filter === 'logged' && !r.logged) return false
+      if (filter === 'blank' && r.logged) return false
+      if (filter === 'perfect' && !(r.logged && r.pct >= 100)) return false
+      if (filter === 'below' && !(r.logged && r.pct < 100)) return false
+      if (!q) return true
+      // A bare number means a day number; anything else is date text. Without
+      // that split, "2" matches day 2 and every date containing a 2.
+      return /^\d+$/.test(q)
+        ? String(r.n) === q
+        : formatShort(r.date).toLowerCase().includes(q)
+    })
+  }, [campaign, filter, query])
 
   return (
     <>
@@ -373,6 +438,39 @@ function SheetView({ campaign, state }: { campaign: Row[]; state: AppState }) {
           Weekends are skipped automatically — the 100 days are working days.
         </p>
       </Card>
+
+      <div className="mk-filter">
+        <Segmented
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: `All · ${campaign.length}` },
+            { value: 'logged', label: `Logged · ${campaign.filter((r) => r.logged).length}` },
+            { value: 'perfect', label: `100% · ${campaign.filter((r) => r.logged && r.pct >= 100).length}` },
+            { value: 'below', label: `Below · ${campaign.filter((r) => r.logged && r.pct < 100).length}` },
+            { value: 'blank', label: `Blank · ${campaign.filter((r) => !r.logged).length}` },
+          ]}
+        />
+        <input
+          className="input"
+          style={{ maxWidth: 190 }}
+          placeholder="Find a day — 34, or 12 Nov"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {(filter !== 'all' || query) && (
+          <button
+            className="btn btn-quiet btn-sm"
+            onClick={() => {
+              setFilter('all')
+              setQuery('')
+            }}
+          >
+            Clear
+          </button>
+        )}
+        <span className="t-foot muted">{visible.length} shown</span>
+      </div>
 
       <div className="tablewrap mk-sheet">
         <table>
@@ -394,7 +492,7 @@ function SheetView({ campaign, state }: { campaign: Row[]; state: AppState }) {
             </tr>
           </thead>
           <tbody>
-            {campaign.map((r) => (
+            {visible.map((r) => (
               <tr
                 key={r.date}
                 onClick={() => setSelected(r.date)}
@@ -424,6 +522,7 @@ function SheetView({ campaign, state }: { campaign: Row[]; state: AppState }) {
             ))}
           </tbody>
         </table>
+        {visible.length === 0 && <Empty>No days match that filter.</Empty>}
       </div>
 
       {selected && selectedDay && (
