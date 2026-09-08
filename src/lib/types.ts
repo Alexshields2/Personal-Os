@@ -1,6 +1,6 @@
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 13
+export const STATE_VERSION = 14
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -91,6 +91,17 @@ export interface TimeBlock {
   auto: boolean
 }
 
+/**
+ * One quarter-hour of the day, as actually spent. Keyed by "HH:MM" so a slot
+ * can be filled in long after it passed — the point is an honest record, not
+ * a live timer you have to keep up with.
+ */
+export interface TimeLogSlot {
+  text: string
+  /** 1-10. 0 means unrated. */
+  rating: number
+}
+
 export interface DayEntry {
   /** ISO date, YYYY-MM-DD. Also the map key. */
   date: string
@@ -126,6 +137,8 @@ export interface DayEntry {
   trackerNotes: Record<string, string>
   /** The day's journal entry, in your own words. */
   journal: string
+  /** "HH:MM" slot -> what that quarter hour actually went on. */
+  timeLog: Record<string, TimeLogSlot>
   /** Set when the nightly scorecard is signed off. */
   closed: boolean
 }

@@ -13,6 +13,7 @@ import {
 } from '../components/ui'
 import { Sparkline } from '../components/charts'
 import TrackerSheet from '../components/TrackerSheet'
+import TimeLog from '../components/TimeLog'
 import { IconChevron, IconFlame, IconPlus, IconTrash } from '../components/icons'
 import {
   CORE_QUESTIONS,
@@ -642,6 +643,8 @@ function PlanView({
 function LogView({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
   return (
     <>
+      <TimeLog date={date} day={day} />
+
       <SectionTitle title="Training" />
       <Card>
         <div className="rows">

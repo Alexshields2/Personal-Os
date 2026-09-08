@@ -50,6 +50,7 @@ import type {
   Theme,
   TimeBlock,
   Tracker,
+  TimeLogSlot,
   Upkeep,
   Vision,
   VisionColumn,
@@ -235,6 +236,7 @@ function hydrate(raw: string): AppState {
       trackers: v?.trackers ?? {},
       trackerNotes: v?.trackerNotes ?? {},
       journal: v?.journal ?? '',
+      timeLog: v?.timeLog ?? {},
     }
   }
   return {
@@ -349,6 +351,7 @@ export function emptyDay(date: string): DayEntry {
     trackers: {},
     trackerNotes: {},
     journal: '',
+    timeLog: {},
     closed: false,
   }
 }
@@ -808,6 +811,17 @@ export const actions = {
     actions.updateDay(date, {
       trackers: { ...prev.trackers, [id]: Math.max(0, value) },
     })
+  },
+
+  /** Writes one quarter-hour slot. Empty text and 0 rating removes it. */
+  setTimeLogSlot(date: string, slot: string, patch: Partial<TimeLogSlot>) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const current = prev.timeLog[slot] ?? { text: '', rating: 0 }
+    const next = { ...current, ...patch }
+    const timeLog = { ...prev.timeLog }
+    if (next.text.trim() === '' && next.rating === 0) delete timeLog[slot]
+    else timeLog[slot] = next
+    actions.updateDay(date, { timeLog })
   },
 
   setTrackerNote(date: string, id: string, text: string) {

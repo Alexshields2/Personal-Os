@@ -2495,3 +2495,44 @@ button.edge:hover {
 .due-dot-needsPush {
   background: var(--warning);
 }
+
+/* ---------------------------------------------------------- time log ---- */
+/* One hairline per hour is enough structure; each row already states its time. */
+.tl-hourgroup + .tl-hourgroup {
+  border-top: 1px solid var(--hairline);
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.tl-row {
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 15px;
+}
+.tl-time {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.tl-row[data-filled='true'] .tl-time {
+  color: var(--text-secondary);
+}
+/* The quarter hour you are actually in. */
+.tl-row[data-now='true'] {
+  background: var(--fill-soft);
+  border-radius: var(--r-sm, 6px);
+}
+.tl-row[data-now='true'] .tl-time {
+  color: var(--accent);
+  font-weight: 600;
+}
+.tl-text {
+  font-size: 13.5px;
+  padding: 5px 8px;
+}
+.tl-rate {
+  width: 56px;
+  flex: none;
+  padding: 4px 6px;
+  font-size: 12px;
+}
