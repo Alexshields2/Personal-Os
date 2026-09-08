@@ -14,6 +14,7 @@ import {
 import { Sparkline } from '../components/charts'
 import TrackerSheet from '../components/TrackerSheet'
 import TimeLog from '../components/TimeLog'
+import DayEdges, { SLEEP_IDS, WAKE_IDS } from '../components/DayEdges'
 import { IconChevron, IconFlame, IconPlus, IconTrash } from '../components/icons'
 import {
   CORE_QUESTIONS,
@@ -58,6 +59,10 @@ export default function Today() {
 
   const day = state.days[date] ?? emptyDay(date)
   const score = scoreDay(day, state.targets, state.checklist)
+  // Tomorrow can be planned but not logged or graded — there is nothing to
+  // grade yet, and offering the form invites fiction.
+  const future = date > todayISO()
+  const activeView: View = future ? 'plan' : view
   const plan = planStatus(day)
   const dayNo = dayNumber(state.startDate, date)
   const streak = currentStreak(state, todayISO())
@@ -102,7 +107,7 @@ export default function Today() {
             className="btn btn-quiet"
             onClick={() => setDate(addDays(date, 1))}
             aria-label="Next day"
-            disabled={date >= todayISO()}
+            disabled={date >= addDays(todayISO(), 7)}
           >
             <IconChevron style={{ width: 18, height: 18 }} />
           </button>
@@ -173,19 +178,25 @@ export default function Today() {
 
       <div style={{ marginTop: 18 }}>
         <Segmented
-          value={view}
+          value={activeView}
           onChange={setView}
-          options={[
-            { value: 'plan', label: plan.set ? `Plan · ${plan.set}` : 'Plan' },
-            { value: 'log', label: `Log · ${score.score}` },
-            { value: 'review', label: 'Review' },
-          ]}
+          options={
+            future
+              ? [{ value: 'plan', label: 'Plan ahead' }]
+              : [
+                  { value: 'plan', label: plan.set ? `Plan · ${plan.set}` : 'Plan' },
+                  { value: 'log', label: `Log · ${score.score}` },
+                  { value: 'review', label: 'Review' },
+                ]
+          }
         />
       </div>
 
-      {view === 'plan' && <PlanView date={date} day={day} onDone={() => setView('log')} />}
-      {view === 'log' && <LogView date={date} day={day} state={state} />}
-      {view === 'review' && <ReviewView date={date} day={day} state={state} />}
+      {activeView === 'plan' && (
+        <PlanView date={date} day={day} onDone={() => !future && setView('log')} />
+      )}
+      {activeView === 'log' && <LogView date={date} day={day} state={state} />}
+      {activeView === 'review' && <ReviewView date={date} day={day} state={state} />}
     </div>
   )
 }
@@ -568,6 +579,13 @@ function PlanView({
 
   return (
     <>
+      <DayEdges
+        date={date}
+        ids={WAKE_IDS}
+        title="Start of day"
+        hint="The one number the morning is judged on. Everything after it is easier from a good start."
+      />
+
       <SectionTitle title="The three" />
       <PriorityCard date={date} day={day} mode="plan" />
       <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
@@ -863,6 +881,13 @@ function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: 
         Set tonight, waiting in the morning. Deciding what matters at 7am is how days get
         handed to whoever shouts loudest.
       </p>
+
+      <DayEdges
+        date={date}
+        ids={SLEEP_IDS}
+        title="End of day"
+        hint="Recorded at night, when you actually know them — not guessed at in the morning."
+      />
 
       <SectionTitle title="Shutdown" />
       <Card>

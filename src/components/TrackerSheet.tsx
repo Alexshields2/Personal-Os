@@ -3,6 +3,7 @@ import { Card, Check, Empty, SectionTitle, Stepper } from './ui'
 import { IconPlus, IconTrash } from './icons'
 import { actions, useStore } from '../lib/store'
 import { uid } from '../lib/format'
+import { SLEEP_IDS, WAKE_IDS } from './DayEdges'
 import { trackerStats } from '../lib/selectors'
 import type { Tracker } from '../lib/types'
 
@@ -16,7 +17,9 @@ import type { Tracker } from '../lib/types'
  */
 export default function TrackerSheet({ date }: { date: string }) {
   const state = useStore()
-  const stats = trackerStats(state, date)
+  // Wake, shut-off and in-bed are asked in Plan and Review, at the moment you
+  // can actually answer them — so they are not asked again here.
+  const stats = trackerStats(state, date).filter((s) => !DAY_EDGE_IDS.includes(s.tracker.id))
 
   if (stats.length === 0) {
     return (
@@ -213,6 +216,8 @@ export function timeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number)
   return (h || 0) * 60 + (m || 0)
 }
+
+const DAY_EDGE_IDS = [...WAKE_IDS, ...SLEEP_IDS]
 
 const ADD_KIND_LABEL: Record<Tracker['kind'], string> = {
   check: 'Check',
