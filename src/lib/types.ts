@@ -130,6 +130,9 @@ export interface OutreachContact {
   workEmail: string
   personalEmail: string
   phone: string
+  /** From an imported list — what to work through first, and which bucket. */
+  priority: string
+  segment: string
 }
 
 export interface DayEntry {

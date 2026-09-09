@@ -24,7 +24,6 @@ export interface MarketingInputs {
   richardConn: number
   alexOutreach: number
   coldEmails: number
-  followUps: number
   valueReel: number
   btsReel: number
   alexPost: number
@@ -37,7 +36,6 @@ export interface MarketingInputs {
   facebook: number
   companyLinkedin: number
   stories: number
-  nurtureEmail: number
   engagements: number
 }
 
@@ -83,7 +81,6 @@ export const MARKETING_INPUTS: InputSpec[] = [
 
   { key: 'alexOutreach', label: 'Alex high-value outreach', short: 'High-value', group: 'Outbound', target: 10 },
   { key: 'coldEmails', label: 'Cold emails sent', short: 'Cold email', group: 'Outbound', target: 1000 },
-  { key: 'followUps', label: 'Follow-ups', short: 'Follow-up', group: 'Outbound', target: 100 },
 
   { key: 'valueReel', label: 'Value reel', short: 'Value', group: 'Content', target: 1 },
   { key: 'btsReel', label: 'BTS reel', short: 'BTS', group: 'Content', target: 1 },
@@ -100,7 +97,6 @@ export const MARKETING_INPUTS: InputSpec[] = [
   { key: 'companyLinkedin', label: 'Consulting.ie LinkedIn posts', short: 'LinkedIn', group: 'Company distribution', target: 2 },
 
   { key: 'stories', label: 'Consulting.ie Instagram stories', short: 'Stories', group: 'Stories', target: 5 },
-  { key: 'nurtureEmail', label: 'Nurture email', short: 'Nurture', group: 'Email', target: 1 },
   { key: 'engagements', label: 'Strategic LinkedIn engagements', short: 'Engagements', group: 'Engagement', target: 20 },
 ]
 
@@ -122,12 +118,10 @@ export const MARKETING_ROLLUPS: { id: string; label: string; keys: InputKey[] }[
   { id: 'linkedin', label: 'LinkedIn connections', keys: ['alexConn', 'cianConn', 'macConn', 'richardConn'] },
   { id: 'outreach', label: 'Dream outreach', keys: ['alexOutreach'] },
   { id: 'email', label: 'Cold email', keys: ['coldEmails'] },
-  { id: 'followups', label: 'Follow-ups', keys: ['followUps'] },
   { id: 'content', label: 'Core content', keys: ['valueReel', 'btsReel'] },
   { id: 'distribution', label: 'Content distribution', keys: ['instagram', 'tiktok', 'youtube', 'facebook', 'companyLinkedin'] },
   { id: 'founder', label: 'Founder LinkedIn', keys: ['alexPost', 'cianPost', 'macPost', 'richardPost'] },
   { id: 'stories', label: 'Stories', keys: ['stories'] },
-  { id: 'nurture', label: 'Nurture emails', keys: ['nurtureEmail'] },
   { id: 'engagement', label: 'Strategic engagement', keys: ['engagements'] },
 ]
 

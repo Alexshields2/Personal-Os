@@ -4,6 +4,7 @@ import { IconTrash } from '../components/icons'
 import { CONTACT_CHANNELS, OUTREACH_STAGES } from '../lib/config'
 import { downscaleImage } from '../lib/image'
 import { parseContact } from '../lib/parseContact'
+import { parseContactCsv } from '../lib/importContacts'
 import { daysBetween, todayISO } from '../lib/date'
 import { actions, useStore } from '../lib/store'
 import type { OutreachContact, OutreachStage } from '../lib/types'
@@ -19,13 +20,29 @@ import type { OutreachContact, OutreachStage } from '../lib/types'
 
 const STALE_DAYS = 7
 
+const PAGE = 25
+
 export default function Outreach() {
   const state = useStore()
   const [adding, setAdding] = useState('')
   const [open, setOpen] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [shown, setShown] = useState(PAGE)
   const contact = state.outreach.find((c) => c.id === open) ?? null
 
-  const byStage = (stage: OutreachStage) => state.outreach.filter((c) => c.stage === stage)
+  const q = query.trim().toLowerCase()
+  const matches = q
+    ? state.outreach.filter((c) =>
+        [c.name, c.company, c.role, c.segment, c.priority].some((f) =>
+          (f ?? '').toLowerCase().includes(q),
+        ),
+      )
+    : state.outreach
+
+  // Priority first when a list has been imported, then most recent.
+  const ordered = [...matches].sort((a, b) => (a.priority || 'zz').localeCompare(b.priority || 'zz'))
+
+  const byStage = (stage: OutreachStage) => ordered.filter((c) => c.stage === stage)
 
   const add = () => {
     if (!adding.trim()) return
@@ -47,6 +64,7 @@ export default function Outreach() {
         ))}
       </div>
 
+      <ListImport />
       <ShotImport />
 
       <div style={{ display: 'flex', gap: 8, margin: '16px 0 14px' }}>
@@ -62,6 +80,24 @@ export default function Outreach() {
           Add
         </button>
       </div>
+
+      {state.outreach.length > 12 && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+          <input
+            className="input"
+            style={{ flex: '1 1 220px' }}
+            placeholder="Search name, company, sector or priority"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setShown(PAGE)
+            }}
+          />
+          <span className="t-foot muted">
+            {matches.length} of {state.outreach.length}
+          </span>
+        </div>
+      )}
 
       {state.outreach.length === 0 ? (
         <Card>
@@ -83,7 +119,19 @@ export default function Outreach() {
                 {items.length === 0 ? (
                   <div className="or-empty t-foot muted">—</div>
                 ) : (
-                  items.map((c) => <ContactCard key={c.id} contact={c} onOpen={() => setOpen(c.id)} />)
+                  <>
+                    {items.slice(0, shown).map((c) => (
+                      <ContactCard key={c.id} contact={c} onOpen={() => setOpen(c.id)} />
+                    ))}
+                    {items.length > shown && (
+                      <button
+                        className="btn btn-quiet btn-sm btn-block"
+                        onClick={() => setShown(shown + PAGE)}
+                      >
+                        {items.length - shown} more
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             )
@@ -99,6 +147,88 @@ export default function Outreach() {
 
       {contact && <ContactSheet contact={contact} onClose={() => setOpen(null)} />}
     </>
+  )
+}
+
+/**
+ * Bringing a researched list in from a spreadsheet.
+ *
+ * The file stays on your machine — it is read in the browser and never
+ * uploaded or committed anywhere, which matters when the list is a few
+ * hundred named people.
+ */
+function ListImport() {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [text, setText] = useState('')
+  const [result, setResult] = useState<{ added: number; total: number; skipped: number } | null>(null)
+  const [error, setError] = useState('')
+  const [openBox, setOpenBox] = useState(false)
+
+  const run = (csv: string) => {
+    setError('')
+    const parsed = parseContactCsv(csv)
+    if (parsed.error) {
+      setResult(null)
+      setError(parsed.error)
+      return
+    }
+    const added = actions.importOutreach(parsed.rows)
+    setResult({ added, total: parsed.rows.length, skipped: parsed.skipped })
+    setText('')
+  }
+
+  return (
+    <Card className="card-pad" style={{ marginTop: 14 }}>
+      <div className="or-import">
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div className="t-cap">From a list</div>
+          <p className="t-foot muted" style={{ marginTop: 4 }}>
+            A CSV of researched companies. Columns are matched by name, anyone already on the
+            board is skipped, and the file never leaves this device.
+          </p>
+        </div>
+        <button className="btn" onClick={() => fileRef.current?.click()}>
+          Choose a CSV
+        </button>
+        <button className="btn btn-quiet" onClick={() => setOpenBox(!openBox)}>
+          {openBox ? 'Hide' : 'Paste'}
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) void f.text().then(run)
+            e.target.value = ''
+          }}
+        />
+      </div>
+
+      {openBox && (
+        <div style={{ marginTop: 12, display: 'grid', gap: 8 }}>
+          <textarea
+            className="input"
+            style={{ minHeight: 120, fontFamily: 'monospace', fontSize: 12 }}
+            placeholder="Paste the sheet here, header row included"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <button className="btn btn-primary" onClick={() => run(text)} disabled={!text.trim()}>
+            Import
+          </button>
+        </div>
+      )}
+
+      {error && <p className="t-foot" style={{ marginTop: 10, color: 'var(--exec-close)' }}>{error}</p>}
+      {result && (
+        <p className="t-foot" style={{ marginTop: 10, color: 'var(--won)' }}>
+          Added {result.added} of {result.total}
+          {result.total - result.added > 0 && ` · ${result.total - result.added} already on the board`}
+        </p>
+      )}
+    </Card>
   )
 }
 
@@ -222,6 +352,11 @@ function ContactCard({ contact, onOpen }: { contact: OutreachContact; onOpen: ()
             {[contact.role, contact.company].filter(Boolean).join(' · ')}
           </span>
         )}
+        {(contact.priority || contact.segment) && (
+          <span className="or-chans">
+            {[contact.priority && `P${contact.priority}`, contact.segment].filter(Boolean).join(' · ')}
+          </span>
+        )}
         {contact.channels.length > 0 && (
           <span className="or-chans">{contact.channels.join(' · ')}</span>
         )}
@@ -290,6 +425,14 @@ function ContactSheet({ contact, onClose }: { contact: OutreachContact; onClose:
           onChange={(phone) => set({ phone })}
           placeholder="+353…"
         />
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1 }}>
+            <TextField label="Priority" value={contact.priority} onChange={(priority) => set({ priority })} />
+          </div>
+          <div style={{ flex: 2 }}>
+            <TextField label="Sector" value={contact.segment} onChange={(segment) => set({ segment })} />
+          </div>
+        </div>
         <Field label="Channels">
           <div className="chips">
             {CONTACT_CHANNELS.map((ch) => {

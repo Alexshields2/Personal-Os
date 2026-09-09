@@ -326,6 +326,8 @@ function hydrate(raw: string): AppState {
       workEmail: c.workEmail ?? '',
       personalEmail: c.personalEmail ?? '',
       phone: c.phone ?? '',
+      priority: c.priority ?? '',
+      segment: c.segment ?? '',
     })),
     marketing: {
       startDate: parsed.marketing?.startDate ?? base.marketing.startDate,
@@ -660,6 +662,8 @@ export const actions = {
       workEmail: '',
       personalEmail: '',
       phone: '',
+      priority: '',
+      segment: '',
       ...extra,
     }
     set({ ...state, outreach: [contact, ...state.outreach] })
@@ -674,6 +678,24 @@ export const actions = {
           : c,
       ),
     })
+  },
+
+  /** Adds only people not already on the list; returns how many were new. */
+  importOutreach(rows: Omit<OutreachContact, 'id' | 'stage' | 'movedAt' | 'channels' | 'workEmail' | 'personalEmail' | 'phone' | 'shot'>[]) {
+    const seen = new Set(state.outreach.map((c) => `${c.name.trim().toLowerCase()}|${c.company.trim().toLowerCase()}`))
+    const fresh = rows.filter((r) => !seen.has(`${r.name.trim().toLowerCase()}|${r.company.trim().toLowerCase()}`))
+    const added: OutreachContact[] = fresh.map((r) => ({
+      ...r,
+      id: uid(),
+      stage: 'target' as const,
+      movedAt: todayISO(),
+      channels: [],
+      workEmail: '',
+      personalEmail: '',
+      phone: '',
+    }))
+    set({ ...state, outreach: [...added, ...state.outreach] })
+    return added.length
   },
 
   removeOutreach(id: string) {
