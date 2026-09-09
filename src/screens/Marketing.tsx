@@ -21,6 +21,7 @@ import {
 } from '../lib/marketing'
 import type { InputKey, MarketingDay, OutputKey } from '../lib/marketing'
 import type { AppState } from '../lib/types'
+import Outreach from './Outreach'
 
 /**
  * 100 working days, one question: did we do the work?
@@ -30,7 +31,7 @@ import type { AppState } from '../lib/types'
  * here is arithmetic on top of that one idea.
  */
 
-type View = 'today' | 'dashboard' | 'sheet' | 'graphs'
+type View = 'today' | 'dashboard' | 'outreach' | 'sheet' | 'graphs'
 
 const STATUS_COLOR = {
   hit: 'var(--exec-hit)',
@@ -91,6 +92,7 @@ export default function Marketing() {
           options={[
             { value: 'today', label: 'Today' },
             { value: 'dashboard', label: 'Dashboard' },
+            { value: 'outreach', label: 'Outreach' },
             { value: 'sheet', label: 'Sheet' },
             { value: 'graphs', label: 'Graphs' },
           ]}
@@ -99,6 +101,7 @@ export default function Marketing() {
 
       {view === 'today' && <TodayView state={state} campaign={campaign} />}
       {view === 'dashboard' && <DashboardView campaign={campaign} dayNo={dayNo} />}
+      {view === 'outreach' && <Outreach />}
       {view === 'sheet' && <SheetView campaign={campaign} state={state} />}
       {view === 'graphs' && <GraphsView campaign={campaign} />}
     </div>

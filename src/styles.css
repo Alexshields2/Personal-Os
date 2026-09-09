@@ -2650,3 +2650,73 @@ button.edge:hover {
 .mk-filter > :first-child {
   flex: 1 1 320px;
 }
+
+/* ------------------------------------------------------------ outreach ---- */
+.or-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(210px, 1fr);
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+}
+.or-col {
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: 10px;
+  min-height: 120px;
+}
+.or-col-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 2px 8px;
+}
+.or-empty {
+  padding: 8px 2px;
+}
+.or-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  padding: 8px 8px 8px 10px;
+  margin-bottom: 7px;
+}
+.or-card[data-stale='true'] {
+  box-shadow: inset 2px 0 0 var(--exec-close);
+}
+.or-card-main {
+  display: grid;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+.or-name {
+  font-size: 14px;
+  font-weight: 550;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.or-sub {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.or-age {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.or-move {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+}

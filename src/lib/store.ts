@@ -43,6 +43,7 @@ import type {
   Task,
   LearnItem,
   LedgerEntry,
+  OutreachContact,
   Lesson,
   Loop,
   Priority,
@@ -99,6 +100,7 @@ function initialState(): AppState {
     tasks: [],
     rewards: DEFAULT_REWARDS.map((r) => ({ ...r })),
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
+    outreach: [],
     marketing: { startDate: nextWorkingDay(todayISO()), days: {} },
   }
 }
@@ -317,6 +319,7 @@ function hydrate(raw: string): AppState {
     }),
     rewards: parsed.rewards ?? base.rewards,
     checklist: parsed.checklist ?? base.checklist,
+    outreach: parsed.outreach ?? [],
     marketing: {
       startDate: parsed.marketing?.startDate ?? base.marketing.startDate,
       days: parsed.marketing?.days ?? {},
@@ -634,6 +637,35 @@ export const actions = {
         days: { ...state.marketing.days, [date]: { ...prev, [key]: value } },
       },
     })
+  },
+
+  addOutreach(name: string) {
+    const contact: OutreachContact = {
+      id: uid(),
+      name: name.trim(),
+      company: '',
+      role: '',
+      handle: '',
+      stage: 'target',
+      notes: '',
+      movedAt: todayISO(),
+    }
+    set({ ...state, outreach: [contact, ...state.outreach] })
+  },
+
+  updateOutreach(id: string, patch: Partial<OutreachContact>) {
+    set({
+      ...state,
+      outreach: state.outreach.map((c) =>
+        c.id === id
+          ? { ...c, ...patch, movedAt: patch.stage && patch.stage !== c.stage ? todayISO() : c.movedAt }
+          : c,
+      ),
+    })
+  },
+
+  removeOutreach(id: string) {
+    set({ ...state, outreach: state.outreach.filter((c) => c.id !== id) })
   },
 
   setMarketingStart(startDate: string) {

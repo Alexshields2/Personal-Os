@@ -15,6 +15,7 @@ import type {
   LearnItem,
   Loop,
   MetricKey,
+  OutreachStage,
   PriorityTag,
   Targets,
 } from './types'
@@ -665,6 +666,13 @@ export const PROJECT_STATUS_LABEL: Record<string, string> = {
  * that stage — good enough to forecast with, and overridable per deal because
  * you usually know more about one deal than its stage does.
  */
+export const OUTREACH_STAGES: { id: OutreachStage; label: string; hint: string }[] = [
+  { id: 'target', label: 'Target', hint: 'identified, not yet approached' },
+  { id: 'sent', label: 'Message sent', hint: 'waiting on them' },
+  { id: 'replied', label: 'Replied', hint: 'a conversation exists' },
+  { id: 'meeting', label: 'Meeting booked', hint: 'in the diary' },
+]
+
 export const DEAL_STAGES: { id: DealStage; label: string; probability: number }[] = [
   { id: 'lead', label: 'Lead', probability: 10 },
   { id: 'qualified', label: 'Qualified', probability: 30 },

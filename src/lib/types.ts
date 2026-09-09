@@ -2,7 +2,7 @@ import type { MarketingDay } from './marketing'
 
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 15
+export const STATE_VERSION = 16
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -102,6 +102,27 @@ export interface TimeLogSlot {
   text: string
   /** 1-10. 0 means unrated. */
   rating: number
+}
+
+/**
+ * Where a cold approach has got to. Deliberately separate from Deal (which is
+ * about money and probability) and Connection (which is about keeping a
+ * relationship warm) — this is the narrow question of whether a named person
+ * has heard from us, answered, and agreed to meet.
+ */
+export type OutreachStage = 'target' | 'sent' | 'replied' | 'meeting'
+
+export interface OutreachContact {
+  id: string
+  name: string
+  company: string
+  role: string
+  /** LinkedIn URL, email, wherever the approach is happening. */
+  handle: string
+  stage: OutreachStage
+  notes: string
+  /** When the stage last changed — what makes a stalled approach visible. */
+  movedAt: string
 }
 
 export interface DayEntry {
@@ -686,6 +707,8 @@ export interface AppState {
   projects: Project[]
   tasks: Task[]
   rewards: { id: string; label: string; detail: string }[]
+  /** The named people we are cold-approaching, and how far each has got. */
+  outreach: OutreachContact[]
   /**
    * The 100-day marketing execution tracker. Keyed by ISO date; the campaign's
    * working-day calendar is derived from `startDate`, so the 100 days shift
