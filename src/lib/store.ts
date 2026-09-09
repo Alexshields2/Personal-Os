@@ -319,7 +319,14 @@ function hydrate(raw: string): AppState {
     }),
     rewards: parsed.rewards ?? base.rewards,
     checklist: parsed.checklist ?? base.checklist,
-    outreach: parsed.outreach ?? [],
+    // Contacts stored before channels existed read as an empty list.
+    outreach: (parsed.outreach ?? []).map((c) => ({
+      ...c,
+      channels: c.channels ?? [],
+      workEmail: c.workEmail ?? '',
+      personalEmail: c.personalEmail ?? '',
+      phone: c.phone ?? '',
+    })),
     marketing: {
       startDate: parsed.marketing?.startDate ?? base.marketing.startDate,
       days: parsed.marketing?.days ?? {},
@@ -639,7 +646,7 @@ export const actions = {
     })
   },
 
-  addOutreach(name: string) {
+  addOutreach(name: string, extra: Partial<OutreachContact> = {}) {
     const contact: OutreachContact = {
       id: uid(),
       name: name.trim(),
@@ -649,6 +656,11 @@ export const actions = {
       stage: 'target',
       notes: '',
       movedAt: todayISO(),
+      channels: [],
+      workEmail: '',
+      personalEmail: '',
+      phone: '',
+      ...extra,
     }
     set({ ...state, outreach: [contact, ...state.outreach] })
   },

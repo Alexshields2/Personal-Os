@@ -666,6 +666,18 @@ export const PROJECT_STATUS_LABEL: Record<string, string> = {
  * that stage — good enough to forecast with, and overridable per deal because
  * you usually know more about one deal than its stage does.
  */
+/** How you actually reach someone. A contact can carry several. */
+export const CONTACT_CHANNELS = [
+  'Email',
+  'LinkedIn',
+  'WhatsApp',
+  'SMS',
+  'Call',
+  'Instagram',
+  'X',
+  'In person',
+]
+
 export const OUTREACH_STAGES: { id: OutreachStage; label: string; hint: string }[] = [
   { id: 'target', label: 'Target', hint: 'identified, not yet approached' },
   { id: 'sent', label: 'Message sent', hint: 'waiting on them' },

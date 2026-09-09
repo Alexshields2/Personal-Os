@@ -123,6 +123,13 @@ export interface OutreachContact {
   notes: string
   /** When the stage last changed — what makes a stalled approach visible. */
   movedAt: string
+  /** The screenshot they were created from, downscaled. Empty when typed by hand. */
+  shot?: string
+  /** Which channels you have for them — email, WhatsApp, SMS and so on. */
+  channels: string[]
+  workEmail: string
+  personalEmail: string
+  phone: string
 }
 
 export interface DayEntry {

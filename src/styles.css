@@ -2720,3 +2720,33 @@ button.edge:hover {
   gap: 2px;
   flex: none;
 }
+.or-import {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.or-draft {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+.or-draft-grid {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.or-shot {
+  max-width: 190px;
+  max-height: 220px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hairline);
+  object-fit: contain;
+}
+.or-chans {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
