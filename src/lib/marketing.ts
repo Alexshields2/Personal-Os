@@ -76,10 +76,10 @@ export interface InputSpec {
  * places and be missing from a third.
  */
 export const MARKETING_INPUTS: InputSpec[] = [
-  { key: 'alexConn', label: 'Alex connections', short: 'Alex', group: 'LinkedIn connections', target: 25 },
-  { key: 'cianConn', label: 'Cian connections', short: 'Cian', group: 'LinkedIn connections', target: 25 },
-  { key: 'macConn', label: 'Mac connections', short: 'Mac', group: 'LinkedIn connections', target: 25 },
-  { key: 'richardConn', label: 'Richard connections', short: 'Richard', group: 'LinkedIn connections', target: 25 },
+  { key: 'alexConn', label: 'Alex connections', short: 'Alex', group: 'LinkedIn connections', target: 5 },
+  { key: 'cianConn', label: 'Cian connections', short: 'Cian', group: 'LinkedIn connections', target: 5 },
+  { key: 'macConn', label: 'Mac connections', short: 'Mac', group: 'LinkedIn connections', target: 5 },
+  { key: 'richardConn', label: 'Richard connections', short: 'Richard', group: 'LinkedIn connections', target: 5 },
 
   { key: 'alexOutreach', label: 'Alex high-value outreach', short: 'High-value', group: 'Outbound', target: 10 },
   { key: 'coldEmails', label: 'Cold emails sent', short: 'Cold email', group: 'Outbound', target: 1000 },
