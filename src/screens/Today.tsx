@@ -62,7 +62,7 @@ export default function Today() {
   // Tomorrow can be planned but not logged or graded — there is nothing to
   // grade yet, and offering the form invites fiction.
   const future = date > todayISO()
-  const activeView: View = future ? 'plan' : view
+  const activeView: View = future ? 'plan' : view === 'log' ? 'review' : view
   const plan = planStatus(day)
   const dayNo = dayNumber(state.startDate, date)
   const streak = currentStreak(state, todayISO())
@@ -197,8 +197,7 @@ export default function Today() {
               ? [{ value: 'plan', label: 'Plan ahead' }]
               : [
                   { value: 'plan', label: plan.set ? `Plan · ${plan.set}` : 'Plan' },
-                  { value: 'log', label: `Log · ${score.score}` },
-                  { value: 'review', label: 'Review' },
+                  { value: 'review', label: `Review · ${score.score}` },
                 ]
           }
         />
@@ -212,8 +211,13 @@ export default function Today() {
           onDone={() => !future && setView('log')}
         />
       )}
-      {activeView === 'log' && <LogView date={date} day={day} state={state} />}
-      {activeView === 'review' && <ReviewView date={date} day={day} state={state} />}
+      {activeView === 'review' && (
+        <>
+          <DayBasics date={date} day={day} state={state} />
+          <LogView date={date} day={day} state={state} />
+          <ReviewView date={date} day={day} state={state} />
+        </>
+      )}
     </div>
   )
 }

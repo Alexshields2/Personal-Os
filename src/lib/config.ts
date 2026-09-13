@@ -30,7 +30,7 @@ export const DEFAULT_TARGETS: Targets = {
   waterL: 3.5,
   steps: 10000,
   sleepHours: 8,
-  pagesRead: 20,
+  pagesRead: 10,
   mobilityMin: 10,
   journalMin: 10,
   goalReviewMin: 10,
@@ -57,72 +57,58 @@ export const PILLARS: { id: PillarId; label: string; points: number }[] = [
  * up to, computed live in `scoreDay`.
  */
 export const DEFAULT_CHECKLIST: ChecklistItem[] = [
-  // Business — 30
+  // Business — 35
+  { id: 'deep_work', label: 'Most important work done before 9:30', pillar: 'business', points: 15 },
   {
     id: 'consulting_hours',
     label: '10 hours in office',
     pillar: 'business',
-    points: 14,
+    points: 12,
     metric: 'consultingHours',
     hint: 'or recovery day',
   },
-  { id: 'measurable', label: 'Measurable progress produced', pillar: 'business', points: 6 },
-  { id: 'sales_activity', label: 'Sales / revenue activity done', pillar: 'business', points: 4 },
-  { id: 'highest_first', label: 'Highest-value task first', pillar: 'business', points: 3 },
-  { id: 'client_work', label: 'Important client work done', pillar: 'business', points: 2 },
-  { id: 'bottlenecks', label: 'Team bottlenecks removed', pillar: 'business', points: 1 },
+  { id: 'sales_activity', label: 'Sales / revenue activity done', pillar: 'business', points: 8 },
 
-  // Body — 30
-  { id: 'training', label: 'Trained or active recovery', pillar: 'body', points: 6 },
-  { id: 'calories', label: 'Calorie target', pillar: 'body', points: 4, metric: 'calories' },
-  { id: 'protein', label: 'Protein target', pillar: 'body', points: 4, metric: 'protein' },
-  { id: 'sleep', label: 'Sleep target', pillar: 'body', points: 4, metric: 'sleepHours' },
-  { id: 'steps', label: 'Steps', pillar: 'body', points: 4, metric: 'steps' },
-  { id: 'water', label: 'Water', pillar: 'body', points: 3, metric: 'waterL' },
-  { id: 'creatine', label: 'Creatine', pillar: 'body', points: 2, metric: 'creatine' },
-  { id: 'mobility', label: 'Mobility / posture', pillar: 'body', points: 2, metric: 'mobilityMin' },
-  { id: 'grooming', label: 'Skincare / grooming', pillar: 'body', points: 1 },
+  // Body — 35
+  { id: 'training', label: 'Gym', pillar: 'body', points: 15 },
+  { id: 'calories', label: 'Calories', pillar: 'body', points: 7, metric: 'calories' },
+  { id: 'sleep', label: 'Sleep', pillar: 'body', points: 7, metric: 'sleepHours' },
+  { id: 'water', label: 'Water', pillar: 'body', points: 6, metric: 'waterL' },
 
-  // Mind — 20
-  { id: 'reading', label: 'Read 20 pages', pillar: 'mind', points: 6, metric: 'pagesRead' },
-  { id: 'journal', label: 'Journal', pillar: 'mind', points: 4, metric: 'journalMin' },
-  {
-    id: 'goal_review',
-    label: 'Goal review / visualisation',
-    pillar: 'mind',
-    points: 4,
-    metric: 'goalReviewMin',
-  },
-  { id: 'notes', label: 'Took notes', pillar: 'mind', points: 3 },
-  { id: 'learned', label: 'Learned something applicable', pillar: 'mind', points: 3 },
+  // Mind — 15
+  { id: 'reading', label: 'Read 10 pages', pillar: 'mind', points: 15, metric: 'pagesRead' },
 
-  // Discipline — 20
-  { id: 'disappeared', label: 'Stayed disappeared', pillar: 'discipline', points: 3 },
-  { id: 'no_alcohol', label: 'No alcohol', pillar: 'discipline', points: 3 },
-  { id: 'no_drugs', label: 'No recreational drugs', pillar: 'discipline', points: 3 },
-  { id: 'no_porn', label: 'No porn', pillar: 'discipline', points: 3 },
+  // Discipline — 15
+  { id: 'no_alcohol', label: 'No alcohol', pillar: 'discipline', points: 5 },
+  { id: 'phone_away', label: 'Phone away during deep work', pillar: 'discipline', points: 5 },
   {
     id: 'no_scrolling',
-    label: 'Recreational scrolling under 30 min',
+    label: 'Scrolling under 30 min',
     pillar: 'discipline',
-    points: 2,
+    points: 5,
     metric: 'socialMin',
     invert: true,
   },
-  { id: 'no_spending', label: 'No unnecessary spending', pillar: 'discipline', points: 2 },
-  { id: 'no_posting', label: 'No progress posting', pillar: 'discipline', points: 2 },
-  { id: 'phone_away', label: 'Phone away during deep work', pillar: 'discipline', points: 1 },
-  { id: 'promises', label: 'Kept promises', pillar: 'discipline', points: 1 },
 ]
 
-/** Ritual, not scored — it sets the day up rather than grading it. */
+/**
+ * The morning SOP, in the order it actually runs. Unscored — it sets the day
+ * up rather than grading it. Editable like everything else; this is only what
+ * a fresh install starts from.
+ *
+ * The rule it exists to enforce: win the morning before the rest of the world
+ * gets access to you.
+ */
 export const MORNING: { id: string; label: string }[] = [
-  { id: 'm_wake', label: 'Woke on time' },
-  { id: 'm_water', label: 'Water' },
+  { id: 'm_alarm', label: 'Alarm off — phone stayed in the kitchen' },
+  { id: 'm_water', label: '1L water + electrolytes' },
+  { id: 'm_creatine', label: 'Creatine + vitamins' },
   { id: 'm_breakfast', label: 'Breakfast' },
-  { id: 'm_creatine', label: 'Creatine' },
-  { id: 'm_goals', label: 'Reviewed goals' },
-  { id: 'm_noscroll', label: 'No morning scrolling' },
+  { id: 'm_cold', label: 'Cold shower' },
+  { id: 'm_journal', label: '5-minute journal' },
+  { id: 'm_read', label: 'Read 10 pages' },
+  { id: 'm_ready', label: 'Changed and ready — no scrolling' },
+  { id: 'm_deep', label: "Most important work done before 9:30" },
 ]
 
 export interface MetricSpec {
@@ -470,8 +456,11 @@ export const PRIORITY_RANK = ['The one thing', 'Second', 'Third']
  * add or delete in Settings. No fixed 10-hour day, no fixed anything.
  */
 export const STARTER_SHAPE: Omit<ShapeBlock, 'id'>[] = [
-  { start: '07:00', end: '08:00', label: 'Morning routine', tag: 'life', kind: 'routine' },
-  { start: '09:00', end: '12:00', label: 'Deep work', tag: 'consulting', kind: 'deep' },
+  { start: '06:00', end: '06:20', label: 'Wake up — water, creatine, breakfast, cold shower', tag: 'life', kind: 'routine' },
+  { start: '06:20', end: '06:30', label: 'Leave for the gym', tag: 'life', kind: 'routine' },
+  { start: '06:30', end: '07:30', label: 'Gym — full session, walk back', tag: 'life', kind: 'routine' },
+  { start: '07:50', end: '08:00', label: 'Get ready — no scrolling', tag: 'life', kind: 'routine' },
+  { start: '08:00', end: '09:30', label: 'Deep work — phone away, highest-priority thing', tag: 'consulting', kind: 'deep' },
   { start: '13:00', end: '17:00', label: 'Client work', tag: 'consulting', kind: 'calls' },
   { start: '17:00', end: '19:00', label: '1Media', tag: 'onemedia', kind: 'deep' },
   { start: '21:00', end: '21:30', label: 'Shutdown', tag: 'life', kind: 'shutdown' },
@@ -810,6 +799,7 @@ export const DEFAULT_TRACKERS: Tracker[] = [
   { id: 'tk_tech', label: 'Tech off by 22:30', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'The day', archived: false },
 
   // Body
+  { id: 'tk_meals', label: 'Meals', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Body', archived: false },
   { id: 'tk_diet', label: 'Diet', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Body', archived: false },
   { id: 'tk_sugar', label: 'No sugar or junk', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: false },
   { id: 'tk_cold', label: 'Cold exposure', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: false },
@@ -826,7 +816,7 @@ export const DEFAULT_TRACKERS: Tracker[] = [
   { id: 'tk_cash', label: 'Cash collected today', kind: 'number', unit: '€', target: 0, direction: 'atLeast', group: 'Work', archived: false },
 
   // Truth. Uncomfortable on purpose — a ceiling of zero.
-  { id: 'tk_lies', label: 'Lies told today', kind: 'number', unit: '', target: 0, direction: 'atMost', group: 'Truth', archived: false },
+  { id: 'tk_lies', label: 'Lies told today', kind: 'number', unit: '', target: 0, direction: 'atMost', group: 'Truth', archived: true },
   { id: 'tk_con_biz', label: 'Constraint — business', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: false },
   { id: 'tk_con_life', label: 'Constraint — personal', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: false },
 ]

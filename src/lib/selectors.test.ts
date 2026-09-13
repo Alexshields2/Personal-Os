@@ -82,7 +82,7 @@ describe('scoreDay', () => {
 
   it('grades a metric row off the number, not a separate tick', () => {
     const state = makeState()
-    const under = day('2026-01-01', { metrics: { ...perfectMetrics(), protein: 100 } })
+    const under = day('2026-01-01', { metrics: { ...perfectMetrics(), calories: 100 } })
     const at = day('2026-01-01', { metrics: perfectMetrics() })
     expect(scoreDay(under, state.targets, state.checklist).score).toBeLessThan(
       scoreDay(at, state.targets, state.checklist).score,
@@ -309,18 +309,18 @@ describe('weakestStandards and breakdownSignals', () => {
     // A cheap standard missed always, against an expensive one missed often.
     const days = Array.from({ length: 10 }, (_, i) =>
       day(`2026-01-${String(i + 1).padStart(2, '0')}`, {
-        checks: { ...MANUAL_CHECKS, grooming: false, measurable: i < 3 },
+        checks: { ...MANUAL_CHECKS, no_alcohol: false, deep_work: i < 3 },
         metrics: perfectMetrics(),
         trained: true,
       }),
     )
     const weak = weakestStandards(makeState({ days: daysMap(days) }))
-    const grooming = weak.find((w) => w.id === 'grooming')!
-    const measurable = weak.find((w) => w.id === 'measurable')!
-    expect(grooming.rate).toBe(100)
-    expect(measurable.rate).toBe(70)
-    // 70% of 6 points outranks 100% of 1 point.
-    expect(weak.indexOf(measurable)).toBeLessThan(weak.indexOf(grooming))
+    const cheap = weak.find((w) => w.id === 'no_alcohol')!
+    const dear = weak.find((w) => w.id === 'deep_work')!
+    expect(cheap.rate).toBe(100)
+    expect(dear.rate).toBe(70)
+    // 70% of 15 points outranks 100% of 5 points.
+    expect(weak.indexOf(dear)).toBeLessThan(weak.indexOf(cheap))
   })
 
   it('compares winning against breakdown days once there are three of each', () => {
@@ -412,12 +412,12 @@ describe('the life map', () => {
     const state = makeState({
       domains: [
         { id: 'root', parentId: '', label: 'Root', note: '', loopIds: [], checkIds: [], metricKeys: [] },
-        { id: 'a', parentId: 'root', label: 'A', note: '', loopIds: [], checkIds: ['grooming'], metricKeys: [] },
-        { id: 'b', parentId: 'root', label: 'B', note: '', loopIds: [], checkIds: ['notes'], metricKeys: [] },
+        { id: 'a', parentId: 'root', label: 'A', note: '', loopIds: [], checkIds: ['no_alcohol'], metricKeys: [] },
+        { id: 'b', parentId: 'root', label: 'B', note: '', loopIds: [], checkIds: ['phone_away'], metricKeys: [] },
       ],
       days: daysMap(
         Array.from({ length: 10 }, (_, i) =>
-          day(addDays(TODAY, -i), { checks: { grooming: true, notes: false } }),
+          day(addDays(TODAY, -i), { checks: { no_alcohol: true, phone_away: false } }),
         ),
       ),
     })

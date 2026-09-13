@@ -168,7 +168,7 @@ function migrateBooks(parsed: Partial<AppState> & { books?: LegacyBook[] }): Lea
  * Merge stored JSON over defaults so a state file written by an older build
  * gains new fields instead of rendering `undefined` into the UI.
  */
-function hydrate(raw: string): AppState {
+export function hydrate(raw: string): AppState {
   const base = initialState()
   let parsed: Partial<AppState>
   try {
@@ -220,6 +220,35 @@ function hydrate(raw: string): AppState {
           return [k, { ...v, trackers, trackerNotes }]
         }),
       ),
+    }
+  }
+  // The scored standards went from 27 to 11. Anything you added yourself is
+  // kept — only the shipped defaults that were cut get dropped, so a custom
+  // standard does not disappear because the default list was trimmed.
+  if ((parsed.version ?? 1) < 17) {
+    const CUT = new Set([
+      'measurable', 'highest_first', 'client_work', 'bottlenecks', 'protein', 'creatine',
+      'mobility', 'grooming', 'steps', 'notes', 'goal_review', 'learned', 'disappeared',
+      'no_drugs', 'no_porn', 'no_spending', 'no_posting', 'promises',
+    ])
+    const fresh = DEFAULT_CHECKLIST.map((c) => ({ ...c }))
+    const freshIds = new Set(fresh.map((c) => c.id))
+    const yours = (parsed.checklist ?? []).filter((c) => !CUT.has(c.id) && !freshIds.has(c.id))
+    parsed = {
+      ...parsed,
+      checklist: [...fresh, ...yours],
+      targets: { ...(parsed.targets ?? {}), pagesRead: 10 },
+      trackers: [
+        ...(parsed.trackers ?? []).map((t) =>
+          t.id === 'tk_lies' ? { ...t, archived: true } : t,
+        ),
+        ...((parsed.trackers ?? []).some((t) => t.id === 'tk_meals')
+          ? []
+          : [{
+              id: 'tk_meals', label: 'Meals', kind: 'text' as const, unit: '',
+              target: 0, direction: 'atLeast' as const, group: 'Body', archived: false,
+            }]),
+      ],
     }
   }
   const days: Record<string, DayEntry> = {}
