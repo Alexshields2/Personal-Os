@@ -99,16 +99,18 @@ export const DEFAULT_CHECKLIST: ChecklistItem[] = [
  * The rule it exists to enforce: win the morning before the rest of the world
  * gets access to you.
  */
-export const MORNING: { id: string; label: string }[] = [
-  { id: 'm_alarm', label: 'Alarm off — phone stayed in the kitchen' },
-  { id: 'm_water', label: '1L water + electrolytes' },
-  { id: 'm_creatine', label: 'Creatine + vitamins' },
-  { id: 'm_breakfast', label: 'Breakfast' },
-  { id: 'm_cold', label: 'Cold shower' },
-  { id: 'm_journal', label: '5-minute journal' },
-  { id: 'm_read', label: 'Read 10 pages' },
-  { id: 'm_ready', label: 'Changed and ready — no scrolling' },
-  { id: 'm_deep', label: "Most important work done before 9:30" },
+export const MORNING: { id: string; label: string; at?: string }[] = [
+  { id: 'm_alarm', at: '06:00', label: 'Alarm off — phone stayed in the kitchen' },
+  { id: 'm_water', at: '06:00', label: '1L water + electrolytes' },
+  { id: 'm_creatine', at: '06:00', label: 'Creatine + vitamins' },
+  { id: 'm_breakfast', at: '06:00', label: 'Breakfast' },
+  { id: 'm_cold', at: '06:00', label: 'Cold shower' },
+  { id: 'm_journal', at: '06:00', label: '5-minute journal' },
+  { id: 'm_read', at: '06:00', label: 'Read 10 pages' },
+  { id: 'm_leave', at: '06:20', label: 'Left for the gym' },
+  { id: 'm_gym', at: '06:30', label: 'Full session — walked back' },
+  { id: 'm_ready', at: '07:50', label: 'Changed and ready — no scrolling' },
+  { id: 'm_deep', at: '08:00', label: 'Phone away — most important work' },
 ]
 
 export interface MetricSpec {
@@ -828,20 +830,12 @@ export const DEFAULT_TRACKERS: Tracker[] = [
  * them as results without importing the shell.
  */
 export const SECTIONS: { id: string; label: string; blurb: string }[] = [
-  { id: 'alex', label: 'Alex', blurb: 'The overview, and what it adds up to' },
   { id: 'today', label: 'Today', blurb: 'Plan, log and review the day' },
-  { id: 'home', label: 'Home', blurb: 'What needs you right now' },
   { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },
   { id: 'money', label: 'Money', blurb: 'Balances, net worth, the ledger' },
   { id: 'marketing', label: 'Marketing', blurb: '100 days of execution, scored' },
   { id: 'calendar', label: 'Calendar', blurb: "Events, and what's coming" },
-  { id: 'map', label: 'Map', blurb: 'The life tree and its causes' },
   { id: 'goals', label: 'Goals', blurb: 'The ladder, and upkeep' },
-  { id: 'learn', label: 'Learn', blurb: 'Books, courses, events and lessons' },
-  { id: 'network', label: 'Network', blurb: 'People and contact cadence' },
-  { id: 'vision', label: 'Vision', blurb: 'The year on one wall' },
-  { id: 'patterns', label: 'Patterns', blurb: 'Loops, breakdowns, your two versions' },
-  { id: 'progress', label: 'Progress', blurb: 'The 126-day totals' },
   { id: 'review', label: 'Review', blurb: 'The Sunday page' },
   { id: 'settings', label: 'Settings', blurb: 'Targets, loops, appearance, sync' },
 ]

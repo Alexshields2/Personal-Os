@@ -225,6 +225,19 @@ export function hydrate(raw: string): AppState {
   // The scored standards went from 27 to 11. Anything you added yourself is
   // kept — only the shipped defaults that were cut get dropped, so a custom
   // standard does not disappear because the default list was trimmed.
+  // The morning SOP gained clock times. Match on id so a renamed item keeps
+  // its wording and only picks up the time.
+  if ((parsed.version ?? 1) < 18 && Array.isArray(parsed.morningRitual)) {
+    const AT = Object.fromEntries(MORNING.map((m) => [m.id, m.at]))
+    const have = new Set(parsed.morningRitual.map((m) => m.id))
+    parsed = {
+      ...parsed,
+      morningRitual: [
+        ...parsed.morningRitual.map((m) => ({ ...m, at: m.at ?? AT[m.id] })),
+        ...MORNING.filter((m) => !have.has(m.id)).map((m) => ({ ...m })),
+      ],
+    }
+  }
   if ((parsed.version ?? 1) < 17) {
     const CUT = new Set([
       'measurable', 'highest_first', 'client_work', 'bottlenecks', 'protein', 'creatine',
@@ -282,7 +295,9 @@ export function hydrate(raw: string): AppState {
     startDate: parsed.startDate ?? base.startDate,
     targets: { ...base.targets, ...(parsed.targets ?? {}) },
     days,
-    weeks: parsed.weeks ?? {},
+    weeks: Object.fromEntries(
+      Object.entries(parsed.weeks ?? {}).map(([k, v]) => [k, { ...emptyWeek(k), ...v }]),
+    ),
     // Ledger entries predate account attribution — unattributed is correct
     // for anything logged before this, since there is no way to know which
     // account it touched.
@@ -430,6 +445,7 @@ export function newTask(title: string, over: Partial<Task> = {}): Task {
 export function emptyWeek(weekStart: string): WeekEntry {
   return {
     weekStart,
+    plan: '',
     weightKg: 0,
     waistCm: 0,
     photos: false,

@@ -698,6 +698,89 @@ function PlanView({
 
 // ---------------------------------------------------------------------- log
 
+/**
+ * The handful of numbers actually logged every day: did the gym happen, what
+ * was eaten, how much sleep, how much water. Everything else in the review is
+ * downstream of these.
+ */
+function DayBasics({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
+  const meals = state.trackers.find((t) => t.id === 'tk_meals' && !t.archived)
+
+  return (
+    <>
+      <SectionTitle title="The day" />
+      <Card>
+        <div className="rows">
+          <div className="row">
+            <span className="row-main">
+              <span className="row-title">Gym</span>
+              <span className="row-sub">
+                {day.restDay ? 'Scheduled recovery — no penalty' : 'Counts toward the workouts'}
+              </span>
+            </span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                className="btn btn-sm"
+                aria-pressed={day.trained}
+                style={day.trained ? { background: 'var(--won)', color: 'var(--on-accent)' } : undefined}
+                onClick={() => actions.updateDay(date, { trained: !day.trained, restDay: false })}
+              >
+                Yes
+              </button>
+              <button
+                className="btn btn-sm"
+                aria-pressed={day.restDay}
+                style={day.restDay ? { background: 'var(--fill-strong)' } : undefined}
+                onClick={() => actions.updateDay(date, { restDay: !day.restDay, trained: false })}
+              >
+                Rest
+              </button>
+            </div>
+          </div>
+
+          {([
+            ['calories', 'Calories', 'kcal', 50, 0],
+            ['sleepHours', 'Sleep', 'h', 0.25, 2],
+            ['waterL', 'Water', 'L', 0.25, 2],
+          ] as const).map(([key, label, unit, step, dp]) => (
+            <div className="row" key={key}>
+              <span className="row-main">
+                <span className="row-title">{label}</span>
+                <span className="row-sub">
+                  target {state.targets[key]} {unit}
+                </span>
+              </span>
+              <Stepper
+                value={day.metrics[key] || 0}
+                step={step}
+                dp={dp}
+                suffix={unit}
+                onChange={(v) => actions.setMetric(date, key, v)}
+              />
+            </div>
+          ))}
+
+          {meals && (
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              <span className="row-main">
+                <span className="row-title">Meals</span>
+                <span className="row-sub">what you actually ate</span>
+              </span>
+              <input
+                className="input"
+                style={{ flex: '1 1 220px' }}
+                value={day.trackerNotes?.[meals.id] ?? ''}
+                placeholder="Eggs, chicken and rice, protein shake…"
+                onChange={(e) => actions.setTrackerNote(date, meals.id, e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+      </Card>
+    </>
+  )
+}
+
 function LogView({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
   return (
     <>

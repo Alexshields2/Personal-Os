@@ -2,7 +2,7 @@ import type { MarketingDay } from './marketing'
 
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 17
+export const STATE_VERSION = 18
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -265,6 +265,8 @@ export interface BalanceSnapshot {
 export interface WeekEntry {
   /** ISO date of that week's Monday. */
   weekStart: string
+  /** The week in your own words, written before it starts. */
+  plan: string
   weightKg: number
   waistCm: number
   photos: boolean
@@ -703,8 +705,8 @@ export interface AppState {
   trackers: Tracker[]
   /** Your own day shape — start empty, edited entirely in Settings. */
   dayShape: ShapeBlock[]
-  /** The six-tap morning ritual. Editable — add, rename, remove any of it. */
-  morningRitual: { id: string; label: string }[]
+  /** The morning SOP. `at` is the clock time it belongs to, for grouping. */
+  morningRitual: { id: string; label: string; at?: string }[]
   /** The end-of-day close-out. Same editing rules as the morning ritual. */
   shutdownRitual: { id: string; label: string; hint: string }[]
   /** The four questions asked every night, in your own words. */

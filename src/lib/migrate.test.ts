@@ -63,6 +63,6 @@ describe('v17 — trimming the standards', () => {
   })
 
   it('stamps the new version', () => {
-    expect(out.version).toBe(17)
+    expect(out.version).toBe(18)
   })
 })

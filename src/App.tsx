@@ -1,36 +1,22 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType, ReactElement, SVGProps } from 'react'
-import Alex from './screens/Alex'
-import VisionBoard from './screens/VisionBoard'
-import Home from './screens/Home'
 import Today from './screens/Today'
 import Money from './screens/Money'
 import Marketing from './screens/Marketing'
-import Progress from './screens/Progress'
 import Review from './screens/Review'
-import Learn from './screens/Learn'
-import Network from './screens/Network'
-import Patterns from './screens/Patterns'
-import LifeMap from './screens/Map'
 import Goals from './screens/Goals'
 import Work from './screens/Work'
 import Calendar from './screens/Calendar'
 import Settings from './screens/Settings'
 import {
-  IconAlex,
+  IconChevron,
   IconCalendar,
-  IconHome,
-  IconLearn,
   IconLife,
-  IconMap,
   IconMoney,
-  IconNetwork,
-  IconPatterns,
   IconProgress,
   IconReview,
   IconSettings,
   IconToday,
-  IconVision,
   IconWork,
 } from './components/icons'
 import Palette from './components/Palette'
@@ -40,20 +26,12 @@ import { useStore } from './lib/store'
 import { formatLong, todayISO } from './lib/date'
 
 type TabId =
-  | 'alex'
-  | 'vision'
-  | 'home'
   | 'today'
   | 'work'
   | 'calendar'
-  | 'patterns'
-  | 'map'
   | 'money'
   | 'marketing'
-  | 'learn'
-  | 'network'
   | 'goals'
-  | 'progress'
   | 'review'
   | 'settings'
 
@@ -63,31 +41,39 @@ type TabId =
  * numbers, "Life" for everything personal, "Review" for looking back, and
  * "System" for the one settings screen. Order here is the order shown.
  */
-const TABS: { id: TabId; label: string; group: string; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
-  { id: 'alex', label: 'Alex', group: 'Today', Icon: IconAlex },
-  { id: 'today', label: 'Today', group: 'Today', Icon: IconToday },
-  { id: 'home', label: 'Home', group: 'Today', Icon: IconHome },
-  { id: 'work', label: 'Work', group: 'Business', Icon: IconWork },
-  { id: 'money', label: 'Money', group: 'Business', Icon: IconMoney },
-  { id: 'marketing', label: 'Marketing', group: 'Business', Icon: IconProgress },
-  { id: 'calendar', label: 'Calendar', group: 'Business', Icon: IconCalendar },
-  { id: 'map', label: 'Map', group: 'Life', Icon: IconMap },
-  { id: 'goals', label: 'Goals', group: 'Life', Icon: IconLife },
-  { id: 'learn', label: 'Learn', group: 'Life', Icon: IconLearn },
-  { id: 'network', label: 'Network', group: 'Life', Icon: IconNetwork },
-  { id: 'vision', label: 'Vision', group: 'Life', Icon: IconVision },
-  { id: 'patterns', label: 'Patterns', group: 'Review', Icon: IconPatterns },
-  { id: 'progress', label: 'Progress', group: 'Review', Icon: IconProgress },
-  { id: 'review', label: 'Review', group: 'Review', Icon: IconReview },
-  { id: 'settings', label: 'Settings', group: 'System', Icon: IconSettings },
+const TABS: {
+  id: TabId
+  label: string
+  group: string
+  primary?: boolean
+  Icon: ComponentType<SVGProps<SVGSVGElement>>
+}[] = [
+  // The four screens that get opened every day, and everything else behind
+  // "More". Sixteen items in a row is a menu you have to read; four is a
+  // menu you aim at. Nothing is deleted — it is one tap further away.
+  { id: 'today', label: 'Today', group: 'Daily', primary: true, Icon: IconToday },
+  { id: 'work', label: 'Work', group: 'Daily', primary: true, Icon: IconWork },
+  { id: 'money', label: 'Money', group: 'Daily', primary: true, Icon: IconMoney },
+  { id: 'marketing', label: 'Marketing', group: 'Daily', primary: true, Icon: IconProgress },
+
+  { id: 'calendar', label: 'Calendar', group: 'More', Icon: IconCalendar },
+  { id: 'goals', label: 'Goals', group: 'More', Icon: IconLife },
+  { id: 'review', label: 'Review', group: 'More', Icon: IconReview },
+  { id: 'settings', label: 'Settings', group: 'More', Icon: IconSettings },
 ]
 
-// The nav order lives in SECTIONS so search and the shell cannot disagree.
+const PRIMARY = TABS.filter((t) => t.primary)
+const SECONDARY = TABS.filter((t) => !t.primary)
+
+// Search and the shell must cover the same screens. Order is deliberately not
+// compared any more — the nav is ordered by how often something is opened,
+// while SECTIONS stays in its own order for search results.
 if (import.meta.env.DEV) {
-  const navIds = TABS.map((t) => t.id).join()
-  const sectionIds = SECTIONS.map((s) => s.id).join()
-  if (navIds !== sectionIds) {
-    console.warn('Nav order and SECTIONS have drifted:', navIds, sectionIds)
+  const navIds = new Set(TABS.map((t) => t.id))
+  const missing = SECTIONS.filter((s) => !navIds.has(s.id as TabId)).map((s) => s.id)
+  const extra = TABS.filter((t) => !SECTIONS.some((s) => s.id === t.id)).map((t) => t.id)
+  if (missing.length || extra.length) {
+    console.warn('Nav and SECTIONS have drifted:', { missing, extra })
   }
 }
 
@@ -95,27 +81,21 @@ if (import.meta.env.DEV) {
 type ScreenProps = { onNavigate?: (tab: string) => void }
 
 const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
-  alex: Alex,
-  vision: VisionBoard,
-  home: Home,
   today: Today,
   work: Work,
   calendar: Calendar,
-  patterns: Patterns,
-  map: LifeMap,
   money: Money,
   marketing: Marketing,
-  learn: Learn,
-  network: Network,
   goals: Goals,
-  progress: Progress,
   review: Review,
   settings: Settings,
 }
 
 export default function App() {
-  const [tab, setTab] = useState<TabId>('alex')
+  // Opens on the day, which is what it is for.
+  const [tab, setTab] = useState<TabId>('today')
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const state = useStore()
   const Screen = SCREENS[tab]
 
@@ -175,11 +155,32 @@ export default function App() {
           Search everything
           <kbd>⌘K</kbd>
         </button>
-        {TABS.map(({ id, label, group, Icon }, i) => (
-          <div key={id}>
-            {group !== TABS[i - 1]?.group && <div className="side-group t-cap">{group}</div>}
+        {PRIMARY.map(({ id, label, Icon }) => (
+          <button
+            key={id}
+            className="side-item"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+          >
+            <Icon />
+            {label}
+          </button>
+        ))}
+
+        <button
+          className="side-item side-more"
+          aria-expanded={moreOpen}
+          onClick={() => setMoreOpen(!moreOpen)}
+        >
+          <IconChevron style={{ transform: moreOpen ? 'rotate(-90deg)' : 'rotate(90deg)' }} />
+          More
+        </button>
+        {moreOpen &&
+          SECONDARY.map(({ id, label, Icon }) => (
             <button
-              className="side-item"
+              key={id}
+              className="side-item side-item-sub"
               role="tab"
               aria-selected={tab === id}
               onClick={() => setTab(id)}
@@ -187,8 +188,7 @@ export default function App() {
               <Icon />
               {label}
             </button>
-          </div>
-        ))}
+          ))}
       </nav>
 
       <main className="scroll">
@@ -196,6 +196,33 @@ export default function App() {
       </main>
 
       <QuickAdd onNavigate={(next) => setTab(next as TabId)} />
+
+      {moreOpen && (
+        <div className="scrim more-scrim" onClick={() => setMoreOpen(false)} role="presentation">
+          <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <div className="sheet-grip" />
+            <div className="card-pad">
+              <div className="t-cap" style={{ marginBottom: 10 }}>Everything else</div>
+              <div className="more-grid">
+                {SECONDARY.map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    className="more-item"
+                    aria-selected={tab === id}
+                    onClick={() => {
+                      setTab(id)
+                      setMoreOpen(false)
+                    }}
+                  >
+                    <Icon />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {paletteOpen && (
         <Palette
@@ -205,7 +232,7 @@ export default function App() {
       )}
 
       <nav className="tabbar" aria-label="Sections">
-        {TABS.map(({ id, label, Icon }) => (
+        {PRIMARY.map(({ id, label, Icon }) => (
           <button
             key={id}
             className="tab"
@@ -217,6 +244,14 @@ export default function App() {
             {label}
           </button>
         ))}
+        <button
+          className="tab"
+          aria-selected={SECONDARY.some((t) => t.id === tab)}
+          onClick={() => setMoreOpen(true)}
+        >
+          <IconChevron style={{ transform: 'rotate(90deg)' }} />
+          More
+        </button>
       </nav>
     </div>
   )
