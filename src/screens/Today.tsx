@@ -27,10 +27,10 @@ import {
   ROTATING_QUESTIONS,
 } from '../lib/config'
 import type { ChecklistItem, PillarId } from '../lib/types'
-import { addDays, blockHours, dayNumber, formatLong, fromISO, todayISO } from '../lib/date'
+import { addDays, dayNumber, formatLong, formatShort, fromISO, todayISO, weekStartISO } from '../lib/date'
 import { dayIntent } from '../lib/nav'
 import { num } from '../lib/format'
-import { actions, emptyDay, emptySlots, newTask, useStore } from '../lib/store'
+import { actions, emptyDay, emptySlots, emptyWeek, useStore } from '../lib/store'
 import {
   currentStreak,
   isItemDone,
@@ -47,14 +47,14 @@ import type { AppState, DayEntry, Priority, Targets } from '../lib/types'
  * has to be fast, and the night form has to be honest, and one screen doing
  * both ends up being neither.
  */
-type View = 'plan' | 'log' | 'review'
+type View = 'plan' | 'time' | 'review'
 
 export default function Today() {
   const state = useStore()
   const [date, setDate] = useState(todayISO())
   // An explicit hand-off from Home or Alex wins; otherwise the hour decides.
   const [view, setView] = useState<View>(
-    () => dayIntent.take() ?? (new Date().getHours() < 12 ? 'plan' : 'log'),
+    () => (dayIntent.take() as View | null) ?? (new Date().getHours() < 12 ? 'plan' : 'review'),
   )
 
   const day = state.days[date] ?? emptyDay(date)
@@ -62,7 +62,7 @@ export default function Today() {
   // Tomorrow can be planned but not logged or graded — there is nothing to
   // grade yet, and offering the form invites fiction.
   const future = date > todayISO()
-  const activeView: View = future ? 'plan' : view === 'log' ? 'review' : view
+  const activeView: View = future ? 'plan' : view
   const plan = planStatus(day)
   const dayNo = dayNumber(state.startDate, date)
   const streak = currentStreak(state, todayISO())
@@ -197,6 +197,7 @@ export default function Today() {
               ? [{ value: 'plan', label: 'Plan ahead' }]
               : [
                   { value: 'plan', label: plan.set ? `Plan · ${plan.set}` : 'Plan' },
+                  { value: 'time', label: 'Time' },
                   { value: 'review', label: `Review · ${score.score}` },
                 ]
           }
@@ -208,9 +209,11 @@ export default function Today() {
           date={date}
           day={day}
           onPickDate={setDate}
-          onDone={() => !future && setView('log')}
+          onDone={() => !future && setView('review')}
         />
       )}
+      {activeView === 'time' && <TimeLog date={date} day={day} />}
+
       {activeView === 'review' && (
         <>
           <DayBasics date={date} day={day} state={state} />
@@ -397,167 +400,36 @@ function PriorityCard({ date, day, mode }: { date: string; day: DayEntry; mode: 
   )
 }
 
-/** The intended shape of the day. Optional — the three still work without it. */
-function BlockCard({ date, day }: { date: string; day: DayEntry }) {
-  const planned = day.blocks.reduce((s, b) => s + blockHours(b.start, b.end), 0)
-
-  if (day.blocks.length === 0) {
-    return (
-      <Card>
-        <Empty>No shape set for the day.</Empty>
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            padding: 13,
-            borderTop: '1px solid var(--hairline)',
-            justifyContent: 'center',
-          }}
-        >
-          <button className="btn btn-sm" onClick={() => actions.seedBlocks(date)}>
-            Use my default shape
-          </button>
-          <button className="btn btn-sm" onClick={() => actions.addBlock(date)}>
-            Add a block
-          </button>
-        </div>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      {day.blocks.map((b) => (
-        <div className="block" key={b.id}>
-          <div style={{ display: 'grid', gap: 5 }}>
-            <input
-              className="input input-time"
-              type="time"
-              value={b.start}
-              onChange={(e) => actions.updateBlock(date, b.id, { start: e.target.value })}
-              aria-label="Start"
-            />
-            <input
-              className="input input-time"
-              type="time"
-              value={b.end}
-              onChange={(e) => actions.updateBlock(date, b.id, { end: e.target.value })}
-              aria-label="End"
-            />
-          </div>
-          <div style={{ display: 'grid', gap: 7, minWidth: 0 }}>
-            <input
-              className="input input-plain"
-              value={b.label}
-              placeholder="What happens in this block"
-              onChange={(e) => actions.updateBlock(date, b.id, { label: e.target.value })}
-            />
-            <TagPicker value={b.tag} onChange={(tag) => actions.updateBlock(date, b.id, { tag })} />
-          </div>
-          <button
-            className="btn btn-quiet btn-danger"
-            onClick={() => actions.removeBlock(date, b.id)}
-            aria-label="Remove block"
-          >
-            <IconTrash style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
-      ))}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
-          padding: 13,
-          borderTop: '1px solid var(--hairline)',
-        }}
-      >
-        <span className="t-foot muted">{num(planned, 1)} hours planned</span>
-        <button className="btn btn-quiet btn-sm" onClick={() => actions.addBlock(date)}>
-          <IconPlus style={{ width: 14, height: 14 }} />
-          Add block
-        </button>
-      </div>
-    </Card>
-  )
-}
-
-// ---------------------------------------------------------------- calls today
+// --------------------------------------------------------------------- plan
 
 /**
- * Who needs a call today. Distinct from the shape of the day: a block says
- * when you're on the phone, this says who's on the other end of it. Backed by
- * ordinary tasks tagged "calls" and scheduled today, so it shows up
- * everywhere else those do — Work, the calendar, the load line — for free.
+ * The week in a sentence, written once and read every morning. Lives on the
+ * week rather than the day, so Monday's thinking is still in front of you on
+ * Thursday instead of scrolling away with the date.
  */
-function CallsToday({ date }: { date: string }) {
+function WeekPlan({ date }: { date: string }) {
   const state = useStore()
-  const calls = state.tasks.filter(
-    (t) => !t.done && t.scheduled === date && t.kindHint === 'calls',
-  )
-  const [text, setText] = useState('')
-
-  const add = () => {
-    if (!text.trim()) return
-    actions.addTask(newTask(text.trim(), { scheduled: date, kindHint: 'calls' }))
-    setText('')
-  }
+  const weekStart = weekStartISO(date)
+  const week = state.weeks[weekStart] ?? emptyWeek(weekStart)
 
   return (
     <>
-      <SectionTitle title={`Calls today · ${calls.length}`} />
-      <Card>
-        {calls.length > 0 && (
-          <div className="rows">
-            {calls.map((t) => (
-              <div className="row" key={t.id}>
-                <button
-                  onClick={() => actions.toggleTask(t.id)}
-                  aria-label="Toggle call"
-                  style={{ display: 'flex' }}
-                >
-                  <Check on={t.done} />
-                </button>
-                <span className="row-main">
-                  <span className="row-title">{t.title}</span>
-                </span>
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => actions.removeTask(t.id)}
-                  aria-label="Remove"
-                >
-                  <IconTrash style={{ width: 15, height: 15 }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            padding: 13,
-            borderTop: calls.length ? '1px solid var(--hairline)' : 'none',
-          }}
-        >
-          <input
-            className="input"
-            placeholder="Who needs a call today"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-          />
-          <button className="btn" onClick={add} disabled={!text.trim()} aria-label="Add call">
-            <IconPlus style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
+      <SectionTitle
+        title="This week"
+        action={<span className="t-foot muted">{formatShort(weekStart)}</span>}
+      />
+      <Card className="card-pad">
+        <textarea
+          className="input"
+          style={{ minHeight: 78 }}
+          value={week.plan}
+          placeholder="What has to happen this week. Notes, not tasks."
+          onChange={(e) => actions.updateWeek(weekStart, { plan: e.target.value })}
+        />
       </Card>
     </>
   )
 }
-
-// --------------------------------------------------------------------- plan
 
 /** A one-line add row, reused under the morning and shutdown lists. */
 function AddRitualItem({ onAdd, placeholder }: { onAdd: (label: string) => void; placeholder: string }) {
@@ -619,23 +491,14 @@ function PlanView({
         />
       </div>
 
+      <WeekPlan date={date} />
+
       <DayEdges
         date={date}
         ids={WAKE_IDS}
-        title="Start of day"
-        hint="The one number the morning is judged on. Everything after it is easier from a good start."
+        title="Woke at"
+        hint=""
       />
-
-      <SectionTitle title="The three" />
-      <PriorityCard date={date} day={day} mode="plan" />
-      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
-        Three is the limit on purpose. A list of ten is a wish; three is a commitment.
-      </p>
-
-      <SectionTitle title="Shape of the day" />
-      <BlockCard date={date} day={day} />
-
-      <CallsToday date={date} />
 
       <SectionTitle title={`Morning · ${morningDone}/${ritual.length}`} />
       <Card>
@@ -675,6 +538,12 @@ function PlanView({
         )}
         <AddRitualItem onAdd={(label) => actions.addMorningItem(label)} placeholder="Add to the morning" />
       </Card>
+
+      <SectionTitle title="The big three" />
+      <PriorityCard date={date} day={day} mode="plan" />
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Three is the limit on purpose. A list of ten is a wish; three is a commitment.
+      </p>
 
       <div style={{ marginTop: 16 }}>
         <button
@@ -784,38 +653,6 @@ function DayBasics({ date, day, state }: { date: string; day: DayEntry; state: A
 function LogView({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
   return (
     <>
-      <TimeLog date={date} day={day} />
-
-      <SectionTitle title="Training" />
-      <Card>
-        <div className="rows">
-          <button
-            className="row"
-            onClick={() => actions.updateDay(date, { trained: !day.trained, restDay: false })}
-            role="checkbox"
-            aria-checked={day.trained}
-          >
-            <Check on={day.trained} />
-            <span className="row-main">
-              <span className="row-title">Trained today</span>
-              <span className="row-sub">Counts toward the 108 workouts</span>
-            </span>
-          </button>
-          <button
-            className="row"
-            onClick={() => actions.updateDay(date, { restDay: !day.restDay, trained: false })}
-            role="checkbox"
-            aria-checked={day.restDay}
-          >
-            <Check on={day.restDay} />
-            <span className="row-main">
-              <span className="row-title">Scheduled recovery day</span>
-              <span className="row-sub">Recovery is part of training — no penalty</span>
-            </span>
-          </button>
-        </div>
-      </Card>
-
       {PILLARS.map((p) => (
         <PillarCard key={p.id} pillar={p.id} label={p.label} date={date} day={day} state={state} />
       ))}
@@ -1194,7 +1031,7 @@ function ItemRow({
         <span className="row-title" style={{ opacity: done ? 0.6 : 1 }}>
           {item.label}
         </span>
-        {derived && <span className="row-sub">Set in the Training card above</span>}
+        {derived && <span className="row-sub">Set with Gym above</span>}
       </span>
       <span className="row-value muted">{item.points}</span>
     </button>

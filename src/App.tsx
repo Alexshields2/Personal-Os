@@ -19,6 +19,7 @@ import {
   IconToday,
   IconWork,
 } from './components/icons'
+import ErrorBoundary from './components/ErrorBoundary'
 import Palette from './components/Palette'
 import QuickAdd from './components/QuickAdd'
 import { SECTIONS } from './lib/config'
@@ -77,7 +78,6 @@ if (import.meta.env.DEV) {
   }
 }
 
-// Alex takes a navigate callback so its two day-form buttons can hand off.
 type ScreenProps = { onNavigate?: (tab: string) => void }
 
 const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
@@ -91,13 +91,29 @@ const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
   settings: Settings,
 }
 
+/**
+ * Navigation arrives as a plain string from search, quick add and the screens
+ * themselves. A screen that has since been removed must not be reachable by
+ * an old id — rendering an undefined screen is what used to blank the app.
+ */
+function isTab(id: string): id is TabId {
+  return Object.prototype.hasOwnProperty.call(SCREENS, id)
+}
+
 export default function App() {
   // Opens on the day, which is what it is for.
   const [tab, setTab] = useState<TabId>('today')
   const [paletteOpen, setPaletteOpen] = useState(false)
+  // Two separate switches: the sidebar's "More" is an inline disclosure, the
+  // phone's is a sheet over the screen. Sharing one flag opened the phone
+  // sheet — and its full-screen scrim — every time the sidebar expanded.
   const [moreOpen, setMoreOpen] = useState(false)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const state = useStore()
-  const Screen = SCREENS[tab]
+  const Screen = SCREENS[tab] ?? Today
+  const go = (next: string) => setTab(isTab(next) ? next : 'today')
+  // A secondary screen reached from search still shows where you are.
+  const showMore = moreOpen || SECONDARY.some((t) => t.id === tab)
 
   // Jumping tabs should land at the top, the way a native push does.
   useEffect(() => {
@@ -170,13 +186,13 @@ export default function App() {
 
         <button
           className="side-item side-more"
-          aria-expanded={moreOpen}
-          onClick={() => setMoreOpen(!moreOpen)}
+          aria-expanded={showMore}
+          onClick={() => setMoreOpen(!showMore)}
         >
-          <IconChevron style={{ transform: moreOpen ? 'rotate(-90deg)' : 'rotate(90deg)' }} />
+          <IconChevron style={{ transform: showMore ? 'rotate(-90deg)' : 'rotate(90deg)' }} />
           More
         </button>
-        {moreOpen &&
+        {showMore &&
           SECONDARY.map(({ id, label, Icon }) => (
             <button
               key={id}
@@ -192,13 +208,15 @@ export default function App() {
       </nav>
 
       <main className="scroll">
-        <Screen key={tab} onNavigate={(next: string) => setTab(next as TabId)} />
+        <ErrorBoundary key={tab} onReset={() => setTab('today')}>
+          <Screen onNavigate={go} />
+        </ErrorBoundary>
       </main>
 
-      <QuickAdd onNavigate={(next) => setTab(next as TabId)} />
+      <QuickAdd onNavigate={go} />
 
-      {moreOpen && (
-        <div className="scrim more-scrim" onClick={() => setMoreOpen(false)} role="presentation">
+      {sheetOpen && (
+        <div className="scrim more-scrim" onClick={() => setSheetOpen(false)} role="presentation">
           <div className="sheet" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="sheet-grip" />
             <div className="card-pad">
@@ -211,7 +229,7 @@ export default function App() {
                     aria-selected={tab === id}
                     onClick={() => {
                       setTab(id)
-                      setMoreOpen(false)
+                      setSheetOpen(false)
                     }}
                   >
                     <Icon />
@@ -225,10 +243,7 @@ export default function App() {
       )}
 
       {paletteOpen && (
-        <Palette
-          onNavigate={(next) => setTab(next as TabId)}
-          onClose={() => setPaletteOpen(false)}
-        />
+        <Palette onNavigate={go} onClose={() => setPaletteOpen(false)} />
       )}
 
       <nav className="tabbar" aria-label="Sections">
@@ -247,7 +262,7 @@ export default function App() {
         <button
           className="tab"
           aria-selected={SECONDARY.some((t) => t.id === tab)}
-          onClick={() => setMoreOpen(true)}
+          onClick={() => setSheetOpen(true)}
         >
           <IconChevron style={{ transform: 'rotate(90deg)' }} />
           More

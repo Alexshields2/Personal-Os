@@ -47,6 +47,7 @@ export function day(date: string, over: Partial<DayEntry> = {}): DayEntry {
     trackers: {},
     trackerNotes: {},
     journal: '',
+    timeLog: {},
     // Closed is what makes `isLogged` true without inventing metric values.
     closed: true,
     ...over,
@@ -208,6 +209,8 @@ export function makeState(over: Partial<AppState> = {}): AppState {
     projects: [],
     tasks: [],
     rewards: [],
+    outreach: [],
+    marketing: { startDate: '2026-09-09', days: {} },
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
     ...over,
   }

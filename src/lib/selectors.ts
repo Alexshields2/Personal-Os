@@ -1448,13 +1448,8 @@ export type SearchKind =
   | 'task'
   | 'project'
   | 'goal'
-  | 'source'
-  | 'lesson'
-  | 'person'
   | 'client'
   | 'deal'
-  | 'branch'
-  | 'loop'
   | 'priority'
 
 export interface SearchResult {
@@ -1472,13 +1467,8 @@ const KIND_LABEL: Record<SearchKind, string> = {
   task: 'Task',
   project: 'Project',
   goal: 'Goal',
-  source: 'Learning',
-  lesson: 'Lesson',
-  person: 'Person',
   client: 'Client',
   deal: 'Deal',
-  branch: 'Branch',
-  loop: 'Loop',
   priority: 'Priority',
 }
 
@@ -1542,29 +1532,6 @@ export function search(state: AppState, query: string, limit = 12): SearchResult
 
   for (const g of state.goals)
     push(`goal-${g.id}`, 'goal', g.title, g.horizon, 'goals', g.note)
-
-  for (const item of state.learning) {
-    push(
-      `source-${item.id}`,
-      'source',
-      item.title,
-      [item.kind, item.source, item.status].filter(Boolean).join(' · '),
-      'learn',
-      item.notes,
-    )
-    for (const lesson of item.lessons) {
-      push(`lesson-${lesson.id}`, 'lesson', lesson.text, `from ${item.title}`, 'learn', lesson.action)
-    }
-  }
-
-  for (const c of state.connections)
-    push(`person-${c.id}`, 'person', c.name, [c.role, c.status].filter(Boolean).join(' · '), 'network', `${c.why} ${c.notes}`)
-
-  for (const d of state.domains)
-    push(`branch-${d.id}`, 'branch', d.label, 'branch of the map', 'map', d.note)
-
-  for (const l of state.loops)
-    push(`loop-${l.id}`, 'loop', l.label, l.archived ? 'archived loop' : 'loop', 'patterns', l.note)
 
   // Priorities are searched across every day, deduped by text — the same
   // intention written on twelve days is one result, not twelve.

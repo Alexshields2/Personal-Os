@@ -15,11 +15,10 @@ import {
   executionStatus,
   isMarketingLogged,
   rollupCampaignTarget,
-  rollupDailyTarget,
   totalLeads,
   workingDates,
 } from '../lib/marketing'
-import type { InputKey, MarketingDay, OutputKey } from '../lib/marketing'
+import type { MarketingDay, OutputKey } from '../lib/marketing'
 import type { AppState } from '../lib/types'
 import Outreach from './Outreach'
 

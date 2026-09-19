@@ -250,7 +250,7 @@ export function hydrate(raw: string): AppState {
     parsed = {
       ...parsed,
       checklist: [...fresh, ...yours],
-      targets: { ...(parsed.targets ?? {}), pagesRead: 10 },
+      targets: { ...DEFAULT_TARGETS, ...(parsed.targets ?? {}), pagesRead: 10 },
       trackers: [
         ...(parsed.trackers ?? []).map((t) =>
           t.id === 'tk_lies' ? { ...t, archived: true } : t,

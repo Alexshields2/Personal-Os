@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import AuthGate from './components/AuthGate'
+import ErrorBoundary from './components/ErrorBoundary'
 import { initSync } from './lib/sync'
 import './styles.css'
 
@@ -9,9 +10,13 @@ initSync()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthGate>
-      <App />
-    </AuthGate>
+    {/* Last line of defence: a crash outside any one screen (the sign-in wall,
+        the shell) still gets a message and a reload rather than a black page. */}
+    <ErrorBoundary>
+      <AuthGate>
+        <App />
+      </AuthGate>
+    </ErrorBoundary>
   </StrictMode>,
 )
 

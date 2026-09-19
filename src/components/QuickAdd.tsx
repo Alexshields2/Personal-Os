@@ -7,7 +7,7 @@ import { uid } from '../lib/format'
 import { actions, emptyDay, emptySlots, newTask, useStore } from '../lib/store'
 import type { MoneyEntity, Priority } from '../lib/types'
 
-type Kind = 'task' | 'priority' | 'goal' | 'person' | 'deal'
+type Kind = 'task' | 'priority' | 'goal' | 'deal'
 
 const KINDS: { id: Kind; label: string; placeholder: string; hint: string }[] = [
   { id: 'task', label: 'Task', placeholder: 'What needs doing', hint: 'Lands in Work, undated' },
@@ -18,7 +18,6 @@ const KINDS: { id: Kind; label: string; placeholder: string; hint: string }[] = 
     hint: "Fills the next empty slot in today's three",
   },
   { id: 'goal', label: 'Goal', placeholder: "What you're aiming at", hint: 'Lands on the ladder' },
-  { id: 'person', label: 'Person', placeholder: 'Who', hint: 'Lands in Network as a target' },
   { id: 'deal', label: 'Deal', placeholder: 'Who and what', hint: 'Lands in the pipeline as a lead' },
 ]
 
@@ -95,21 +94,6 @@ function QuickAddSheet({
         },
       ])
       onNavigate('goals')
-    } else if (kind === 'person') {
-      actions.setConnections([
-        ...state.connections,
-        {
-          id: uid(),
-          name: value,
-          role: '',
-          why: '',
-          status: 'target',
-          lastContact: '',
-          cadenceDays: 0,
-          notes: '',
-        },
-      ])
-      onNavigate('network')
     } else if (kind === 'deal') {
       actions.setDeals([
         ...state.deals,
@@ -161,7 +145,7 @@ function QuickAddSheet({
           />
         </Field>
 
-        {kind !== 'goal' && kind !== 'person' && (
+        {kind !== 'goal' && (
           <Field label="Belongs to">
             <Segmented
               value={tag === 'life' && kind === 'deal' ? 'consulting' : tag}

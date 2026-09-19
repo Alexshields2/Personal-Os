@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Card, Empty, Field, SectionTitle, Sheet, Stat, TextField } from '../components/ui'
+import { Card, Empty, Field, Sheet, Stat, TextField } from '../components/ui'
 import { IconTrash } from '../components/icons'
 import { CONTACT_CHANNELS, OUTREACH_STAGES } from '../lib/config'
 import { downscaleImage } from '../lib/image'
