@@ -110,3 +110,14 @@ export function addMinutes(hhmm: string, n: number): string {
 export function blockHours(start: string, end: string): number {
   return Math.max(0, (minutesOfDay(end) - minutesOfDay(start)) / 60)
 }
+
+/** Times are stored as minutes since midnight so they can be averaged. */
+export function minutesToTime(mins: number): string {
+  const m = Math.max(0, Math.min(24 * 60 - 1, Math.round(mins)))
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+}
+
+export function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}

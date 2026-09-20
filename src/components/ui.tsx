@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { IconCheck } from './icons'
 
@@ -382,4 +382,53 @@ export function Ring({
 
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>
+}
+
+/**
+ * An editable label that wraps instead of hiding its end. A single-line input
+ * cuts "Alarm off — phone stayed in the kitchen" in half on a phone, and the
+ * half you lose is the half that says what to do. Enter is swallowed: these
+ * are labels, not paragraphs.
+ */
+export function GrowText({
+  value,
+  onChange,
+  className = '',
+  style,
+  ariaLabel,
+}: {
+  value: string
+  onChange: (v: string) => void
+  className?: string
+  style?: CSSProperties
+  ariaLabel?: string
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null)
+
+  // Measured after layout, before paint, so the field never flashes at the
+  // wrong height on first render or after an edit.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    // scrollHeight covers content and padding; the border is on top of that,
+    // and the box is border-box — without it the last line loses its tails.
+    const border = el.offsetHeight - el.clientHeight
+    el.style.height = `${el.scrollHeight + border}px`
+  }, [value])
+
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      className={`input input-plain grow-text ${className}`}
+      style={style}
+      value={value}
+      aria-label={ariaLabel}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.preventDefault()
+      }}
+    />
+  )
 }

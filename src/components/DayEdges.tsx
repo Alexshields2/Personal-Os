@@ -1,6 +1,6 @@
 import { Card, SectionTitle } from './ui'
 import { actions, useStore } from '../lib/store'
-import { minutesToTime, timeToMinutes } from './TrackerSheet'
+import { minutesToTime, timeToMinutes } from '../lib/date'
 
 /**
  * The two ends of the day, asked at the moment you can actually answer them:
@@ -10,10 +10,6 @@ import { minutesToTime, timeToMinutes } from './TrackerSheet'
  * duplicated — they are just surfaced at the right moment instead of all
  * being asked at midnight.
  */
-
-/** Time trackers belonging to the morning and the night respectively. */
-export const WAKE_IDS = ['tk_wake']
-export const SLEEP_IDS = ['tk_shutoff', 'tk_bed']
 
 export default function DayEdges({
   date,

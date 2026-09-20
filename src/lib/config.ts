@@ -793,6 +793,10 @@ export const VISION_IMAGE_QUALITY = 0.72
  * — is deliberately absent, because logging the same number twice is how two
  * records start disagreeing.
  */
+/** The time trackers asked at the two ends of the day rather than at midnight. */
+export const WAKE_IDS = ['tk_wake']
+export const SLEEP_IDS = ['tk_shutoff', 'tk_bed']
+
 export const DEFAULT_TRACKERS: Tracker[] = [
   // Times. Stored as minutes since midnight; the two bookends of the day.
   { id: 'tk_wake', label: 'Wake up', kind: 'time', unit: '', target: 6 * 60, direction: 'atMost', group: 'The day', archived: false },

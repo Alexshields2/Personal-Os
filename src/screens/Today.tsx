@@ -4,6 +4,7 @@ import {
   CardHead,
   Check,
   Empty,
+  GrowText,
   Meter,
   Ring,
   SectionTitle,
@@ -13,9 +14,17 @@ import {
 import { Sparkline } from '../components/charts'
 import TrackerSheet from '../components/TrackerSheet'
 import TimeLog from '../components/TimeLog'
-import DayEdges, { SLEEP_IDS, WAKE_IDS } from '../components/DayEdges'
+import DayEdges from '../components/DayEdges'
 import { IconChevron, IconFlame, IconPlus, IconTrash } from '../components/icons'
-import { MAX_PRIORITIES, METRIC_BY_KEY, PILLARS, PRIORITY_RANK, PRIORITY_TAGS } from '../lib/config'
+import {
+  MAX_PRIORITIES,
+  METRIC_BY_KEY,
+  PILLARS,
+  PRIORITY_RANK,
+  PRIORITY_TAGS,
+  SLEEP_IDS,
+  WAKE_IDS,
+} from '../lib/config'
 import type { ChecklistItem } from '../lib/types'
 import { addDays, dayNumber, formatLong, formatShort, todayISO, weekStartISO } from '../lib/date'
 import { num } from '../lib/format'
@@ -482,13 +491,14 @@ function MorningCard({ date, day }: { date: string; day: DayEntry }) {
                       >
                         <Check on={on} />
                       </button>
-                      <input
-                        className="input input-plain row-main"
+                      <GrowText
+                        className="row-main"
                         style={{ opacity: on ? 0.55 : 1 }}
                         value={m.label}
-                        onChange={(e) =>
+                        ariaLabel="Step"
+                        onChange={(label) =>
                           actions.setMorningRitual(
-                            ritual.map((x) => (x.id === m.id ? { ...x, label: e.target.value } : x)),
+                            ritual.map((x) => (x.id === m.id ? { ...x, label } : x)),
                           )
                         }
                       />

@@ -1111,6 +1111,17 @@ textarea.input {
   background: transparent;
 }
 
+/* A label that wraps rather than truncating. Sized to its content in JS, so
+   it has to keep its own scrollbar out of the way. */
+textarea.grow-text {
+  resize: none;
+  overflow: hidden;
+  line-height: 1.35;
+  /* Beats the min-height every other textarea gets: this one is a label, and
+     its height is measured from its own content. */
+  min-height: 0;
+}
+
 /* Nightly question */
 .qa {
   display: grid;

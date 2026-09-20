@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Card, Empty, Field, NumberField, SectionTitle, Segmented } from '../components/ui'
+import { Card, Empty, Field, GrowText, NumberField, SectionTitle, Segmented } from '../components/ui'
 import { IconPlus, IconTrash } from '../components/icons'
 import SyncCard from '../components/SyncCard'
 import { useSync } from '../lib/sync'
@@ -699,13 +699,13 @@ function MorningEditor() {
                   }
                   onBlur={() => actions.setMorningRitual(byTime(state.morningRitual))}
                 />
-                <input
-                  className="input input-plain"
+                <GrowText
                   style={{ flex: 1, minWidth: 0 }}
                   value={item.label}
-                  onChange={(e) =>
+                  ariaLabel="Step"
+                  onChange={(label) =>
                     actions.setMorningRitual(
-                      items.map((i) => (i.id === item.id ? { ...i, label: e.target.value } : i)),
+                      items.map((i) => (i.id === item.id ? { ...i, label } : i)),
                     )
                   }
                 />

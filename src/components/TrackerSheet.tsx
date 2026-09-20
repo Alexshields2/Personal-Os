@@ -3,7 +3,8 @@ import { Card, Check, Empty, SectionTitle, Stepper } from './ui'
 import { IconPlus, IconTrash } from './icons'
 import { actions, useStore } from '../lib/store'
 import { uid } from '../lib/format'
-import { SLEEP_IDS, WAKE_IDS } from './DayEdges'
+import { minutesToTime, timeToMinutes } from '../lib/date'
+import { SLEEP_IDS, WAKE_IDS } from '../lib/config'
 import { trackerStats } from '../lib/selectors'
 import type { Tracker } from '../lib/types'
 
@@ -213,17 +214,6 @@ function formatValue(tracker: Tracker, v: number): string {
   if (tracker.kind === 'time') return minutesToTime(Math.round(v))
   if (tracker.kind === 'rating') return `${v.toFixed(1)}/10`
   return `${Math.round(v)}${tracker.unit ? ` ${tracker.unit}` : ''}`
-}
-
-/** Times are stored as minutes since midnight so they can be averaged. */
-export function minutesToTime(mins: number): string {
-  const m = Math.max(0, Math.min(24 * 60 - 1, Math.round(mins)))
-  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
-}
-
-export function timeToMinutes(hhmm: string): number {
-  const [h, m] = hhmm.split(':').map(Number)
-  return (h || 0) * 60 + (m || 0)
 }
 
 const ASKED_ELSEWHERE = [...WAKE_IDS, ...SLEEP_IDS, 'tk_meals']
