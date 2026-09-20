@@ -15,13 +15,22 @@ import type { Tracker } from '../lib/types'
  * Green is the only hue in the app and it means exactly one thing: you hit it.
  * That is why it needs no legend.
  */
-export default function TrackerSheet({ date }: { date: string }) {
+export default function TrackerSheet({
+  date,
+  hideWhenEmpty = false,
+}: {
+  date: string
+  /** Render nothing rather than an empty sheet — the review has enough on it. */
+  hideWhenEmpty?: boolean
+}) {
   const state = useStore()
   // Wake, shut-off and in-bed are asked in Plan and Review, at the moment you
-  // can actually answer them — so they are not asked again here.
-  const stats = trackerStats(state, date).filter((s) => !DAY_EDGE_IDS.includes(s.tracker.id))
+  // can actually answer them, and meals sit under calories in the
+  // non-negotiables — so none of them are asked again here.
+  const stats = trackerStats(state, date).filter((s) => !ASKED_ELSEWHERE.includes(s.tracker.id))
 
   if (stats.length === 0) {
+    if (hideWhenEmpty) return null
     return (
       <>
         <SectionTitle title="The sheet" />
@@ -217,7 +226,7 @@ export function timeToMinutes(hhmm: string): number {
   return (h || 0) * 60 + (m || 0)
 }
 
-const DAY_EDGE_IDS = [...WAKE_IDS, ...SLEEP_IDS]
+const ASKED_ELSEWHERE = [...WAKE_IDS, ...SLEEP_IDS, 'tk_meals']
 
 const ADD_KIND_LABEL: Record<Tracker['kind'], string> = {
   check: 'Check',

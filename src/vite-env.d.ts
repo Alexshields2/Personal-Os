@@ -11,6 +11,3 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
-
-/** Build-time diagnostic injected by vite.config.ts. Temporary. */
-declare const __ENV_PROBE__: string

@@ -798,29 +798,29 @@ export const DEFAULT_TRACKERS: Tracker[] = [
   { id: 'tk_wake', label: 'Wake up', kind: 'time', unit: '', target: 6 * 60, direction: 'atMost', group: 'The day', archived: false },
   { id: 'tk_bed', label: 'In bed', kind: 'time', unit: '', target: 22 * 60 + 30, direction: 'atMost', group: 'The day', archived: false },
   { id: 'tk_shutoff', label: 'Shut off', kind: 'time', unit: '', target: 21 * 60, direction: 'atMost', group: 'The day', archived: false },
-  { id: 'tk_tech', label: 'Tech off by 22:30', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'The day', archived: false },
+  { id: 'tk_tech', label: 'Tech off by 22:30', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'The day', archived: true },
 
   // Body
   { id: 'tk_meals', label: 'Meals', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Body', archived: false },
-  { id: 'tk_diet', label: 'Diet', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Body', archived: false },
-  { id: 'tk_sugar', label: 'No sugar or junk', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: false },
-  { id: 'tk_cold', label: 'Cold exposure', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: false },
-  { id: 'tk_workout', label: 'Workout quality', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Body', archived: false },
+  { id: 'tk_diet', label: 'Diet', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Body', archived: true },
+  { id: 'tk_sugar', label: 'No sugar or junk', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: true },
+  { id: 'tk_cold', label: 'Cold exposure', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Body', archived: true },
+  { id: 'tk_workout', label: 'Workout quality', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Body', archived: true },
 
   // Mind
-  { id: 'tk_meditation', label: 'Meditation', kind: 'number', unit: 'min', target: 10, direction: 'atLeast', group: 'Mind', archived: false },
-  { id: 'tk_focus', label: 'Focus', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Mind', archived: false },
-  { id: 'tk_wellbeing', label: 'Wellbeing', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Mind', archived: false },
+  { id: 'tk_meditation', label: 'Meditation', kind: 'number', unit: 'min', target: 10, direction: 'atLeast', group: 'Mind', archived: true },
+  { id: 'tk_focus', label: 'Focus', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Mind', archived: true },
+  { id: 'tk_wellbeing', label: 'Wellbeing', kind: 'rating', unit: '', target: 7, direction: 'atLeast', group: 'Mind', archived: true },
 
   // Work
-  { id: 'tk_workdone', label: 'All work completed', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: false },
-  { id: 'tk_schedule', label: 'Schedule updated', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: false },
-  { id: 'tk_cash', label: 'Cash collected today', kind: 'number', unit: '€', target: 0, direction: 'atLeast', group: 'Work', archived: false },
+  { id: 'tk_workdone', label: 'All work completed', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: true },
+  { id: 'tk_schedule', label: 'Schedule updated', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Work', archived: true },
+  { id: 'tk_cash', label: 'Cash collected today', kind: 'number', unit: '€', target: 0, direction: 'atLeast', group: 'Work', archived: true },
 
   // Truth. Uncomfortable on purpose — a ceiling of zero.
   { id: 'tk_lies', label: 'Lies told today', kind: 'number', unit: '', target: 0, direction: 'atMost', group: 'Truth', archived: true },
-  { id: 'tk_con_biz', label: 'Constraint — business', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: false },
-  { id: 'tk_con_life', label: 'Constraint — personal', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: false },
+  { id: 'tk_con_biz', label: 'Constraint — business', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: true },
+  { id: 'tk_con_life', label: 'Constraint — personal', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Truth', archived: true },
 ]
 
 // ------------------------------------------------------------------ sections
@@ -837,7 +837,7 @@ export const SECTIONS: { id: string; label: string; blurb: string }[] = [
   { id: 'calendar', label: 'Calendar', blurb: "Events, and what's coming" },
   { id: 'goals', label: 'Goals', blurb: 'The ladder, and upkeep' },
   { id: 'review', label: 'Review', blurb: 'The Sunday page' },
-  { id: 'settings', label: 'Settings', blurb: 'Targets, loops, appearance, sync' },
+  { id: 'settings', label: 'Settings', blurb: 'Targets, standards, morning, sync' },
 ]
 
 export const MONTH_LABEL = [

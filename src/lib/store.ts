@@ -222,9 +222,16 @@ export function hydrate(raw: string): AppState {
       ),
     }
   }
-  // The scored standards went from 27 to 11. Anything you added yourself is
-  // kept — only the shipped defaults that were cut get dropped, so a custom
-  // standard does not disappear because the default list was trimmed.
+  // The nightly sheet is gone from the day: what gets logged now is the
+  // standards, the three, bed times and meals. The shipped extras are archived
+  // rather than deleted — their history stays, and any of them can be switched
+  // back on in Settings. Trackers you added yourself are left alone.
+  if ((parsed.version ?? 1) < 19 && Array.isArray(parsed.trackers)) {
+    parsed = {
+      ...parsed,
+      trackers: parsed.trackers.map((t) => (RETIRED_TRACKERS.has(t.id) ? { ...t, archived: true } : t)),
+    }
+  }
   // The morning SOP gained clock times. Match on id so a renamed item keeps
   // its wording and only picks up the time.
   if ((parsed.version ?? 1) < 18 && Array.isArray(parsed.morningRitual)) {
@@ -238,6 +245,9 @@ export function hydrate(raw: string): AppState {
       ],
     }
   }
+  // The scored standards went from 27 to 11. Anything you added yourself is
+  // kept — only the shipped defaults that were cut get dropped, so a custom
+  // standard does not disappear because the default list was trimmed.
   if ((parsed.version ?? 1) < 17) {
     const CUT = new Set([
       'measurable', 'highest_first', 'client_work', 'bottlenecks', 'protein', 'creatine',
@@ -440,6 +450,20 @@ export function newTask(title: string, over: Partial<Task> = {}): Task {
     goalId: '',
     ...over,
   }
+}
+
+/** The shipped nightly-sheet trackers that no longer belong to the day. */
+export const RETIRED_TRACKERS = new Set([
+  'tk_tech', 'tk_diet', 'tk_sugar', 'tk_cold', 'tk_workout', 'tk_meditation', 'tk_focus',
+  'tk_wellbeing', 'tk_workdone', 'tk_schedule', 'tk_cash', 'tk_con_biz', 'tk_con_life',
+])
+
+/** Steps in clock order. Ties keep the order they were written in; untimed steps go last. */
+export function byTime<T extends { at?: string }>(items: T[]): T[] {
+  return items
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => (a.m.at || '~').localeCompare(b.m.at || '~') || a.i - b.i)
+    .map(({ m }) => m)
 }
 
 export function emptyWeek(weekStart: string): WeekEntry {
@@ -974,12 +998,13 @@ export const actions = {
 
   // -------------------------------------------------------- editable rituals
 
-  setMorningRitual(items: { id: string; label: string }[]) {
+  setMorningRitual(items: AppState['morningRitual']) {
     set({ ...state, morningRitual: items })
   },
 
-  addMorningItem(label: string) {
-    actions.setMorningRitual([...state.morningRitual, { id: uid(), label }])
+  /** A new step lands at its time, not at the bottom. */
+  addMorningItem(label: string, at = '') {
+    actions.setMorningRitual(byTime([...state.morningRitual, { id: uid(), label, ...(at ? { at } : {}) }]))
   },
 
   removeMorningItem(id: string) {

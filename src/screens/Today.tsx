@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import {
   Card,
   CardHead,
@@ -9,28 +9,17 @@ import {
   SectionTitle,
   Segmented,
   Stepper,
-  TextField,
 } from '../components/ui'
 import { Sparkline } from '../components/charts'
 import TrackerSheet from '../components/TrackerSheet'
 import TimeLog from '../components/TimeLog'
 import DayEdges, { SLEEP_IDS, WAKE_IDS } from '../components/DayEdges'
 import { IconChevron, IconFlame, IconPlus, IconTrash } from '../components/icons'
-import {
-  CORE_QUESTIONS,
-  ENERGY_LABEL,
-  MAX_PRIORITIES,
-  METRIC_BY_KEY,
-  PILLARS,
-  PRIORITY_RANK,
-  PRIORITY_TAGS,
-  ROTATING_QUESTIONS,
-} from '../lib/config'
-import type { ChecklistItem, PillarId } from '../lib/types'
-import { addDays, dayNumber, formatLong, formatShort, fromISO, todayISO, weekStartISO } from '../lib/date'
-import { dayIntent } from '../lib/nav'
+import { MAX_PRIORITIES, METRIC_BY_KEY, PILLARS, PRIORITY_RANK, PRIORITY_TAGS } from '../lib/config'
+import type { ChecklistItem } from '../lib/types'
+import { addDays, dayNumber, formatLong, formatShort, todayISO, weekStartISO } from '../lib/date'
 import { num } from '../lib/format'
-import { actions, emptyDay, emptySlots, emptyWeek, useStore } from '../lib/store'
+import { actions, byTime, emptyDay, emptySlots, emptyWeek, useStore } from '../lib/store'
 import {
   currentStreak,
   isItemDone,
@@ -42,20 +31,19 @@ import {
 import type { AppState, DayEntry, Priority, Targets } from '../lib/types'
 
 /**
- * The day runs in three passes: commit to it in the morning, log what happened,
- * then sit with it at night. They are separate on purpose — the morning form
- * has to be fast, and the night form has to be honest, and one screen doing
- * both ends up being neither.
+ * The day in three tabs. Plan is the morning: the week's notes, the SOP, the
+ * big three. Time is the quarter-hour log, filled in as the day goes. Review
+ * is the night: the non-negotiables checked off, the three graded, the day
+ * closed. Each one is short on purpose — a form that takes ten minutes stops
+ * getting filled in by day nine.
  */
 type View = 'plan' | 'time' | 'review'
 
 export default function Today() {
   const state = useStore()
   const [date, setDate] = useState(todayISO())
-  // An explicit hand-off from Home or Alex wins; otherwise the hour decides.
-  const [view, setView] = useState<View>(
-    () => (dayIntent.take() as View | null) ?? (new Date().getHours() < 12 ? 'plan' : 'review'),
-  )
+  // Mornings open on the plan, evenings on the review.
+  const [view, setView] = useState<View>(() => (new Date().getHours() < 12 ? 'plan' : 'review'))
 
   const day = state.days[date] ?? emptyDay(date)
   const score = scoreDay(day, state.targets, state.checklist)
@@ -74,7 +62,7 @@ export default function Today() {
       out.push(isLogged(d) ? scoreDay(d, state.targets, state.checklist).score : 0)
     }
     return out
-  }, [state.days, state.targets, date])
+  }, [state.days, state.targets, state.checklist, date])
 
   const inWindow = dayNo >= 1 && dayNo <= state.targets.protocolDays
 
@@ -205,21 +193,20 @@ export default function Today() {
       </div>
 
       {activeView === 'plan' && (
-        <PlanView
-          date={date}
-          day={day}
-          onPickDate={setDate}
-          onDone={() => !future && setView('review')}
-        />
+        <PlanView date={date} day={day} onPickDate={setDate} />
       )}
       {activeView === 'time' && <TimeLog date={date} day={day} />}
 
       {activeView === 'review' && (
-        <>
-          <DayBasics date={date} day={day} state={state} />
-          <LogView date={date} day={day} state={state} />
-          <ReviewView date={date} day={day} state={state} />
-        </>
+        <ReviewView
+          date={date}
+          day={day}
+          state={state}
+          onPlanTomorrow={() => {
+            setDate(addDays(date, 1))
+            setView('plan')
+          }}
+        />
       )}
     </div>
   )
@@ -342,10 +329,7 @@ function PriorityCard({ date, day, mode }: { date: string; day: DayEntry; mode: 
     if (filled.length === 0) {
       return (
         <Card>
-          <Empty>
-            No plan was set for this day. That is itself the finding — unplanned days are
-            tracked in Patterns.
-          </Empty>
+          <Empty>No three were set for this day.</Empty>
         </Card>
       )
     }
@@ -431,20 +415,129 @@ function WeekPlan({ date }: { date: string }) {
   )
 }
 
-/** A one-line add row, reused under the morning and shutdown lists. */
-function AddRitualItem({ onAdd, placeholder }: { onAdd: (label: string) => void; placeholder: string }) {
+/**
+ * The morning SOP, grouped the way it is written: everything at 06:00, then
+ * 06:20, then the gym, then ready, then deep work. A block's time is edited
+ * on its header and moves every step in it; a step added with a time lands
+ * in that block. Order is settled when a time field is left, not while it is
+ * being typed in, so the field being edited never jumps out from under you.
+ */
+function MorningCard({ date, day }: { date: string; day: DayEntry }) {
+  const state = useStore()
+  const ritual = state.morningRitual
+  const done = ritual.filter((m) => day.checks[m.id]).length
+
+  const blocks: { key: string; at: string; items: typeof ritual }[] = []
+  for (const m of ritual) {
+    const at = m.at ?? ''
+    const last = blocks[blocks.length - 1]
+    if (last && last.at === at) last.items.push(m)
+    else blocks.push({ key: m.id, at, items: [m] })
+  }
+
+  const retime = (items: typeof ritual, at: string) => {
+    const ids = new Set(items.map((m) => m.id))
+    actions.setMorningRitual(ritual.map((m) => (ids.has(m.id) ? { ...m, at: at || undefined } : m)))
+  }
+  const settle = () => actions.setMorningRitual(byTime(state.morningRitual))
+
+  return (
+    <>
+      <SectionTitle
+        title="Morning"
+        action={<span className="t-foot muted">{done}/{ritual.length}</span>}
+      />
+      <Card>
+        {ritual.length === 0 ? (
+          <div style={{ padding: 14 }}>
+            <Empty>Nothing set. Add what actually opens your day, right here.</Empty>
+          </div>
+        ) : (
+          <div className="rows">
+            {blocks.map((b) => (
+              <Fragment key={b.key}>
+                <div className="row-group sop-head">
+                  <input
+                    type="time"
+                    className="input input-plain sop-time"
+                    value={b.at}
+                    aria-label="Block time"
+                    onChange={(e) => retime(b.items, e.target.value)}
+                    onBlur={settle}
+                  />
+                  <span className="t-foot muted">
+                    {b.items.filter((m) => day.checks[m.id]).length}/{b.items.length}
+                  </span>
+                </div>
+                {b.items.map((m) => {
+                  const on = Boolean(day.checks[m.id])
+                  return (
+                    <div key={m.id} className="row">
+                      <button
+                        onClick={() => actions.toggleCheck(date, m.id)}
+                        role="checkbox"
+                        aria-checked={on}
+                        aria-label={m.label}
+                        style={{ display: 'flex' }}
+                      >
+                        <Check on={on} />
+                      </button>
+                      <input
+                        className="input input-plain row-main"
+                        style={{ opacity: on ? 0.55 : 1 }}
+                        value={m.label}
+                        onChange={(e) =>
+                          actions.setMorningRitual(
+                            ritual.map((x) => (x.id === m.id ? { ...x, label: e.target.value } : x)),
+                          )
+                        }
+                      />
+                      <button
+                        className="btn btn-quiet btn-danger"
+                        onClick={() => actions.removeMorningItem(m.id)}
+                        aria-label="Remove"
+                      >
+                        <IconTrash style={{ width: 15, height: 15 }} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </Fragment>
+            ))}
+          </div>
+        )}
+        <AddMorningStep defaultAt={blocks[blocks.length - 1]?.at ?? ''} />
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        Win the morning before the rest of the world gets access to you.
+      </p>
+    </>
+  )
+}
+
+/** Time and words for a new step. The time defaults to the last block's. */
+function AddMorningStep({ defaultAt }: { defaultAt: string }) {
   const [label, setLabel] = useState('')
+  const [at, setAt] = useState<string | null>(null)
+  const time = at ?? defaultAt
   const add = () => {
     if (!label.trim()) return
-    onAdd(label.trim())
+    actions.addMorningItem(label.trim(), time)
     setLabel('')
   }
   return (
     <div style={{ display: 'flex', gap: 8, padding: 13, borderTop: '1px solid var(--hairline)' }}>
       <input
+        type="time"
+        className="input input-time"
+        value={time}
+        aria-label="Time for the new step"
+        onChange={(e) => setAt(e.target.value)}
+      />
+      <input
         className="input"
-        style={{ flex: 1 }}
-        placeholder={placeholder}
+        style={{ flex: 1, minWidth: 0 }}
+        placeholder="Add to the morning"
         value={label}
         onChange={(e) => setLabel(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && add()}
@@ -459,18 +552,13 @@ function AddRitualItem({ onAdd, placeholder }: { onAdd: (label: string) => void;
 function PlanView({
   date,
   day,
-  onDone,
   onPickDate,
 }: {
   date: string
   day: DayEntry
-  onDone: () => void
   onPickDate: (date: string) => void
 }) {
-  const state = useStore()
   const plan = planStatus(day)
-  const ritual = state.morningRitual
-  const morningDone = ritual.filter((m) => day.checks[m.id]).length
 
   return (
     <>
@@ -500,44 +588,7 @@ function PlanView({
         hint=""
       />
 
-      <SectionTitle title={`Morning · ${morningDone}/${ritual.length}`} />
-      <Card>
-        {ritual.length === 0 ? (
-          <div style={{ padding: 14 }}>
-            <Empty>Nothing set. Add what actually opens your day, right here.</Empty>
-          </div>
-        ) : (
-          <div className="rows">
-            {ritual.map((m) => (
-              <div key={m.id} className="row">
-                <button
-                  onClick={() => actions.toggleCheck(date, m.id)}
-                  role="checkbox"
-                  aria-checked={Boolean(day.checks[m.id])}
-                  aria-label={m.label}
-                  style={{ display: 'flex' }}
-                >
-                  <Check on={Boolean(day.checks[m.id])} />
-                </button>
-                <input
-                  className="input input-plain row-main"
-                  style={{ opacity: day.checks[m.id] ? 0.55 : 1 }}
-                  value={m.label}
-                  onChange={(e) => actions.setMorningRitual(ritual.map((x) => (x.id === m.id ? { ...x, label: e.target.value } : x)))}
-                />
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => actions.removeMorningItem(m.id)}
-                  aria-label="Remove"
-                >
-                  <IconTrash style={{ width: 15, height: 15 }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <AddRitualItem onAdd={(label) => actions.addMorningItem(label)} placeholder="Add to the morning" />
-      </Card>
+      <MorningCard date={date} day={day} />
 
       <SectionTitle title="The big three" />
       <PriorityCard date={date} day={day} mode="plan" />
@@ -549,10 +600,7 @@ function PlanView({
         <button
           className={`btn btn-block ${day.planned ? '' : 'btn-primary'}`}
           disabled={plan.set === 0 && !day.planned}
-          onClick={() => {
-            actions.updateDay(date, { planned: !day.planned })
-            if (!day.planned) onDone()
-          }}
+          onClick={() => actions.updateDay(date, { planned: !day.planned })}
         >
           {day.planned ? 'Plan committed — reopen' : 'Commit to the day'}
         </button>
@@ -565,106 +613,173 @@ function PlanView({
   )
 }
 
-// ---------------------------------------------------------------------- log
+// ------------------------------------------------------------------- review
 
 /**
- * The handful of numbers actually logged every day: did the gym happen, what
- * was eaten, how much sleep, how much water. Everything else in the review is
- * downstream of these.
+ * Every standard the day is scored on, checked off in one list. Yes/no ones
+ * are a tap. The ones that are really a number — office hours, calories,
+ * sleep, water, pages, scrolling — take the number and tick themselves once
+ * it clears the target, so each thing is logged once, in one place, and the
+ * score can never disagree with what was entered.
  */
-function DayBasics({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
+function NonNegotiables({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
+  const items = state.checklist
+  const done = items.filter((i) => isItemDone(i, day, state.targets)).length
   const meals = state.trackers.find((t) => t.id === 'tk_meals' && !t.archived)
+  // Meals sit under calories, or at the end if calories has been removed.
+  const mealsAfter = (items.find((i) => i.id === 'calories') ?? items[items.length - 1])?.id
+  const groups = PILLARS.map((p) => ({ ...p, items: items.filter((i) => i.pillar === p.id) })).filter(
+    (g) => g.items.length > 0,
+  )
 
   return (
     <>
-      <SectionTitle title="The day" />
+      <SectionTitle
+        title="Non-negotiables"
+        action={
+          <span className="t-foot muted">
+            {done} of {items.length}
+          </span>
+        }
+      />
       <Card>
-        <div className="rows">
-          <div className="row">
-            <span className="row-main">
-              <span className="row-title">Gym</span>
-              <span className="row-sub">
-                {day.restDay ? 'Scheduled recovery — no penalty' : 'Counts toward the workouts'}
-              </span>
-            </span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                className="btn btn-sm"
-                aria-pressed={day.trained}
-                style={day.trained ? { background: 'var(--won)', color: 'var(--on-accent)' } : undefined}
-                onClick={() => actions.updateDay(date, { trained: !day.trained, restDay: false })}
-              >
-                Yes
-              </button>
-              <button
-                className="btn btn-sm"
-                aria-pressed={day.restDay}
-                style={day.restDay ? { background: 'var(--fill-strong)' } : undefined}
-                onClick={() => actions.updateDay(date, { restDay: !day.restDay, trained: false })}
-              >
-                Rest
-              </button>
-            </div>
+        {items.length === 0 ? (
+          <Empty>No standards set. Add them in Settings.</Empty>
+        ) : (
+          <div className="rows">
+            {groups.map((g) => (
+              <Fragment key={g.id}>
+                <div className="row-group t-cap">{g.label}</div>
+                {g.items.map((item) => (
+                  <Fragment key={item.id}>
+                    <StandardRow item={item} date={date} day={day} targets={state.targets} />
+                    {meals && item.id === mealsAfter && (
+                      <div className="row" style={{ flexWrap: 'wrap' }}>
+                        <span className="row-main">
+                          <span className="row-title">Meals</span>
+                          <span className="row-sub">What you actually ate</span>
+                        </span>
+                        <input
+                          className="input"
+                          style={{ flex: '1 1 220px' }}
+                          value={day.trackerNotes?.[meals.id] ?? ''}
+                          placeholder="Eggs, chicken and rice, protein shake…"
+                          onChange={(e) => actions.setTrackerNote(date, meals.id, e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </Fragment>
+                ))}
+              </Fragment>
+            ))}
           </div>
-
-          {([
-            ['calories', 'Calories', 'kcal', 50, 0],
-            ['sleepHours', 'Sleep', 'h', 0.25, 2],
-            ['waterL', 'Water', 'L', 0.25, 2],
-          ] as const).map(([key, label, unit, step, dp]) => (
-            <div className="row" key={key}>
-              <span className="row-main">
-                <span className="row-title">{label}</span>
-                <span className="row-sub">
-                  target {state.targets[key]} {unit}
-                </span>
-              </span>
-              <Stepper
-                value={day.metrics[key] || 0}
-                step={step}
-                dp={dp}
-                suffix={unit}
-                onChange={(v) => actions.setMetric(date, key, v)}
-              />
-            </div>
-          ))}
-
-          {meals && (
-            <div className="row" style={{ flexWrap: 'wrap' }}>
-              <span className="row-main">
-                <span className="row-title">Meals</span>
-                <span className="row-sub">what you actually ate</span>
-              </span>
-              <input
-                className="input"
-                style={{ flex: '1 1 220px' }}
-                value={day.trackerNotes?.[meals.id] ?? ''}
-                placeholder="Eggs, chicken and rice, protein shake…"
-                onChange={(e) => actions.setTrackerNote(date, meals.id, e.target.value)}
-              />
-            </div>
-          )}
-        </div>
+        )}
       </Card>
     </>
   )
 }
 
-function LogView({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
-  return (
-    <>
-      {PILLARS.map((p) => (
-        <PillarCard key={p.id} pillar={p.id} label={p.label} date={date} day={day} state={state} />
-      ))}
+function StandardRow({
+  item,
+  date,
+  day,
+  targets,
+}: {
+  item: ChecklistItem
+  date: string
+  day: DayEntry
+  targets: Targets
+}) {
+  const done = isItemDone(item, day, targets)
 
-      <p className="t-foot muted" style={{ textAlign: 'center', marginTop: 16 }}>
-        Same inputs. Every day. Then go to Review.
-      </p>
-    </>
+  // The gym is a yes, a planned rest, or not yet — never a number.
+  if (item.id === 'training') {
+    return (
+      <div className="row">
+        <Check on={done} />
+        <span className="row-main">
+          <span className="row-title" style={{ opacity: done ? 0.6 : 1 }}>
+            {item.label}
+          </span>
+          <span className="row-sub">
+            {day.restDay ? 'Scheduled recovery — no penalty' : day.trained ? 'Trained' : 'Did you train?'}
+          </span>
+        </span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            className="btn btn-sm"
+            aria-pressed={day.trained}
+            style={day.trained ? { background: 'var(--won)', color: 'var(--on-accent)' } : undefined}
+            onClick={() => actions.updateDay(date, { trained: !day.trained, restDay: false })}
+          >
+            Yes
+          </button>
+          <button
+            className="btn btn-sm"
+            aria-pressed={day.restDay}
+            style={day.restDay ? { background: 'var(--fill-strong)' } : undefined}
+            onClick={() => actions.updateDay(date, { restDay: !day.restDay, trained: false })}
+          >
+            Rest
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // A number is graded off the number, so the tick fills or clears it rather
+  // than drifting out of step with what was logged.
+  if (item.metric) {
+    const spec = METRIC_BY_KEY[item.metric]
+    const target = targets[item.metric as keyof Targets] as number
+    const value = day.metrics[item.metric]
+    const quick = () => {
+      if (item.invert) actions.setMetric(date, item.metric!, done ? target + spec.step : 0)
+      else actions.setMetric(date, item.metric!, done ? 0 : target)
+    }
+    return (
+      <div className="row row-metric">
+        <button onClick={quick} aria-label={`${item.label} — set to target`} style={{ display: 'flex' }}>
+          <Check on={done} />
+        </button>
+        <span className="row-main">
+          <span className="row-title" style={{ opacity: done ? 0.6 : 1 }}>
+            {item.label}
+          </span>
+          <span className="row-sub">
+            {item.invert ? 'At most' : 'Target'} {num(target, spec.dp)}
+            {spec.unit && ` ${spec.unit}`}
+            {item.hint ? ` · ${item.hint}` : ''}
+          </span>
+        </span>
+        <Stepper
+          value={value}
+          step={spec.step}
+          dp={spec.dp}
+          suffix={spec.unit}
+          onChange={(v) => actions.setMetric(date, item.metric!, v)}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <button
+      className="row"
+      onClick={() => actions.toggleCheck(date, item.id)}
+      role="checkbox"
+      aria-checked={done}
+    >
+      <Check on={done} />
+      <span className="row-main">
+        <span className="row-title" style={{ opacity: done ? 0.6 : 1 }}>
+          {item.label}
+        </span>
+        {item.hint && <span className="row-sub">{item.hint}</span>}
+      </span>
+    </button>
   )
 }
-
-// ------------------------------------------------------------------- review
 
 /**
  * Every task that touched this day, in one place, each with a one-tap link
@@ -721,22 +836,37 @@ function DayLog({ date, state }: { date: string; state: AppState }) {
   )
 }
 
-function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: AppState }) {
-  const tomorrow = addDays(date, 1)
-  const tomorrowDay = state.days[tomorrow] ?? emptyDay(tomorrow)
-  const tomorrowSet = planStatus(tomorrowDay).set > 0
-  const rotating = ROTATING_QUESTIONS[fromISO(date).getDay()]
-  const questions = state.nightlyQuestions.length ? state.nightlyQuestions : [...CORE_QUESTIONS, rotating]
-  const activeLoops = state.loops.filter((l) => !l.archived)
+function ReviewView({
+  date,
+  day,
+  state,
+  onPlanTomorrow,
+}: {
+  date: string
+  day: DayEntry
+  state: AppState
+  onPlanTomorrow: () => void
+}) {
+  const touched = tasksTouchedOn(state, date).length > 0
 
   return (
     <>
-      <SectionTitle title="How the plan went" />
+      <NonNegotiables date={date} day={day} state={state} />
+
+      <SectionTitle title="How the three went" />
       <PriorityCard date={date} day={day} mode="grade" />
 
-      <TrackerSheet date={date} />
+      {touched && <DayLog date={date} state={state} />}
 
-      <DayLog date={date} state={state} />
+      {/* Only there if you have switched a tracker on in Settings. */}
+      <TrackerSheet date={date} hideWhenEmpty />
+
+      <DayEdges
+        date={date}
+        ids={SLEEP_IDS}
+        title="End of day"
+        hint="Recorded at night, when you actually know them."
+      />
 
       <SectionTitle title="Journal" />
       <Card className="card-pad">
@@ -749,291 +879,17 @@ function ReviewView({ date, day, state }: { date: string; day: DayEntry; state: 
         />
       </Card>
 
-      <SectionTitle title="Energy" />
-      <Card className="card-pad">
-        <div className="energy">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              aria-pressed={day.energy === n}
-              onClick={() => actions.updateDay(date, { energy: day.energy === n ? 0 : n })}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-        <p className="t-foot muted" style={{ marginTop: 9, textAlign: 'center' }}>
-          {day.energy ? ENERGY_LABEL[day.energy] : 'How much was in the tank today'}
-        </p>
-      </Card>
-
-      <SectionTitle title="Three lines" />
-      <Card className="card-pad">
-        <div style={{ display: 'grid', gap: 14 }}>
-          <TextField
-            label="Biggest win"
-            value={day.biggestWin}
-            onChange={(v) => actions.updateDay(date, { biggestWin: v })}
-            placeholder="What actually moved"
-            multiline
-          />
-          <TextField
-            label="Biggest mistake"
-            value={day.biggestMistake}
-            onChange={(v) => actions.updateDay(date, { biggestMistake: v })}
-            placeholder="Name it, don't repeat it"
-            multiline
-          />
-          <TextField
-            label="The lesson"
-            value={day.lesson}
-            onChange={(v) => actions.updateDay(date, { lesson: v })}
-            placeholder="What today teaches tomorrow"
-            multiline
-          />
-        </div>
-      </Card>
-
-      <SectionTitle
-        title="Which loops ran today?"
-        action={<span className="t-foot muted">{day.loops.length} tagged</span>}
-      />
-      <Card className="card-pad">
-        <div className="chips">
-          {activeLoops.map((l) => (
-            <button
-              key={l.id}
-              className="chip"
-              aria-pressed={day.loops.includes(l.id)}
-              onClick={() => actions.toggleLoop(date, l.id)}
-              title={l.note}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
-        <p className="t-foot muted" style={{ marginTop: 12 }}>
-          Tag them honestly or the pattern engine has nothing to find. Edit the list in
-          Settings.
-        </p>
-      </Card>
-
-      <SectionTitle title="Questions" />
-      <Card>
-        {questions.map((q) => (
-          <div className="qa" key={q.id}>
-            <div className="qa-q">{q.q}</div>
-            {q.hint && <div className="t-foot muted">{q.hint}</div>}
-            <textarea
-              className="input"
-              style={{ minHeight: 62 }}
-              value={day.answers[q.id] ?? ''}
-              placeholder="…"
-              onChange={(e) => actions.setAnswer(date, q.id, e.target.value)}
-            />
-          </div>
-        ))}
-      </Card>
-
-      <SectionTitle title="Tomorrow's three" />
-      <PriorityCard date={tomorrow} day={tomorrowDay} mode="plan" />
-      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
-        Set tonight, waiting in the morning. Deciding what matters at 7am is how days get
-        handed to whoever shouts loudest.
-      </p>
-
-      <DayEdges
-        date={date}
-        ids={SLEEP_IDS}
-        title="End of day"
-        hint="Recorded at night, when you actually know them — not guessed at in the morning."
-      />
-
-      <SectionTitle title="Shutdown" />
-      <Card>
-        <div className="rows">
-          {/* The one derived row — computed, so it stays fixed rather than editable. */}
-          <button
-            className="row"
-            role="checkbox"
-            aria-checked={tomorrowSet}
-            disabled
-          >
-            <Check on={tomorrowSet} locked />
-            <span className="row-main">
-              <span className="row-title" style={{ opacity: tomorrowSet ? 0.55 : 1 }}>
-                Tomorrow's three are set
-              </span>
-              <span className="row-sub">Filled in above</span>
-            </span>
-          </button>
-          {state.shutdownRitual.map((s) => {
-            const on = Boolean(day.checks[s.id])
-            return (
-              <div key={s.id} className="row">
-                <button
-                  onClick={() => actions.toggleCheck(date, s.id)}
-                  role="checkbox"
-                  aria-checked={on}
-                  aria-label={s.label}
-                  style={{ display: 'flex' }}
-                >
-                  <Check on={on} />
-                </button>
-                <input
-                  className="input input-plain row-main"
-                  style={{ opacity: on ? 0.55 : 1 }}
-                  value={s.label}
-                  onChange={(e) =>
-                    actions.setShutdownRitual(
-                      state.shutdownRitual.map((x) => (x.id === s.id ? { ...x, label: e.target.value } : x)),
-                    )
-                  }
-                />
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => actions.removeShutdownItem(s.id)}
-                  aria-label="Remove"
-                >
-                  <IconTrash style={{ width: 15, height: 15 }} />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-        <AddRitualItem onAdd={(label) => actions.addShutdownItem(label)} placeholder="Add to shutdown" />
-      </Card>
-
-      <div style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16, display: 'grid', gap: 10 }}>
         <button
           className={`btn btn-block ${day.closed ? '' : 'btn-primary'}`}
           onClick={() => actions.updateDay(date, { closed: !day.closed })}
         >
           {day.closed ? 'Day closed — reopen' : 'Close the day'}
         </button>
-      </div>
-
-      <p className="t-foot muted" style={{ textAlign: 'center', marginTop: 16 }}>
-        Answered honestly, this is the part that compounds.
-      </p>
-    </>
-  )
-}
-
-// ---------------------------------------------------------------- pillars
-
-function PillarCard({
-  pillar,
-  label,
-  date,
-  day,
-  state,
-}: {
-  pillar: PillarId
-  label: string
-  date: string
-  day: DayEntry
-  state: AppState
-}) {
-  const items = state.checklist.filter((i) => i.pillar === pillar)
-  const earned = items.reduce(
-    (s, i) => s + (isItemDone(i, day, state.targets) ? i.points : 0),
-    0,
-  )
-  const possible = items.reduce((s, i) => s + i.points, 0)
-
-  return (
-    <>
-      <SectionTitle title={label} />
-      <Card>
-        <CardHead
-          title={`${earned} / ${possible} points`}
-          action={
-            <span style={{ width: 92 }}>
-              <Meter pct={(earned / possible) * 100} />
-            </span>
-          }
-        />
-        <div className="rows" style={{ borderTop: '1px solid var(--hairline)' }}>
-          {items.map((item) => (
-            <ItemRow key={item.id} item={item} date={date} day={day} targets={state.targets} />
-          ))}
-        </div>
-      </Card>
-    </>
-  )
-}
-
-function ItemRow({
-  item,
-  date,
-  day,
-  targets,
-}: {
-  item: ChecklistItem
-  date: string
-  day: DayEntry
-  targets: Targets
-}) {
-  const done = isItemDone(item, day, targets)
-
-  // Rows with a number are graded off the number, so the tick fills or clears
-  // it rather than drifting out of sync with the logged value.
-  if (item.metric) {
-    const spec = METRIC_BY_KEY[item.metric]
-    const target = targets[item.metric as keyof Targets] as number
-    const value = day.metrics[item.metric]
-    const quick = () => {
-      if (item.invert) actions.setMetric(date, item.metric!, done ? target + spec.step : 0)
-      else actions.setMetric(date, item.metric!, done ? 0 : target)
-    }
-    return (
-      <div className="row row-metric">
-        <button
-          onClick={quick}
-          aria-label={`${item.label} — set to target`}
-          style={{ display: 'flex' }}
-        >
-          <Check on={done} />
+        <button className="btn btn-block" onClick={onPlanTomorrow}>
+          Plan tomorrow
         </button>
-        <span className="row-main">
-          <span className="row-title" style={{ opacity: done ? 0.6 : 1 }}>
-            {item.label}
-          </span>
-          <span className="row-sub">
-            {item.invert ? 'Ceiling' : 'Target'} {num(target, spec.dp)}
-            {spec.unit && ` ${spec.unit}`}
-            {item.hint ? ` · ${item.hint}` : ''}
-          </span>
-        </span>
-        <Stepper
-          value={value}
-          step={spec.step}
-          dp={spec.dp}
-          suffix={spec.unit}
-          onChange={(v) => actions.setMetric(date, item.metric!, v)}
-        />
       </div>
-    )
-  }
-
-  const derived = item.id === 'training'
-  return (
-    <button
-      className="row"
-      onClick={() => !derived && actions.toggleCheck(date, item.id)}
-      role="checkbox"
-      aria-checked={done}
-      disabled={derived}
-    >
-      <Check on={done} locked={derived} />
-      <span className="row-main">
-        <span className="row-title" style={{ opacity: done ? 0.6 : 1 }}>
-          {item.label}
-        </span>
-        {derived && <span className="row-sub">Set with Gym above</span>}
-      </span>
-      <span className="row-value muted">{item.points}</span>
-    </button>
+    </>
   )
 }

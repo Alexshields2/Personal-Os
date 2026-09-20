@@ -434,6 +434,31 @@ button {
   background: var(--fill-soft);
 }
 
+/* A caption between rows naming the group below it: the pillar in the
+   non-negotiables, the clock time in the morning SOP. It belongs to the rows
+   under it, so the rule sits above it and not between it and them. */
+.row-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 17px 4px;
+}
+
+.rows > .row-group + * {
+  border-top: none;
+}
+
+/* The SOP block time reads as a heading but stays a real time field, so the
+   native picker opens on tap. */
+.sop-time {
+  width: 116px;
+  padding: 4px 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
 .row-main {
   flex: 1;
   min-width: 0;

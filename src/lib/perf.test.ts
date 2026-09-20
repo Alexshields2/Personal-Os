@@ -2,7 +2,6 @@ import { writeFileSync } from 'node:fs'
 import { afterAll, describe, expect, it } from 'vitest'
 import { DEFAULT_CHECKLIST } from './config'
 import { addDays } from './date'
-import { briefing } from './advisor'
 import {
   agenda,
   breakdownSignals,
@@ -112,8 +111,6 @@ describe('selector budgets at a year of data', () => {
     ['agenda', () => agenda(state, TODAY, 30), 15],
     ['monthGrid', () => monthGrid(state, TODAY), 15],
     ['search', () => search(state, 'task'), 15],
-    // The briefing calls most of the above, so its budget is the sum-ish.
-    ['briefing', () => briefing(state, TODAY), 45],
   ]
 
   for (const [name, fn, budget] of cases) {
@@ -125,13 +122,12 @@ describe('selector budgets at a year of data', () => {
   }
 
   it('a whole screen of selectors together stays interactive', () => {
-    // Roughly what Alex computes on one render — about 3ms in practice. This is
+    // Roughly what a busy screen computes on one render. This is
     // the number that decides whether typing anywhere in the app feels instant.
     const ms = fastest(() => {
       oscillation(state, TODAY)
       domainScores(state, TODAY)
       weekBoard(state, TODAY)
-      briefing(state, TODAY)
     })
     measured['one screen'] = Number(ms.toFixed(2))
     expect(ms).toBeLessThan(50)

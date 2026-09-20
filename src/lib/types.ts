@@ -2,7 +2,7 @@ import type { MarketingDay } from './marketing'
 
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 18
+export const STATE_VERSION = 19
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
