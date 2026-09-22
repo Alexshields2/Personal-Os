@@ -10,7 +10,7 @@ import {
   Stepper,
 } from '../components/ui'
 import TimeLog from '../components/TimeLog'
-import { IconChevron, IconPlus, IconTrash } from '../components/icons'
+import { IconChevron, IconPlay, IconPlus, IconStop, IconTrash } from '../components/icons'
 import {
   ACCOUNT_LABEL,
   CLOTHES_CHECK,
@@ -32,6 +32,7 @@ import { euro, num, uid } from '../lib/format'
 import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
 import { dayProgress, lastGymSets, missedGymCount, todoFor } from '../lib/selectors'
 import { downscaleImage } from '../lib/image'
+import { loadVoices, pickVoice, scoreVoice, speak } from '../lib/speech'
 import { ACCOUNT_OWNER, BANK_ACCOUNTS } from '../lib/types'
 import type { AccountId, DayEntry, Exercise, Purse, Targets } from '../lib/types'
 
@@ -235,9 +236,14 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
   const [editing, setEditing] = useState(false)
   const [speaking, setSpeaking] = useState(false)
   const [note, setNote] = useState('')
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const read = Boolean(day.checks[READ_CHECK])
   const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window
+
+  // The list arrives asynchronously on most browsers — the first read is
+  // usually empty, with a "voiceschanged" event along shortly after.
+  useEffect(() => loadVoices(setVoices), [])
 
   // A voice that keeps reading after you have moved on is a bug you can hear.
   useEffect(() => {
@@ -247,19 +253,23 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
   }, [canSpeak])
 
   const play = () => {
-    if (!canSpeak || !text.trim()) return
-    window.speechSynthesis.cancel()
-    const said = new SpeechSynthesisUtterance(`${title}. ${text}`)
-    said.onend = () => setSpeaking(false)
-    said.onerror = () => setSpeaking(false)
-    setSpeaking(true)
-    window.speechSynthesis.speak(said)
+    if (speak(`${title}. ${text}`, voices, state.identity.voice, () => setSpeaking(false))) {
+      setSpeaking(true)
+    }
   }
 
   const stop = () => {
     if (canSpeak) window.speechSynthesis.cancel()
     setSpeaking(false)
   }
+
+  // English voices, best first, so the top of the list is the one it would
+  // have picked anyway.
+  const choices = voices
+    .map((v) => ({ voice: v, score: scoreVoice(v) }))
+    .filter((v) => v.score >= 0)
+    .sort((a, b) => b.score - a.score || a.voice.name.localeCompare(b.voice.name))
+  const chosen = pickVoice(voices, state.identity.voice)
 
   const attach = async (file: File | undefined) => {
     if (!file) return
@@ -278,16 +288,7 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
     <>
       <SectionTitle
         title={title || 'The top of the day'}
-        action={
-          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {canSpeak && text.trim() !== '' && (
-              <button className="btn btn-quiet btn-sm" onClick={speaking ? stop : play}>
-                {speaking ? 'Stop' : 'Play'}
-              </button>
-            )}
-            <EditToggle editing={editing} onToggle={() => setEditing(!editing)} />
-          </span>
-        }
+        action={<EditToggle editing={editing} onToggle={() => setEditing(!editing)} />}
       />
       <Card className="identity">
         {image !== '' && <img className="identity-img" src={image} alt="" />}
@@ -309,6 +310,31 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
                 placeholder="Who you are becoming, in your own words. Read it every morning."
                 onChange={(e) => actions.setIdentity({ text: e.target.value })}
               />
+              {canSpeak && choices.length > 0 && (
+                <label className="identity-voice">
+                  <span className="t-cap">Voice</span>
+                  <select
+                    className="input"
+                    value={state.identity.voice}
+                    aria-label="Voice"
+                    onChange={(e) => {
+                      const name = e.target.value
+                      actions.setIdentity({ voice: name })
+                      // Say a line in it, because a voice name tells you nothing.
+                      speak('This is how it sounds.', voices, name, () => setSpeaking(false))
+                    }}
+                  >
+                    <option value="">
+                      Automatic{chosen ? ` — ${chosen.name}` : ''}
+                    </option>
+                    {choices.map(({ voice }) => (
+                      <option key={voice.name} value={voice.name}>
+                        {voice.name} ({voice.lang})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn btn-sm" onClick={() => fileRef.current?.click()}>
                   {image ? 'Change photo' : 'Add photo'}
@@ -345,6 +371,18 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
             <p className="identity-text">{text}</p>
           )}
         </div>
+        {canSpeak && !editing && text.trim() !== '' && (
+          <div className="identity-play">
+            <button className="btn btn-block" onClick={speaking ? stop : play}>
+              {speaking ? (
+                <IconStop style={{ width: 15, height: 15 }} />
+              ) : (
+                <IconPlay style={{ width: 15, height: 15 }} />
+              )}
+              {speaking ? 'Stop' : 'Listen'}
+            </button>
+          </div>
+        )}
         {readable && !editing && (
           <button
             className="row"

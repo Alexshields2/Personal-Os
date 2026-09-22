@@ -180,3 +180,17 @@ export const IconCalendar = (p: P) => (
     <path d="M3.2 9.6h17.6M8.2 3.2v3.6M15.8 3.2v3.6" />
   </svg>
 )
+
+/** Filled triangle: a play button reads as a play button or not at all. */
+export const IconPlay = (p: P) => (
+  <svg {...base} {...p} fill="currentColor" stroke="none">
+    <path d="M8 5.6v12.8a.8.8 0 0 0 1.22.68l10.2-6.4a.8.8 0 0 0 0-1.36L9.22 4.92A.8.8 0 0 0 8 5.6z" />
+  </svg>
+)
+
+export const IconStop = (p: P) => (
+  <svg {...base} {...p} fill="currentColor" stroke="none">
+    <rect x="6.5" y="6.5" width="11" height="11" rx="1.6" />
+  </svg>
+)
+

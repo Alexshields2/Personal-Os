@@ -219,6 +219,8 @@ export interface Identity {
   text: string
   /** A downscaled data URI, or empty. The whole state syncs as one document. */
   image: string
+  /** Which installed voice reads it. Empty means pick the best one on the device. */
+  voice: string
 }
 
 /** An exercise in the gym list, and how many sets it gets. */

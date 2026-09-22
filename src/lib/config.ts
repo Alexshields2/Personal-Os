@@ -112,6 +112,7 @@ export const DEFAULT_IDENTITY: Identity = {
   title: 'Alex 4.0',
   text: '',
   image: '',
+  voice: '',
 }
 
 /** The gym list a fresh install starts with. Edited on Today. */

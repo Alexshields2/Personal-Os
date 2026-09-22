@@ -2945,3 +2945,13 @@ button.edge:hover {
   background: var(--fill-strong);
 }
 
+/* The play control sits inside the card, under the words it reads. */
+.identity-play {
+  padding: 0 16px 14px;
+}
+
+.identity-voice {
+  display: grid;
+  gap: 6px;
+}
+

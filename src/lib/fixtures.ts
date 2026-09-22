@@ -220,7 +220,7 @@ export function makeState(over: Partial<AppState> = {}): AppState {
     outreach: [],
     marketing: { startDate: '2026-09-09', days: {} },
     workout: [],
-    identity: { title: 'Alex 4.0', text: '', image: '' },
+    identity: { title: 'Alex 4.0', text: '', image: '', voice: '' },
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
     ...over,
   }
