@@ -5,7 +5,6 @@ import {
   CADENCE_PER_MONTH,
   READ_CHECK,
   DEAL_STAGES,
-  GOAL_HORIZONS,
   METRIC_BY_KEY,
   METRICS,
   OPEN_STAGES,
@@ -43,7 +42,6 @@ import type {
   DomainLink,
   DomainNode,
   Goal,
-  GoalHorizon,
   GymSet,
   Invoice,
   KeyResult,
@@ -1631,11 +1629,45 @@ export function goalProgress(state: AppState, goal: Goal, iso = todayISO()): Goa
   }
 }
 
+export type GoalBandKey = 'overdue' | 'month' | 'quarter' | 'year' | 'later' | 'undated' | 'done'
+
+export interface GoalBand {
+  key: GoalBandKey
+  label: string
+  goals: GoalProgress[]
+}
+
 export interface GoalBoard {
-  byHorizon: { horizon: GoalHorizon; label: string; goals: GoalProgress[] }[]
+  bands: GoalBand[]
   atRisk: GoalProgress[]
   done: number
   total: number
+}
+
+const GOAL_BANDS: { key: GoalBandKey; label: string }[] = [
+  { key: 'overdue', label: 'Past its date' },
+  { key: 'month', label: 'Within a month' },
+  { key: 'quarter', label: 'Within three months' },
+  { key: 'year', label: 'Within a year' },
+  { key: 'later', label: 'Further out' },
+  { key: 'undated', label: 'No date yet' },
+  { key: 'done', label: 'Done' },
+]
+
+/**
+ * Which band a goal falls in, worked out from its date rather than a bucket
+ * anyone had to choose. "Ten years" was a label; a date is a fact, and it
+ * moves the goal up the page on its own as it gets closer.
+ */
+export function goalBand(goal: Goal, iso = todayISO()): GoalBandKey {
+  if (goal.done) return 'done'
+  if (!goal.due) return 'undated'
+  const days = daysBetween(iso, goal.due)
+  if (days < 0) return 'overdue'
+  if (days <= 31) return 'month'
+  if (days <= 92) return 'quarter'
+  if (days <= 366) return 'year'
+  return 'later'
 }
 
 /**
@@ -1655,11 +1687,15 @@ export function goalBoard(state: AppState, iso = todayISO()): GoalBoard {
     return p.pct < 50 && p.daysLeft <= 30
   })
 
+  // Soonest first inside each band; an undated goal sorts by its own words.
+  const order = (a: GoalProgress, b: GoalProgress) =>
+    (a.goal.due || '9999').localeCompare(b.goal.due || '9999') ||
+    a.goal.title.localeCompare(b.goal.title)
+
   return {
-    byHorizon: GOAL_HORIZONS.map((h) => ({
-      horizon: h.id,
-      label: h.label,
-      goals: all.filter((p) => p.goal.horizon === h.id),
+    bands: GOAL_BANDS.map((band) => ({
+      ...band,
+      goals: all.filter((p) => goalBand(p.goal, iso) === band.key).sort(order),
     })),
     atRisk,
     done: state.goals.filter((g) => g.done).length,
@@ -1762,7 +1798,7 @@ export function search(state: AppState, query: string, limit = 12): SearchResult
     push(`deal-${d.id}`, 'deal', d.name, `${d.stage} · ${d.entity}`, 'work', d.nextStep)
 
   for (const g of state.goals)
-    push(`goal-${g.id}`, 'goal', g.title, g.horizon, 'goals', g.note)
+    push(`goal-${g.id}`, 'goal', g.title, g.due ? `by ${g.due}` : 'no date', 'goals', g.note)
 
   // Priorities are searched across every day, deduped by text — the same
   // intention written on twelve days is one result, not twelve.

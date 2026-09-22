@@ -2,7 +2,7 @@ import type { MarketingDay } from './marketing'
 
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 21
+export const STATE_VERSION = 22
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -390,8 +390,6 @@ export interface LearnItem {
 }
 
 /** How far out a goal sits. The ladder is what stops a ten-year goal being a wish. */
-export type GoalHorizon = 'life' | 'tenYear' | 'threeYear' | 'year' | 'quarter'
-
 /**
  * How a key result knows where it stands. `manual` is a number you type;
  * everything else is pulled from data the app already holds, so it can't drift
@@ -415,13 +413,18 @@ export interface Goal {
   id: string
   /** Links a shorter goal up to the longer one it serves. Empty at the top. */
   parentId: string
-  horizon: GoalHorizon
   /** Optional tie into the life map, so a goal sits on a branch. */
   domainId: string
   title: string
   note: string
-  /** Optional ISO deadline. */
+  /**
+   * The date it is meant to be true by. This is the whole timeframe — there
+   * are no ten-year or three-year buckets to file it under, because "2034"
+   * says more than "ten years" ever did. Empty means no date set yet.
+   */
   due: string
+  /** A downscaled data URI of what it looks like, or empty. */
+  image: string
   done: boolean
   keyResults: KeyResult[]
 }

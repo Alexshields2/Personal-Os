@@ -151,11 +151,20 @@ function Accounts() {
         <div className="hero" style={{ margin: '8px 0 4px' }}>
           {euroCompact(consultingBank)}
         </div>
-        <div className="t-foot" style={{ marginBottom: 12 }}>
-          {euro(consultingBank)} of {euroCompact(state.targets.bonusPool)} target ·{' '}
-          {pct(consultingBank, state.targets.bonusPool).toFixed(1)}%
-        </div>
-        <Meter pct={pct(consultingBank, state.targets.bonusPool)} color="var(--series-consulting)" />
+        {state.targets.bonusPool > 0 ? (
+          <>
+            <div className="t-foot" style={{ marginBottom: 12 }}>
+              {euro(consultingBank)} of {euroCompact(state.targets.bonusPool)} target ·{' '}
+              {pct(consultingBank, state.targets.bonusPool).toFixed(1)}%
+            </div>
+            <Meter
+              pct={pct(consultingBank, state.targets.bonusPool)}
+              color="var(--series-consulting)"
+            />
+          </>
+        ) : (
+          <div className="t-foot muted">{euro(consultingBank)} · no target set</div>
+        )}
       </Card>
 
       <SectionTitle title={`${ytdAll.year} so far`} />
@@ -285,12 +294,16 @@ function Accounts() {
         </div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 10 }}>
           <span className="t-title">{euro(state.payoutReceived)}</span>
-          <span className="t-foot muted">of {euroCompact(state.targets.personalPayout)}</span>
+          {state.targets.personalPayout > 0 && (
+            <span className="t-foot muted">of {euroCompact(state.targets.personalPayout)}</span>
+          )}
         </div>
-        <Meter
-          pct={pct(state.payoutReceived, state.targets.personalPayout)}
-          color="var(--series-personal)"
-        />
+        {state.targets.personalPayout > 0 && (
+          <Meter
+            pct={pct(state.payoutReceived, state.targets.personalPayout)}
+            color="var(--series-personal)"
+          />
+        )}
         <div style={{ marginTop: 14 }}>
           <NumberField
             label="Payout received to date (€)"
@@ -346,7 +359,7 @@ function Accounts() {
           </div>
         ))}
         <AddReward />
-        {!unlocked && (
+        {!unlocked && state.targets.personalPayout > 0 && (
           <p className="t-foot muted" style={{ padding: '2px 4px' }}>
             {euro(state.targets.personalPayout - state.payoutReceived)} still to land. Nothing on
             this list gets bought until it does — change the target above if that's not right.

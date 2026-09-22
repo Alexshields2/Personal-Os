@@ -157,12 +157,12 @@ export function goal(id: string, over: Partial<Goal> = {}): Goal {
   return {
     id,
     parentId: '',
-    horizon: 'year',
     domainId: '',
     title: `goal ${id}`,
     note: '',
     due: '',
     done: false,
+    image: '',
     keyResults: [],
     ...over,
   }

@@ -320,6 +320,23 @@ export function hydrate(raw: string): AppState {
       ),
     }
   }
+  // The shipped goals were someone else's ambitions — a €10M bank, a €1M
+  // payout, 95kg — and the money targets existed only to chart them. Both
+  // go. Anything written since is left exactly as it is, and a target that
+  // was edited by hand is taken as meant.
+  if ((parsed.version ?? 1) < 22) {
+    const SHIPPED_GOALS = new Set(['g1', 'g2', 'g3'])
+    const targets = { ...DEFAULT_TARGETS, ...(parsed.targets ?? {}) }
+    if (targets.bonusPool === 10_000_000) targets.bonusPool = 0
+    if (targets.personalPayout === 1_000_000) targets.personalPayout = 0
+    if (targets.netWorth === 5_000_000) targets.netWorth = 0
+    if (targets.bodyweightKg === 95) targets.bodyweightKg = 0
+    parsed = {
+      ...parsed,
+      goals: (parsed.goals ?? []).filter((g) => !SHIPPED_GOALS.has(g.id)),
+      targets,
+    }
+  }
   // Everything logged before the one-page day is noise from older versions
   // and sample data, and it was asked for gone. Days only — weeks, tasks,
   // money and the gym list are untouched.
@@ -388,12 +405,15 @@ export function hydrate(raw: string): AppState {
     // v1 goals were a flat list with no ladder, no branch and no key results.
     goals: (parsed.goals ?? base.goals).map((g) => {
       const legacy = g as Partial<Goal>
+      // The horizon buckets are gone; whatever one a goal used to carry is
+      // dropped rather than kept as a field nothing reads.
+      const { horizon: _horizon, ...rest } = legacy as Partial<Goal> & { horizon?: unknown }
       return {
         parentId: '',
-        horizon: 'year' as const,
         domainId: '',
         keyResults: [],
-        ...legacy,
+        image: '',
+        ...rest,
       } as Goal
     }),
     connections: (parsed.connections ?? base.connections).map((c) => {

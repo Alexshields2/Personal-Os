@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   Card,
   CardHead,
@@ -16,16 +16,17 @@ import {
 import { IconChevron, IconPlus, IconTrash, IconWarn } from '../components/icons'
 import {
   ACCOUNT_LABEL,
-  GOAL_HORIZONS,
-  HORIZON_LABEL,
   KIND_LABEL,
   METRICS,
+  VISION_IMAGE_MAX_PX,
+  VISION_IMAGE_QUALITY,
 } from '../lib/config'
 import { addDays, formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, num, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
 import { goalBoard, goalContribution, goalProgress, upkeepStatus } from '../lib/selectors'
-import type { Goal, GoalHorizon, KeyResult, KeyResultSource } from '../lib/types'
+import { downscaleImage } from '../lib/image'
+import type { Goal, KeyResult, KeyResultSource } from '../lib/types'
 
 type View = 'goals' | 'upkeep'
 
@@ -51,8 +52,8 @@ export default function Goals() {
         </div>
         <h1 className="t-large">Goals</h1>
         <p className="t-sub">
-          What you're aiming at, from a lifetime down to this quarter — and the upkeep that
-          keeps slipping while you aim.
+          What you're aiming at, each with the date it's meant to be true by — and the upkeep
+          that keeps slipping while you aim.
         </p>
       </header>
 
@@ -175,8 +176,7 @@ function Ladder() {
                   {p.daysLeft !== null && p.daysLeft < 0
                     ? `${-p.daysLeft} days past its date`
                     : `${p.daysLeft} days left`}
-                  {' · '}
-                  {HORIZON_LABEL[p.goal.horizon]}
+                  {p.goal.due && ` · by ${formatShort(p.goal.due)}`}
                 </div>
               </div>
             ))}
@@ -193,10 +193,10 @@ function Ladder() {
         }
       />
 
-      {board.byHorizon.map(
+      {board.bands.map(
         (band) =>
           band.goals.length > 0 && (
-            <div key={band.horizon} style={{ marginBottom: 12 }}>
+            <div key={band.key} style={{ marginBottom: 12 }}>
               <Card>
                 <CardHead
                   title={band.label}
@@ -207,8 +207,16 @@ function Ladder() {
                     const parent = state.goals.find((g) => g.id === p.goal.parentId)
                     const domain = state.domains.find((d) => d.id === p.goal.domainId)
                     return (
-                      <button className="row" key={p.goal.id} onClick={() => setOpen(p.goal.id)}>
+                      <div className="row" key={p.goal.id}>
+                        <button
+                          className="goal-open"
+                          onClick={() => setOpen(p.goal.id)}
+                          aria-label={`Open ${p.goal.title}`}
+                        >
                         <Check on={p.goal.done} />
+                        {p.goal.image !== '' && (
+                          <img className="goal-thumb" src={p.goal.image} alt="" />
+                        )}
                         <span className="row-main">
                           <span
                             className="row-title"
@@ -217,18 +225,38 @@ function Ladder() {
                             {p.goal.title}
                           </span>
                           <span className="row-sub">
-                            {domain ? `${domain.label}` : 'unmapped'}
+                            {p.goal.due ? `By ${formatShort(p.goal.due)}` : 'No date yet'}
+                            {domain && ` · ${domain.label}`}
                             {parent && ` · serves “${parent.title}”`}
                             {p.goal.keyResults.length > 0 &&
                               ` · ${p.goal.keyResults.length} key result${p.goal.keyResults.length === 1 ? '' : 's'}`}
-                            {p.goal.due && ` · ${formatShort(p.goal.due)}`}
                           </span>
                         </span>
                         <span style={{ width: 58 }}>
                           <Meter pct={p.pct} />
                         </span>
                         <IconChevron style={{ width: 16, height: 16, opacity: 0.5 }} />
-                      </button>
+                        </button>
+                        <button
+                          className="btn btn-quiet btn-danger"
+                          aria-label={`Delete ${p.goal.title}`}
+                          onClick={() => {
+                            if (!confirm(`Delete “${p.goal.title}”?`)) return
+                            // Anything that served it is promoted, not orphaned.
+                            actions.setGoals(
+                              state.goals
+                                .filter((g) => g.id !== p.goal.id)
+                                .map((g) =>
+                                  g.parentId === p.goal.id
+                                    ? { ...g, parentId: p.goal.parentId }
+                                    : g,
+                                ),
+                            )
+                          }}
+                        >
+                          <IconTrash style={{ width: 15, height: 15 }} />
+                        </button>
+                      </div>
                     )
                   })}
                 </div>
@@ -244,8 +272,8 @@ function Ladder() {
       )}
 
       <p className="t-foot muted" style={{ padding: '4px 4px 0' }}>
-        A goal at the top of the ladder that nothing below it serves is a wish. Link each one
-        to the longer goal it feeds.
+        Every goal carries the date it is meant to be true by, and sorts itself by how close
+        that is. A goal with no date is a wish with better grammar.
       </p>
 
       {adding && <GoalSheet onClose={() => setAdding(false)} />}
@@ -257,7 +285,6 @@ function Ladder() {
 function GoalSheet({ onClose }: { onClose: () => void }) {
   const state = useStore()
   const [title, setTitle] = useState('')
-  const [horizon, setHorizon] = useState<GoalHorizon>('year')
   const [parentId, setParentId] = useState('')
   const [domainId, setDomainId] = useState('')
   const [due, setDue] = useState('')
@@ -269,12 +296,12 @@ function GoalSheet({ onClose }: { onClose: () => void }) {
       {
         id: uid(),
         parentId,
-        horizon,
         domainId,
         title: title.trim(),
         note: '',
         due,
         done: false,
+        image: '',
         keyResults: [],
       },
     ])
@@ -290,19 +317,6 @@ function GoalSheet({ onClose }: { onClose: () => void }) {
           onChange={setTitle}
           placeholder="Stated so you'd know if you hit it"
         />
-        <Field label="Horizon">
-          <select
-            className="input"
-            value={horizon}
-            onChange={(e) => setHorizon(e.target.value as GoalHorizon)}
-          >
-            {GOAL_HORIZONS.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.label}
-              </option>
-            ))}
-          </select>
-        </Field>
         <Field label="Serves which longer goal">
           <select className="input" value={parentId} onChange={(e) => setParentId(e.target.value)}>
             <option value="">Nothing — it's a top-level goal</option>
@@ -360,7 +374,7 @@ function GoalDetail({ id, onClose }: { id: string; onClose: () => void }) {
               {Math.round(p.pct)}%
             </span>
             <span className="t-foot muted">
-              {HORIZON_LABEL[goal.horizon]}
+              {goal.due ? `By ${formatShort(goal.due)}` : 'No date yet'}
               {p.daysLeft !== null &&
                 (p.daysLeft < 0 ? ` · ${-p.daysLeft} days over` : ` · ${p.daysLeft} days left`)}
             </span>
@@ -374,6 +388,8 @@ function GoalDetail({ id, onClose }: { id: string; onClose: () => void }) {
             </p>
           )}
         </Card>
+
+        <GoalPhoto goal={goal} patch={patch} />
 
         <div>
           <SectionTitle
@@ -445,20 +461,6 @@ function GoalDetail({ id, onClose }: { id: string; onClose: () => void }) {
           onChange={(note) => patch({ note })}
           multiline
         />
-
-        <Field label="Horizon">
-          <select
-            className="input"
-            value={goal.horizon}
-            onChange={(e) => patch({ horizon: e.target.value as GoalHorizon })}
-          >
-            {GOAL_HORIZONS.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.label}
-              </option>
-            ))}
-          </select>
-        </Field>
 
         <Field label="Serves which longer goal">
           <select
@@ -533,6 +535,74 @@ function GoalDetail({ id, onClose }: { id: string; onClose: () => void }) {
         />
       )}
     </Sheet>
+  )
+}
+
+/**
+ * What it looks like when it's true. A goal written down is a sentence; a
+ * goal with a picture is a place you have already been in your head.
+ *
+ * Downscaled before it is stored, like every other picture here — the whole
+ * app is one document that syncs as a blob.
+ */
+function GoalPhoto({ goal, patch }: { goal: Goal; patch: (next: Partial<Goal>) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [note, setNote] = useState('')
+
+  const attach = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      patch({ image: await downscaleImage(file, VISION_IMAGE_MAX_PX, VISION_IMAGE_QUALITY) })
+      setNote('')
+    } catch {
+      setNote("That file couldn't be read as an image.")
+    }
+  }
+
+  return (
+    <div>
+      <SectionTitle
+        title="Picture"
+        action={
+          <span style={{ display: 'flex', gap: 2 }}>
+            <button className="btn btn-quiet btn-sm" onClick={() => fileRef.current?.click()}>
+              {goal.image ? 'Change' : 'Add'}
+            </button>
+            {goal.image !== '' && (
+              <button
+                className="btn btn-quiet btn-danger btn-sm"
+                onClick={() => patch({ image: '' })}
+              >
+                Remove
+              </button>
+            )}
+          </span>
+        }
+      />
+      <Card className={goal.image ? 'goal-photo' : 'card-pad'}>
+        {goal.image !== '' ? (
+          <img src={goal.image} alt="" />
+        ) : (
+          <Empty>No picture yet. Add what it looks like when it's true.</Empty>
+        )}
+      </Card>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        hidden
+        aria-label="Goal photo"
+        onChange={(e) => {
+          void attach(e.target.files?.[0])
+          e.target.value = ''
+        }}
+      />
+      {note !== '' && (
+        <p className="t-foot" style={{ color: 'var(--warning)', paddingTop: 8 }} role="status">
+          {note}
+        </p>
+      )}
+    </div>
   )
 }
 

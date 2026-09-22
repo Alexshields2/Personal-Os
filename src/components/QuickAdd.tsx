@@ -75,12 +75,12 @@ function QuickAddSheet({
         {
           id: uid(),
           parentId: '',
-          horizon: 'quarter',
           domainId: '',
           title: value,
           note: '',
           due: '',
           done: false,
+          image: '',
           keyResults: [],
         },
       ])
