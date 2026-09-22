@@ -12,6 +12,7 @@ import type {
   GoalHorizon,
   DomainLink,
   DomainNode,
+  Exercise,
   LearnItem,
   Loop,
   MetricKey,
@@ -92,9 +93,28 @@ export const DEFAULT_CHECKLIST: ChecklistItem[] = [
 ]
 
 /**
- * The morning SOP, in the order it actually runs. Unscored — it sets the day
- * up rather than grading it. Editable like everything else; this is only what
- * a fresh install starts from.
+ * The daily habits. Ids are the old SOP's, so ticks logged before the day was
+ * cut down still count. Edited on Today; this is what a fresh install has.
+ */
+export const HABITS: { id: string; label: string }[] = [
+  { id: 'm_cold', label: 'Cold shower' },
+  { id: 'm_journal', label: 'Morning journal' },
+  { id: 'm_read', label: 'Read 10 pages' },
+]
+
+/** The gym list a fresh install starts with. Edited on Today. */
+export const DEFAULT_WORKOUT: Exercise[] = [
+  { id: 'ex_incline', name: 'Incline bench', sets: 3 },
+  { id: 'ex_pullup', name: 'Pull-ups', sets: 3 },
+  { id: 'ex_curl', name: 'Biceps curls', sets: 3 },
+  { id: 'ex_tri_ext', name: 'Triceps extension', sets: 3 },
+  { id: 'ex_tri_oh', name: 'Triceps overhead', sets: 3 },
+  { id: 'ex_squat', name: 'Squats', sets: 3 },
+]
+
+/**
+ * The old morning SOP, kept only so migrations can recognise its ids. The day
+ * now carries habits instead (above).
  *
  * The rule it exists to enforce: win the morning before the rest of the world
  * gets access to you.
@@ -834,14 +854,13 @@ export const DEFAULT_TRACKERS: Tracker[] = [
  * them as results without importing the shell.
  */
 export const SECTIONS: { id: string; label: string; blurb: string }[] = [
-  { id: 'today', label: 'Today', blurb: 'Plan, log and review the day' },
+  { id: 'today', label: 'Today', blurb: 'Sleep, to-do, habits, gym, food, money' },
   { id: 'work', label: 'Work', blurb: 'Tasks, projects, clients, pipeline' },
   { id: 'money', label: 'Money', blurb: 'Balances, net worth, the ledger' },
-  { id: 'marketing', label: 'Marketing', blurb: '100 days of execution, scored' },
   { id: 'calendar', label: 'Calendar', blurb: "Events, and what's coming" },
   { id: 'goals', label: 'Goals', blurb: 'The ladder, and upkeep' },
   { id: 'review', label: 'Review', blurb: 'The Sunday page' },
-  { id: 'settings', label: 'Settings', blurb: 'Targets, standards, morning, sync' },
+  { id: 'settings', label: 'Settings', blurb: 'Targets, appearance, backup, sync' },
 ]
 
 export const MONTH_LABEL = [

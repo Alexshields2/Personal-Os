@@ -434,31 +434,6 @@ button {
   background: var(--fill-soft);
 }
 
-/* A caption between rows naming the group below it: the pillar in the
-   non-negotiables, the clock time in the morning SOP. It belongs to the rows
-   under it, so the rule sits above it and not between it and them. */
-.row-group {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 17px 4px;
-}
-
-.rows > .row-group + * {
-  border-top: none;
-}
-
-/* The SOP block time reads as a heading but stays a real time field, so the
-   native picker opens on tap. */
-.sop-time {
-  width: 116px;
-  padding: 4px 0;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-secondary);
-}
-
 .row-main {
   flex: 1;
   min-width: 0;
@@ -2820,3 +2795,92 @@ button.edge:hover {
   background: var(--fill-soft-hover);
   color: var(--text-primary);
 }
+
+/* ------------------------------------------------------------------ today */
+
+/* Hours slept, worked out from the two times. Green only when it clears the
+   target — the one colour in the app means "you hit it" and nothing else. */
+.sleep-total {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  flex: none;
+}
+
+.sleep-total[data-hit='true'] {
+  color: var(--won);
+}
+
+/* The gym log reads like a paper log sheet: one block per exercise, sets
+   across, kg and reps down. */
+.gym-ex {
+  padding: 13px 17px 15px;
+}
+
+.gym-ex + .gym-ex {
+  border-top: 1px solid var(--hairline);
+}
+
+.gym-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.gym-grid {
+  display: grid;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.gym-col {
+  text-align: center;
+}
+
+.gym-label {
+  text-align: right;
+  padding-right: 2px;
+}
+
+.gym-cell {
+  min-width: 0;
+  padding: 8px 4px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Add-a-line forms: the description takes the whole line, the numbers and
+   the button share the one under it. */
+.food-add,
+.money-add {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+}
+
+.food-add {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.money-add {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+}
+
+.food-what,
+.money-what,
+.money-for,
+.money-note,
+.money-log {
+  grid-column: 1 / -1;
+}
+
+.money-for {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+

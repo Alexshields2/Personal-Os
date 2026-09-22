@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import type { ComponentType, ReactElement, SVGProps } from 'react'
 import Today from './screens/Today'
 import Money from './screens/Money'
-import Marketing from './screens/Marketing'
 import Review from './screens/Review'
 import Goals from './screens/Goals'
 import Work from './screens/Work'
@@ -13,7 +12,6 @@ import {
   IconCalendar,
   IconLife,
   IconMoney,
-  IconProgress,
   IconReview,
   IconSettings,
   IconToday,
@@ -31,7 +29,6 @@ type TabId =
   | 'work'
   | 'calendar'
   | 'money'
-  | 'marketing'
   | 'goals'
   | 'review'
   | 'settings'
@@ -55,7 +52,6 @@ const TABS: {
   { id: 'today', label: 'Today', group: 'Daily', primary: true, Icon: IconToday },
   { id: 'work', label: 'Work', group: 'Daily', primary: true, Icon: IconWork },
   { id: 'money', label: 'Money', group: 'Daily', primary: true, Icon: IconMoney },
-  { id: 'marketing', label: 'Marketing', group: 'Daily', primary: true, Icon: IconProgress },
 
   { id: 'calendar', label: 'Calendar', group: 'More', Icon: IconCalendar },
   { id: 'goals', label: 'Goals', group: 'More', Icon: IconLife },
@@ -85,7 +81,6 @@ const SCREENS: Record<TabId, (props: ScreenProps) => ReactElement> = {
   work: Work,
   calendar: Calendar,
   money: Money,
-  marketing: Marketing,
   goals: Goals,
   review: Review,
   settings: Settings,

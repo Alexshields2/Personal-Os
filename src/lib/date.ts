@@ -121,3 +121,22 @@ export function timeToMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number)
   return (h || 0) * 60 + (m || 0)
 }
+
+/**
+ * Minutes slept between falling asleep and waking. Wraps midnight — asleep at
+ * 23:30 and up at 06:00 is six and a half hours, not minus seventeen. Null
+ * until both times are in.
+ */
+export function sleepMinutes(bedtime: string, wake: string): number | null {
+  if (!bedtime || !wake) return null
+  let mins = timeToMinutes(wake) - timeToMinutes(bedtime)
+  if (mins <= 0) mins += 24 * 60
+  return mins
+}
+
+/** 450 -> "7h 30m", 420 -> "7h". */
+export function hoursMinutes(mins: number): string {
+  const h = Math.floor(mins / 60)
+  const m = Math.round(mins % 60)
+  return m ? `${h}h ${m}m` : `${h}h`
+}

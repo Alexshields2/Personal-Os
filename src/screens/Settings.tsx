@@ -1,23 +1,17 @@
 import { useRef, useState } from 'react'
-import { Card, Empty, Field, GrowText, NumberField, SectionTitle, Segmented } from '../components/ui'
+import { Card, Empty, Field, NumberField, SectionTitle, Segmented } from '../components/ui'
 import { IconPlus, IconTrash } from '../components/icons'
 import SyncCard from '../components/SyncCard'
 import { useSync } from '../lib/sync'
-import { METRICS, PILLARS } from '../lib/config'
+import { METRICS } from '../lib/config'
 import { uid } from '../lib/format'
 import { formatWithYear, isoForDay } from '../lib/date'
 import { euroCompact } from '../lib/format'
-import { actions, byTime, exportJSON, useStore } from '../lib/store'
-import type {
-  AppState,
-  ChecklistItem,
-  MetricKey,
-  PillarId,
-  Targets,
-  Theme,
-  Tracker,
-  TrackerKind,
-} from '../lib/types'
+import { actions, exportJSON, useStore } from '../lib/store'
+import type { AppState, Targets, Theme } from '../lib/types'
+
+/** The targets Today reads: sleep, water, food, and hours in the office. */
+const TODAY_TARGETS = new Set(['sleepHours', 'waterL', 'calories', 'protein', 'consultingHours'])
 
 export default function Settings() {
   const state = useStore()
@@ -25,7 +19,6 @@ export default function Settings() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [note, setNote] = useState('')
 
-  const scoredMetrics = new Set(state.checklist.map((c) => c.metric).filter(Boolean))
 
   const flash = (m: string) => {
     setNote(m)
@@ -128,12 +121,11 @@ export default function Settings() {
         </div>
       </Card>
 
-      {/* Only the numbers a standard is actually scored against. A target for
-          something nothing measures is a setting that does nothing. */}
+      {/* Only the numbers Today actually shows a target for. */}
       <SectionTitle title="Daily targets" />
       <Card>
         <div className="rows">
-          {METRICS.filter((m) => scoredMetrics.has(m.key)).map((m) => (
+          {METRICS.filter((m) => TODAY_TARGETS.has(m.key)).map((m) => (
             <div className="row" key={m.key}>
               <span className="row-main">
                 <span className="row-title">{m.label}</span>
@@ -156,8 +148,6 @@ export default function Settings() {
           ))}
         </div>
       </Card>
-
-      <ChecklistEditor />
 
       <SectionTitle title="Capacity" />
       <Card className="card-pad">
@@ -189,10 +179,6 @@ export default function Settings() {
           the hours this actually gets used in.
         </p>
       </Card>
-
-      <MorningEditor />
-
-      <TrackerEditor />
 
       <RewardEditor />
 
@@ -254,334 +240,6 @@ export default function Settings() {
         126 days. Head down. Same inputs. Every day.
       </p>
     </div>
-  )
-}
-
-// ------------------------------------------------------------ checklist editor
-
-const PILLAR_OPTIONS = PILLARS.map((p) => p.id)
-
-/**
- * The standards the day is actually scored against — "10 hours in office",
- * "Sleep target", all of it. Used to be a fixed list; now it's data, so a
- * standard that doesn't fit your life can be reworded, reweighted or deleted
- * instead of silently ignored forever.
- */
-function ChecklistEditor() {
-  const state = useStore()
-  const [label, setLabel] = useState('')
-  const [pillar, setPillar] = useState<PillarId>('business')
-
-  const update = (id: string, patch: Partial<ChecklistItem>) => {
-    actions.setChecklist(state.checklist.map((c) => (c.id === id ? { ...c, ...patch } : c)))
-  }
-
-  const add = () => {
-    if (!label.trim()) return
-    const item: ChecklistItem = { id: uid(), label: label.trim(), pillar, points: 1 }
-    actions.setChecklist([...state.checklist, item])
-    setLabel('')
-  }
-
-  const totalByPillar = (p: PillarId) =>
-    state.checklist.filter((c) => c.pillar === p).reduce((s, c) => s + c.points, 0)
-  const total = state.checklist.reduce((s, c) => s + c.points, 0)
-
-  return (
-    <>
-      <SectionTitle
-        title="Standards"
-        action={<span className="t-foot muted">{total} points</span>}
-      />
-      <Card>
-        {state.checklist.length === 0 ? (
-          <Empty>Nothing set. What actually earns points on a good day?</Empty>
-        ) : (
-          <div className="rows">
-            {state.checklist.map((c) => (
-              <div key={c.id} className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-                <input
-                  className="input input-plain"
-                  style={{ flex: '1 1 160px' }}
-                  value={c.label}
-                  onChange={(e) => update(c.id, { label: e.target.value })}
-                />
-                <select
-                  className="input"
-                  style={{ width: 120, flex: 'none' }}
-                  value={c.pillar}
-                  onChange={(e) => update(c.id, { pillar: e.target.value as PillarId })}
-                >
-                  {PILLAR_OPTIONS.map((p) => (
-                    <option key={p} value={p}>
-                      {PILLARS.find((x) => x.id === p)?.label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  className="input"
-                  type="number"
-                  style={{ width: 64, flex: 'none' }}
-                  value={c.points}
-                  onChange={(e) => update(c.id, { points: Math.max(0, Number(e.target.value) || 0) })}
-                />
-                <select
-                  className="input"
-                  style={{ width: 150, flex: 'none' }}
-                  value={c.metric ?? ''}
-                  onChange={(e) =>
-                    update(c.id, { metric: (e.target.value || undefined) as MetricKey | undefined })
-                  }
-                >
-                  <option value="">Manual check</option>
-                  {METRICS.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      Tied to: {m.label}
-                    </option>
-                  ))}
-                </select>
-                {c.metric && (
-                  <label
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
-                    className="dim"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(c.invert)}
-                      onChange={(e) => update(c.id, { invert: e.target.checked })}
-                    />
-                    Ceiling, not floor
-                  </label>
-                )}
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => {
-                    if (confirm(`Delete "${c.label}"? Days already logged against it lose that credit.`))
-                      actions.setChecklist(state.checklist.filter((x) => x.id !== c.id))
-                  }}
-                  aria-label="Delete standard"
-                >
-                  <IconTrash style={{ width: 16, height: 16 }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div
-          style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 13, borderTop: '1px solid var(--hairline)' }}
-        >
-          <input
-            className="input"
-            style={{ flex: '1 1 160px' }}
-            placeholder="Add a standard"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-          />
-          <select
-            className="input"
-            style={{ width: 120, flex: 'none' }}
-            value={pillar}
-            onChange={(e) => setPillar(e.target.value as PillarId)}
-          >
-            {PILLAR_OPTIONS.map((p) => (
-              <option key={p} value={p}>
-                {PILLARS.find((x) => x.id === p)?.label}
-              </option>
-            ))}
-          </select>
-          <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add standard">
-            <IconPlus style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
-      </Card>
-      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
-        {PILLARS.map((p) => `${p.label} ${totalByPillar(p.id)}`).join(' · ')} — the score is
-        normalised to 100 regardless of what this adds up to, so reweighting never breaks it.
-        "Tied to" links a standard to a number you log elsewhere (like sleep hours) instead of a
-        manual tick.
-      </p>
-    </>
-  )
-}
-
-// -------------------------------------------------------------- tracker editor
-
-const TRACKER_KIND_LABEL: Record<TrackerKind, string> = {
-  check: 'Check',
-  number: 'Number',
-  rating: 'Rating /10',
-  time: 'Time',
-  text: 'Text',
-}
-
-/**
- * Everything watched on the daily tracker sheet — wake time, diet, cash
- * collected, whatever — lives here as data, not code, so a field that
- * doesn't earn its place (like the old "cash in bank" one) can just be
- * deleted instead of asked for a code change.
- */
-function TrackerEditor() {
-  const state = useStore()
-  const [label, setLabel] = useState('')
-  const [kind, setKind] = useState<TrackerKind>('check')
-
-  const update = (id: string, patch: Partial<Tracker>) => {
-    actions.setTrackers(state.trackers.map((t) => (t.id === id ? { ...t, ...patch } : t)))
-  }
-
-  const add = () => {
-    if (!label.trim()) return
-    const t: Tracker = {
-      id: uid(),
-      label: label.trim(),
-      kind,
-      unit: kind === 'number' ? '' : '',
-      target: kind === 'rating' ? 7 : kind === 'time' ? 0 : 1,
-      direction: 'atLeast',
-      group: '',
-      archived: false,
-    }
-    actions.setTrackers([...state.trackers, t])
-    setLabel('')
-    setKind('check')
-  }
-
-  const active = state.trackers.filter((t) => !t.archived)
-
-  return (
-    <>
-      <SectionTitle
-        title="Trackers"
-        action={<span className="t-foot muted">{active.length} active</span>}
-      />
-      <Card>
-        {state.trackers.length === 0 ? (
-          <Empty>Nothing tracked. Add whatever you actually watch day to day.</Empty>
-        ) : (
-          <div className="rows">
-            {state.trackers.map((t) => (
-              <div
-                key={t.id}
-                className="row"
-                style={{ flexWrap: 'wrap', gap: 8, opacity: t.archived ? 0.5 : 1 }}
-              >
-                <input
-                  className="input input-plain"
-                  style={{ flex: '1 1 140px' }}
-                  value={t.label}
-                  onChange={(e) => update(t.id, { label: e.target.value })}
-                />
-                <input
-                  className="input"
-                  style={{ width: 100, flex: 'none' }}
-                  placeholder="Group"
-                  value={t.group}
-                  onChange={(e) => update(t.id, { group: e.target.value })}
-                />
-                <select
-                  className="input"
-                  style={{ width: 110, flex: 'none' }}
-                  value={t.kind}
-                  onChange={(e) => update(t.id, { kind: e.target.value as TrackerKind })}
-                >
-                  {(Object.keys(TRACKER_KIND_LABEL) as TrackerKind[]).map((k) => (
-                    <option key={k} value={k}>
-                      {TRACKER_KIND_LABEL[k]}
-                    </option>
-                  ))}
-                </select>
-                {(t.kind === 'number' || t.kind === 'rating' || t.kind === 'time') && (
-                  <input
-                    className="input"
-                    type="number"
-                    style={{ width: 76, flex: 'none' }}
-                    placeholder="Target"
-                    value={t.target}
-                    onChange={(e) => update(t.id, { target: Number(e.target.value) || 0 })}
-                  />
-                )}
-                {t.kind === 'number' && (
-                  <input
-                    className="input"
-                    style={{ width: 60, flex: 'none' }}
-                    placeholder="Unit"
-                    value={t.unit}
-                    onChange={(e) => update(t.id, { unit: e.target.value })}
-                  />
-                )}
-                {t.kind !== 'check' && t.kind !== 'text' && (
-                  <select
-                    className="input"
-                    style={{ width: 96, flex: 'none' }}
-                    value={t.direction}
-                    onChange={(e) =>
-                      update(t.id, { direction: e.target.value as 'atLeast' | 'atMost' })
-                    }
-                  >
-                    <option value="atLeast">At least</option>
-                    <option value="atMost">At most</option>
-                  </select>
-                )}
-                <button
-                  className="btn btn-quiet btn-sm"
-                  onClick={() => update(t.id, { archived: !t.archived })}
-                >
-                  {t.archived ? 'Restore' : 'Archive'}
-                </button>
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => {
-                    if (confirm(`Delete "${t.label}"? Days already logged against it lose that value.`))
-                      actions.setTrackers(state.trackers.filter((x) => x.id !== t.id))
-                  }}
-                  aria-label="Delete tracker"
-                >
-                  <IconTrash style={{ width: 16, height: 16 }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            padding: 13,
-            borderTop: '1px solid var(--hairline)',
-          }}
-        >
-          <input
-            className="input"
-            style={{ flex: '1 1 160px' }}
-            placeholder="Add a tracker"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-          />
-          <select
-            className="input"
-            style={{ width: 110, flex: 'none' }}
-            value={kind}
-            onChange={(e) => setKind(e.target.value as TrackerKind)}
-          >
-            {(Object.keys(TRACKER_KIND_LABEL) as TrackerKind[]).map((k) => (
-              <option key={k} value={k}>
-                {TRACKER_KIND_LABEL[k]}
-              </option>
-            ))}
-          </select>
-          <button className="btn" onClick={add} disabled={!label.trim()} aria-label="Add tracker">
-            <IconPlus style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
-      </Card>
-      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
-        Archiving keeps a tracker out of the daily sheet without erasing what's already logged
-        against it. Deleting removes that history too.
-      </p>
-    </>
   )
 }
 
@@ -653,103 +311,6 @@ function RewardEditor() {
       </Card>
       <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
         Unlocks together, against the personal payout target above.
-      </p>
-    </>
-  )
-}
-
-// ------------------------------------------------------------- morning editor
-
-/**
- * The morning SOP and its clock times. Today shows the same list grouped by
- * time and checks it off; this is the one-row-per-step view for editing it.
- * Rows settle into time order when a time field is left.
- */
-function MorningEditor() {
-  const state = useStore()
-  const items = state.morningRitual
-  const [draft, setDraft] = useState('')
-  const [at, setAt] = useState('')
-
-  const add = () => {
-    if (!draft.trim()) return
-    actions.addMorningItem(draft.trim(), at)
-    setDraft('')
-  }
-
-  return (
-    <>
-      <SectionTitle title="Morning" />
-      <Card>
-        {items.length === 0 ? (
-          <Empty>Nothing set yet. Add the first step of the morning below.</Empty>
-        ) : (
-          <div className="rows">
-            {items.map((item) => (
-              <div className="row" key={item.id}>
-                <input
-                  type="time"
-                  className="input input-plain sop-time"
-                  value={item.at ?? ''}
-                  aria-label={`Time for ${item.label}`}
-                  onChange={(e) =>
-                    actions.setMorningRitual(
-                      items.map((i) => (i.id === item.id ? { ...i, at: e.target.value || undefined } : i)),
-                    )
-                  }
-                  onBlur={() => actions.setMorningRitual(byTime(state.morningRitual))}
-                />
-                <GrowText
-                  style={{ flex: 1, minWidth: 0 }}
-                  value={item.label}
-                  ariaLabel="Step"
-                  onChange={(label) =>
-                    actions.setMorningRitual(
-                      items.map((i) => (i.id === item.id ? { ...i, label } : i)),
-                    )
-                  }
-                />
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => actions.removeMorningItem(item.id)}
-                  aria-label="Remove"
-                >
-                  <IconTrash style={{ width: 16, height: 16 }} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            padding: 13,
-            borderTop: items.length ? '1px solid var(--hairline)' : 'none',
-          }}
-        >
-          <input
-            type="time"
-            className="input input-time"
-            value={at}
-            aria-label="Time for the new step"
-            onChange={(e) => setAt(e.target.value)}
-          />
-          <input
-            className="input"
-            style={{ flex: 1, minWidth: 0 }}
-            placeholder="Add a step"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-          />
-          <button className="btn" onClick={add} disabled={!draft.trim()} aria-label="Add">
-            <IconPlus style={{ width: 16, height: 16 }} />
-          </button>
-        </div>
-      </Card>
-      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
-        Checked off every morning on Today, grouped by time.
       </p>
     </>
   )

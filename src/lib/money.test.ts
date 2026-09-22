@@ -186,9 +186,9 @@ describe('invoices', () => {
 
 describe('search', () => {
   it('lists the sections when the query matches one', () => {
-    const hits = search(makeState(), 'marketi')
+    const hits = search(makeState(), 'mone')
     expect(hits[0].kind).toBe('section')
-    expect(hits[0].tab).toBe('marketing')
+    expect(hits[0].tab).toBe('money')
   })
 
   it('ranks an exact prefix above a match buried mid-word', () => {

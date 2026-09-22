@@ -4,7 +4,7 @@ import { IconPlus } from './icons'
 import { PRIORITY_TAGS } from '../lib/config'
 import { todayISO } from '../lib/date'
 import { uid } from '../lib/format'
-import { actions, emptyDay, emptySlots, newTask, useStore } from '../lib/store'
+import { actions, newTask, useStore } from '../lib/store'
 import type { MoneyEntity, Priority } from '../lib/types'
 
 type Kind = 'task' | 'priority' | 'goal' | 'deal'
@@ -14,8 +14,8 @@ const KINDS: { id: Kind; label: string; placeholder: string; hint: string }[] = 
   {
     id: 'priority',
     label: 'Today',
-    placeholder: 'What matters today',
-    hint: "Fills the next empty slot in today's three",
+    placeholder: 'What needs doing today',
+    hint: "Lands on today's to-do, and in Work",
   },
   { id: 'goal', label: 'Goal', placeholder: "What you're aiming at", hint: 'Lands on the ladder' },
   { id: 'deal', label: 'Deal', placeholder: 'Who and what', hint: 'Lands in the pipeline as a lead' },
@@ -59,24 +59,15 @@ function QuickAddSheet({
   const spec = KINDS.find((k) => k.id === kind)!
   const today = todayISO()
 
-  // Today's slots fill left to right; a full plan says so rather than silently
-  // dropping what you typed.
-  const day = state.days[today] ?? emptyDay(today)
-  const slots = day.priorities.length ? day.priorities : emptySlots(today)
-  const nextSlot = slots.find((p) => p.text.trim() === '')
-  const planFull = kind === 'priority' && !nextSlot
-
   const save = () => {
     const value = text.trim()
-    if (!value || planFull) return
+    if (!value) return
 
     if (kind === 'task') {
       actions.addTask(newTask(value, { entity: tag }))
       onNavigate('work')
-    } else if (kind === 'priority' && nextSlot) {
-      // Write the slots back first when the day had none stored yet.
-      if (!day.priorities.length) actions.setPriorities(today, slots)
-      actions.updatePriority(today, nextSlot.id, { text: value, tag })
+    } else if (kind === 'priority') {
+      actions.addTask(newTask(value, { entity: tag, scheduled: today }))
       onNavigate('today')
     } else if (kind === 'goal') {
       actions.setGoals([
@@ -158,15 +149,13 @@ function QuickAddSheet({
         )}
 
         <p className="t-foot muted">
-          {planFull
-            ? "Today's three are already full. Add it as a task instead, or clear a slot in Today."
-            : spec.hint}
+          {spec.hint}
         </p>
 
         <button
           className="btn btn-primary btn-block"
           onClick={save}
-          disabled={!text.trim() || planFull}
+          disabled={!text.trim()}
         >
           Add
         </button>

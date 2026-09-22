@@ -16,11 +16,13 @@ import {
   DEFAULT_TARGETS,
   DEFAULT_UPKEEP,
   CORE_QUESTIONS,
+  DEFAULT_WORKOUT,
+  HABITS,
   MAX_PRIORITIES,
   MORNING,
   SHUTDOWN,
 } from './config'
-import { addDays, addMinutes, todayISO } from './date'
+import { addDays, addMinutes, minutesToTime, sleepMinutes, todayISO } from './date'
 import { uid } from './format'
 import { emptyMarketingDay, nextWorkingDay } from './marketing'
 import type { MarketingDay } from './marketing'
@@ -36,7 +38,10 @@ import type {
   Deal,
   DomainLink,
   DomainNode,
+  Exercise,
+  FoodEntry,
   Goal,
+  GymSet,
   Holding,
   Invoice,
   Project,
@@ -87,7 +92,7 @@ function initialState(): AppState {
     // Empty by default — nothing is assumed about anyone's day. The starter
     // shape is offered once, from Settings, never forced.
     dayShape: [],
-    morningRitual: MORNING.map((m) => ({ ...m })),
+    morningRitual: HABITS.map((h) => ({ ...h })),
     shutdownRitual: SHUTDOWN.map((s) => ({ id: s.id, label: s.label, hint: s.hint ?? '' })),
     nightlyQuestions: CORE_QUESTIONS.map((q) => ({ id: q.id, q: q.q, hint: q.hint ?? '' })),
     trackers: DEFAULT_TRACKERS.map((t) => ({ ...t })),
@@ -102,6 +107,7 @@ function initialState(): AppState {
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
     outreach: [],
     marketing: { startDate: nextWorkingDay(todayISO()), days: {} },
+    workout: DEFAULT_WORKOUT.map((e) => ({ ...e })),
   }
 }
 
@@ -274,6 +280,42 @@ export function hydrate(raw: string): AppState {
       ],
     }
   }
+  // The day became one page. Habits replace the timed SOP (keeping anything
+  // you added yourself), and sleep is two clock times on the morning it ends.
+  // The old wake tracker becomes that morning's wake time and the old in-bed
+  // tracker, logged on the night itself, becomes the next morning's bedtime.
+  // Day notes fold into the journal, which is the notes field the page shows.
+  // Runs after every older step so none of them can put the SOP back.
+  if ((parsed.version ?? 1) < 20) {
+    const sop = new Set(MORNING.map((m) => m.id))
+    const yours = (parsed.morningRitual ?? []).filter((m) => !sop.has(m.id))
+    const before = parsed.days ?? {}
+    parsed = {
+      ...parsed,
+      morningRitual: [...HABITS.map((h) => ({ ...h })), ...yours.map(({ id, label }) => ({ id, label }))],
+      days: Object.fromEntries(
+        Object.entries(before).map(([k, v]) => {
+          if (!v) return [k, v]
+          const wake = v.trackers?.tk_wake
+          const bed = before[addDays(k, -1)]?.trackers?.tk_bed
+          const notes = (v.notes ?? '').trim()
+          const journal = v.journal ?? ''
+          return [
+            k,
+            {
+              ...v,
+              wakeTime: v.wakeTime || (wake ? minutesToTime(wake) : ''),
+              bedtime: v.bedtime || (bed ? minutesToTime(bed) : ''),
+              journal:
+                notes && !journal.includes(notes)
+                  ? [journal.trim(), notes].filter(Boolean).join('\n\n')
+                  : journal,
+            },
+          ]
+        }),
+      ),
+    }
+  }
   const days: Record<string, DayEntry> = {}
   for (const [k, v] of Object.entries(parsed.days ?? {})) {
     days[k] = {
@@ -294,6 +336,10 @@ export function hydrate(raw: string): AppState {
       trackerNotes: v?.trackerNotes ?? {},
       journal: v?.journal ?? '',
       timeLog: v?.timeLog ?? {},
+      bedtime: v?.bedtime ?? '',
+      wakeTime: v?.wakeTime ?? '',
+      gym: v?.gym ?? {},
+      food: v?.food ?? [],
     }
   }
   return {
@@ -387,6 +433,7 @@ export function hydrate(raw: string): AppState {
       startDate: parsed.marketing?.startDate ?? base.marketing.startDate,
       days: parsed.marketing?.days ?? {},
     },
+    workout: parsed.workout ?? base.workout,
   }
 }
 
@@ -425,6 +472,10 @@ export function emptyDay(date: string): DayEntry {
     trackerNotes: {},
     journal: '',
     timeLog: {},
+    bedtime: '',
+    wakeTime: '',
+    gym: {},
+    food: [],
     closed: false,
   }
 }
@@ -570,6 +621,45 @@ export const actions = {
     const prev = state.days[date] ?? emptyDay(date)
     const next = value ?? !prev.checks[id]
     actions.updateDay(date, { checks: { ...prev.checks, [id]: next } })
+  },
+
+  /** Bed and wake times in; the hours slept are worked out, never typed. */
+  setSleep(date: string, patch: { bedtime?: string; wakeTime?: string }) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const next = { ...prev, ...patch }
+    const mins = sleepMinutes(next.bedtime, next.wakeTime)
+    actions.updateDay(date, {
+      ...patch,
+      metrics: { ...prev.metrics, sleepHours: mins === null ? 0 : Math.round((mins / 60) * 100) / 100 },
+    })
+  },
+
+  /** Logging a set is what makes it a gym day — there is no separate box to tick. */
+  setGymSet(date: string, exerciseId: string, index: number, patch: Partial<GymSet>) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const sets = [...(prev.gym[exerciseId] ?? [])]
+    while (sets.length <= index) sets.push({ kg: null, reps: null })
+    sets[index] = { ...sets[index], ...patch }
+    const gym = { ...prev.gym, [exerciseId]: sets }
+    const trained = Object.values(gym).some((list) =>
+      list.some((s) => s.kg !== null || s.reps !== null),
+    )
+    actions.updateDay(date, { gym, trained, restDay: trained ? false : prev.restDay })
+  },
+
+  setWorkout(workout: Exercise[]) {
+    set({ ...state, workout })
+  },
+
+  /** The food log is the record; the day's calories and protein are its totals. */
+  setFood(date: string, food: FoodEntry[]) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const total = (key: 'kcal' | 'protein') =>
+      food.reduce((sum, f) => sum + (Number.isFinite(f[key]) ? f[key] : 0), 0)
+    actions.updateDay(date, {
+      food,
+      metrics: { ...prev.metrics, calories: total('kcal'), protein: total('protein') },
+    })
   },
 
   setMetric(date: string, key: keyof typeof EMPTY_METRICS, value: number) {

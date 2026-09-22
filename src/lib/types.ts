@@ -2,7 +2,7 @@ import type { MarketingDay } from './marketing'
 
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 19
+export const STATE_VERSION = 20
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -172,8 +172,37 @@ export interface DayEntry {
   journal: string
   /** "HH:MM" slot -> what that quarter hour actually went on. */
   timeLog: Record<string, TimeLogSlot>
+  /** "HH:MM" you fell asleep the night before this date. Empty until logged. */
+  bedtime: string
+  /** "HH:MM" you woke up on this date. Hours slept are worked out from the two. */
+  wakeTime: string
+  /** Exercise id -> the sets done that day, in order. */
+  gym: Record<string, GymSet[]>
+  /** What was eaten. Calories and protein for the day are its totals. */
+  food: FoodEntry[]
   /** Set when the nightly scorecard is signed off. */
   closed: boolean
+}
+
+/** One set. Null means not logged — zero kg is a real bodyweight set. */
+export interface GymSet {
+  kg: number | null
+  reps: number | null
+}
+
+/** One line of the food log: what it was, and the estimate for it. */
+export interface FoodEntry {
+  id: string
+  what: string
+  kcal: number
+  protein: number
+}
+
+/** An exercise in the gym list, and how many sets it gets. */
+export interface Exercise {
+  id: string
+  name: string
+  sets: number
 }
 
 export type MoneyEntity = 'consulting' | 'onemedia'
@@ -732,4 +761,6 @@ export interface AppState {
   }
   /** The standards the day is scored against. Editable — add, reweight, remove. */
   checklist: ChecklistItem[]
+  /** The gym list: each exercise and its number of sets. Edited on Today. */
+  workout: Exercise[]
 }

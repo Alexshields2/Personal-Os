@@ -28,9 +28,9 @@ import { euro } from './format'
 import { ACCOUNT_OWNER, ONEMEDIA_ACCOUNTS, PERSONAL_ACCOUNTS } from './types'
 import type {
   AccountId,
-  BlockKind,
   AppState,
   Bill,
+  BlockKind,
   CalendarEvent,
   ChecklistItem,
   Client,
@@ -42,23 +42,24 @@ import type {
   DomainNode,
   Goal,
   GoalHorizon,
+  GymSet,
   Invoice,
   KeyResult,
+  LearnItem,
   LedgerKind,
+  Loop,
   MetricKey,
+  MoneyEntity,
   PillarId,
+  Priority,
+  PriorityTag,
   Project,
   Purse,
   Task,
+  TimeBlock,
   Tracker,
   Transaction,
   TxCategory,
-  LearnItem,
-  Loop,
-  MoneyEntity,
-  Priority,
-  PriorityTag,
-  TimeBlock,
   Upkeep,
 } from './types'
 
@@ -1280,6 +1281,44 @@ export function taskQueue(state: AppState, iso = todayISO()): TaskQueue {
  * so the day-end review can put every task in front of you once, rather than
  * you having to remember what you did.
  */
+/**
+ * The day's to-do list, straight out of Work: anything scheduled for the day
+ * or finished on it — and, on today only, anything still open from an earlier
+ * day or already due, so a task can't slide off the list by being left undone.
+ * Open first, oldest first; done ones sink.
+ */
+export function todoFor(state: AppState, date: string, today = todayISO()): Task[] {
+  const carried = (t: Task) =>
+    !t.done &&
+    ((t.scheduled !== '' && t.scheduled < date) || (t.scheduled === '' && t.due !== '' && t.due <= date))
+  const when = (t: Task) => t.scheduled || t.due || date
+  return state.tasks
+    .filter((t) => t.scheduled === date || t.doneDate === date || (date === today && carried(t)))
+    .sort((a, b) => Number(a.done) - Number(b.done) || when(a).localeCompare(when(b)))
+}
+
+/**
+ * For each exercise, the most recent session before `date` that logged it.
+ * The empty fields show these faintly — the number to beat, right where the
+ * new one gets typed.
+ */
+export function lastGymSets(
+  state: AppState,
+  date: string,
+): Record<string, { date: string; sets: GymSet[] }> {
+  const out: Record<string, { date: string; sets: GymSet[] }> = {}
+  const earlier = Object.keys(state.days)
+    .filter((d) => d < date)
+    .sort()
+    .reverse()
+  for (const d of earlier) {
+    for (const [id, sets] of Object.entries(state.days[d]?.gym ?? {})) {
+      if (!out[id] && sets.some((x) => x.kg !== null || x.reps !== null)) out[id] = { date: d, sets }
+    }
+  }
+  return out
+}
+
 export function tasksTouchedOn(state: AppState, date: string): Task[] {
   return state.tasks.filter((t) => t.scheduled === date || t.doneDate === date)
 }
