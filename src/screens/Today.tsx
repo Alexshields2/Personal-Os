@@ -30,7 +30,7 @@ import {
 } from '../lib/date'
 import { euro, num, uid } from '../lib/format'
 import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
-import { dayProgress, lastGymSets, missedGymCount, todoFor } from '../lib/selectors'
+import { dayProgress, lastGymSets, missedGymCount, progressTone, todoFor } from '../lib/selectors'
 import { downscaleImage } from '../lib/image'
 import { loadVoices, pickVoice, scoreVoice, speak } from '../lib/speech'
 import { ACCOUNT_OWNER, BANK_ACCOUNTS } from '../lib/types'
@@ -133,30 +133,48 @@ export default function Today({ onNavigate }: { onNavigate?: (tab: string) => vo
 // ----------------------------------------------------------------- the day
 
 /**
- * One bar over everything the day asks for. It names what is left rather
- * than only counting it, so the answer to "what now" is on the same line.
+ * One bar over everything the day asks for, red through amber to green, with
+ * everything still outstanding named underneath — the whole answer to "what
+ * is left to nail today" without scrolling the page.
  */
 function DayBar({ date }: { date: string }) {
   const state = useStore()
   const progress = dayProgress(state, date)
-  const left = progress.parts.filter((p) => !p.done)
+  const left = progress.points.filter((p) => p.state !== 'done')
+  const tone = progressTone(progress.pct)
 
   return (
-    <div className="day-bar">
+    <div className="day-bar" data-tone={tone}>
       <div className="day-bar-head">
         <span className="t-cap">The day</span>
-        <span className="t-foot muted">
-          {progress.done} of {progress.total} · {Math.round(progress.pct)}%
+        <span className="day-bar-score">
+          {progress.done}/{progress.total} · {Math.round(progress.pct)}%
         </span>
       </div>
       <Meter pct={progress.pct} />
-      <p className="t-foot muted" style={{ marginTop: 8 }}>
-        {left.length === 0
-          ? 'Everything done.'
-          : `Left: ${left.slice(0, 3).map((p) => p.label).join(', ')}${
-              left.length > 3 ? ` and ${left.length - 3} more` : ''
-            }`}
-      </p>
+      {left.length === 0 ? (
+        <p className="t-foot" style={{ marginTop: 10, color: 'var(--won)' }}>
+          Day nailed. Everything on the page is done.
+        </p>
+      ) : (
+        <>
+          <p className="t-cap" style={{ marginTop: 12, marginBottom: 6 }}>
+            Left to nail the day
+          </p>
+          <div className="chips">
+            {left.map((point) => (
+              <span
+                key={point.key}
+                className="chip chip-sm day-left"
+                data-missed={point.state === 'missed'}
+              >
+                {point.label}
+                {point.state === 'missed' ? ' — missed' : ''}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { HABITS } from './config'
 import { hoursMinutes, sleepMinutes } from './date'
 import { day, daysMap, makeState, task } from './fixtures'
 import { EMPTY_METRICS } from './types'
-import { dayProgress, lastGymSets, missedGymCount, todoFor } from './selectors'
+import { consistency, dayProgress, lastGymSets, missedGymCount, progressTone, todoFor } from './selectors'
 import { actions, getState, hydrate } from './store'
 
 /**
@@ -90,21 +90,64 @@ describe('the day bar', () => {
       tasks: [task('t1', { title: 'Call John', scheduled: D, done: true })],
     })
     const p = dayProgress(state, D, D)
-    // Read, sleep, 3 habits, gym, 1 to-do, water, food, office, tomorrow, clothes.
+    // Read, sleep, 3 habits, gym, the to-do, water, food, office, tomorrow, clothes.
     expect(p.total).toBe(12)
     // Everything above except the two habits not done and tomorrow's list.
     expect(p.done).toBe(9)
-    expect(p.parts.filter((x) => !x.done).map((x) => x.label)).toEqual([
+    expect(p.points.filter((x) => x.state !== 'done').map((x) => x.label)).toEqual([
       'Morning journal',
       'Read 10 pages',
       "Tomorrow's to-do",
     ])
+    // A habit marked missed is not the same as one nobody answered.
+    expect(p.points.find((x) => x.label === 'Morning journal')?.state).toBe('missed')
   })
 
   it('is empty on a day with nothing logged', () => {
     const p = dayProgress(makeState(), D, D)
     expect(p.done).toBe(0)
     expect(p.pct).toBe(0)
+  })
+})
+
+describe('the board', () => {
+  const state = makeState({
+    morningRitual: HABITS.map((h) => ({ ...h })),
+    days: daysMap([
+      day('2026-09-22', { checks: { m_cold: true }, trained: true }),
+      day('2026-09-23', { habitMissed: { m_cold: true }, gymMissed: true }),
+    ]),
+  })
+  const board = consistency(state, '2026-09-22', '2026-09-23', '2026-09-23')
+
+  it('lines every point up against every day', () => {
+    expect(board.dates).toEqual(['2026-09-22', '2026-09-23'])
+    expect(board.rows.every((r) => r.cells.length === 2)).toBe(true)
+  })
+
+  it('tells done, missed and never-answered apart', () => {
+    expect(board.rows.find((r) => r.label === 'Cold shower')?.cells).toEqual(['done', 'missed'])
+    expect(board.rows.find((r) => r.key === 'gym')?.cells).toEqual(['done', 'missed'])
+    expect(board.rows.find((r) => r.key === 'water')?.cells).toEqual(['none', 'none'])
+  })
+
+  it('rates each row over the days shown', () => {
+    expect(board.rows.find((r) => r.label === 'Cold shower')?.rate).toBe(50)
+    expect(board.rows.find((r) => r.key === 'water')?.rate).toBe(0)
+  })
+
+  it('averages the day scores', () => {
+    expect(board.scores).toHaveLength(2)
+    expect(board.average).toBeCloseTo((board.scores[0] + board.scores[1]) / 2, 5)
+  })
+
+  it('goes red, amber, green', () => {
+    expect(progressTone(0)).toBe('bad')
+    expect(progressTone(39)).toBe('bad')
+    expect(progressTone(40)).toBe('mid')
+    expect(progressTone(79)).toBe('mid')
+    expect(progressTone(80)).toBe('good')
+    expect(progressTone(100)).toBe('good')
   })
 })
 

@@ -1321,39 +1321,160 @@ export function lastGymSets(
   return out
 }
 
+/** Done, deliberately marked as not done, or not answered yet. */
+export type PointState = 'done' | 'missed' | 'none'
+
+export interface DayPoint {
+  key: string
+  label: string
+  state: PointState
+}
+
 export interface DayProgress {
   done: number
   total: number
   pct: number
-  /** Every item the day asks for, so what's left can be named rather than guessed. */
-  parts: { label: string; done: boolean }[]
+  /** Every point of the day, so what is left can be named rather than guessed. */
+  points: DayPoint[]
 }
 
 /**
- * One bar over the whole day: the read, sleep, each habit, the gym, each
- * to-do, water, food, hours in the office, tomorrow's list and the clothes.
- * A missed habit or a missed session counts as not done — that is the point
- * of marking it — and nothing here is weighted, because a day is only the
- * sum of the things in it.
+ * Everything one day asks for, in the order the page asks it: the read, how
+ * you slept, each habit, the gym, the to-do, water, food, hours in the
+ * office, tomorrow's list and the clothes.
+ *
+ * One definition, read by the bar on Today and by the board in Review, so
+ * the two can never disagree about what a day was.
+ */
+export function dayPoints(state: AppState, date: string, today = todayISO()): DayPoint[] {
+  const day = state.days[date]
+  const todos = todoFor(state, date, today)
+  const points: DayPoint[] = [
+    { key: 'read', label: 'Read', state: day?.checks[READ_CHECK] ? 'done' : 'none' },
+    { key: 'sleep', label: 'Sleep', state: day?.bedtime && day?.wakeTime ? 'done' : 'none' },
+  ]
+  for (const habit of state.morningRitual) {
+    points.push({
+      key: `habit:${habit.id}`,
+      label: habit.label,
+      state: day?.checks[habit.id] ? 'done' : day?.habitMissed[habit.id] ? 'missed' : 'none',
+    })
+  }
+  points.push({
+    key: 'gym',
+    label: 'Gym',
+    state: day?.trained ? 'done' : day?.gymMissed ? 'missed' : 'none',
+  })
+  points.push({
+    key: 'todo',
+    label: 'To-do',
+    // Nothing on the list is not the same as a list you cleared.
+    state: todos.length > 0 && todos.every((t) => t.done) ? 'done' : 'none',
+  })
+  points.push({
+    key: 'water',
+    label: 'Water',
+    state: (day?.metrics.waterL ?? 0) >= state.targets.waterL ? 'done' : 'none',
+  })
+  points.push({ key: 'food', label: 'Food', state: (day?.food.length ?? 0) > 0 ? 'done' : 'none' })
+  points.push({
+    key: 'office',
+    label: 'Hours in office',
+    state: (day?.metrics.consultingHours ?? 0) > 0 ? 'done' : 'none',
+  })
+  points.push({
+    key: 'tomorrow',
+    label: "Tomorrow's to-do",
+    state: state.tasks.some((t) => t.scheduled === addDays(date, 1)) ? 'done' : 'none',
+  })
+  points.push({
+    key: 'clothes',
+    label: 'Clothes',
+    state: day?.checks[CLOTHES_CHECK] ? 'done' : 'none',
+  })
+  return points
+}
+
+/**
+ * One number over the whole day. A missed habit or session counts as not
+ * done — that is the point of marking it — and nothing is weighted, because
+ * a day is only the sum of the things in it.
  */
 export function dayProgress(state: AppState, date: string, today = todayISO()): DayProgress {
-  const day = state.days[date]
-  const parts: { label: string; done: boolean }[] = []
-  const add = (label: string, done: boolean) => parts.push({ label, done })
+  const points = dayPoints(state, date, today)
+  const done = points.filter((p) => p.state === 'done').length
+  return {
+    done,
+    total: points.length,
+    pct: points.length ? (done / points.length) * 100 : 0,
+    points,
+  }
+}
 
-  add('Read', Boolean(day?.checks[READ_CHECK]))
-  add('Sleep', Boolean(day?.bedtime && day?.wakeTime))
-  for (const h of state.morningRitual) add(h.label, Boolean(day?.checks[h.id]))
-  add('Gym', Boolean(day?.trained))
-  for (const t of todoFor(state, date, today)) add(t.title, t.done)
-  add('Water', (day?.metrics.waterL ?? 0) >= state.targets.waterL)
-  add('Food', (day?.food.length ?? 0) > 0)
-  add('Hours in office', (day?.metrics.consultingHours ?? 0) > 0)
-  add("Tomorrow's to-do", state.tasks.some((t) => t.scheduled === addDays(date, 1)))
-  add('Clothes', Boolean(day?.checks[CLOTHES_CHECK]))
+/** Red until it is a real day, amber while it is going, green once it is nailed. */
+export function progressTone(pct: number): 'bad' | 'mid' | 'good' {
+  if (pct >= 80) return 'good'
+  if (pct >= 40) return 'mid'
+  return 'bad'
+}
 
-  const done = parts.filter((p) => p.done).length
-  return { done, total: parts.length, pct: parts.length ? (done / parts.length) * 100 : 0, parts }
+export interface ConsistencyRow {
+  key: string
+  label: string
+  /** One per day in the range, in the same order. */
+  cells: PointState[]
+  done: number
+  /** Share of the days in range that were done, 0-100. */
+  rate: number
+}
+
+export interface Consistency {
+  dates: string[]
+  rows: ConsistencyRow[]
+  /** The day's score for each date in range, 0-100. */
+  scores: number[]
+  /** Average score across the range. */
+  average: number
+}
+
+/**
+ * Every point against every day, for the board: rows that hold across the
+ * range even as habits are added or renamed, and a rate per row so a streak
+ * and a slide are both visible at a glance.
+ */
+export function consistency(
+  state: AppState,
+  from: string,
+  to: string,
+  today = todayISO(),
+): Consistency {
+  const dates: string[] = []
+  for (let d = from; d <= to; d = addDays(d, 1)) dates.push(d)
+
+  const rows = new Map<string, ConsistencyRow>()
+  const scores: number[] = []
+  for (const date of dates) {
+    const points = dayPoints(state, date, today)
+    scores.push(points.length ? (points.filter((p) => p.state === 'done').length / points.length) * 100 : 0)
+    for (const point of points) {
+      const row = rows.get(point.key) ?? { key: point.key, label: point.label, cells: [], done: 0, rate: 0 }
+      // A renamed habit keeps its row and takes the newest wording.
+      row.label = point.label
+      row.cells.push(point.state)
+      if (point.state === 'done') row.done += 1
+      rows.set(point.key, row)
+    }
+  }
+  const list = [...rows.values()].map((row) => ({
+    ...row,
+    rate: dates.length ? (row.done / dates.length) * 100 : 0,
+  }))
+  return {
+    dates,
+    rows: list,
+    scores,
+    average: scores.length ? scores.reduce((sum, s) => sum + s, 0) / scores.length : 0,
+  }
 }
 
 /** Gym days marked missed in the `window` days ending on `date`, inclusive. */

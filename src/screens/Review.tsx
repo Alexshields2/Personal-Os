@@ -5,18 +5,22 @@ import {
   Meter,
   NumberField,
   SectionTitle,
+  Segmented,
   Stat,
   TextField,
 } from '../components/ui'
 import { IconChevron } from '../components/icons'
 import { INNER_CIRCLE } from '../lib/config'
-import { addDays, formatShort, todayISO, weekStartISO } from '../lib/date'
+import { addDays, formatShort, fromISO, todayISO, weekStartISO } from '../lib/date'
 import { euro } from '../lib/format'
-import { actions, emptyWeek, useStore } from '../lib/store'
-import { isLogged, scoreDay, weekRevenue } from '../lib/selectors'
+import { DAYS_START, actions, emptyWeek, useStore } from '../lib/store'
+import { consistency, dayProgress, progressTone, weekRevenue } from '../lib/selectors'
+
+type View = 'board' | 'week'
 
 export default function Review() {
   const state = useStore()
+  const [view, setView] = useState<View>('board')
   const [weekStart, setWeekStart] = useState(weekStartISO(todayISO()))
   const week = state.weeks[weekStart] ?? emptyWeek(weekStart)
   const money = weekRevenue(state, weekStart)
@@ -26,10 +30,11 @@ export default function Review() {
     [weekStart],
   )
 
+  // The same points the day is measured by, so the week and the day can
+  // never disagree. Days before the app started are not counted against you.
   const scored = days
-    .map((d) => state.days[d])
-    .filter(isLogged)
-    .map((d) => scoreDay(d, state.targets, state.checklist).score)
+    .filter((d) => d >= DAYS_START && d <= todayISO())
+    .map((d) => dayProgress(state, d).pct)
   const weekScore = scored.length ? scored.reduce((s, v) => s + v, 0) / scored.length : 0
 
   const set = (patch: Partial<typeof week>) => actions.updateWeek(weekStart, patch)
@@ -45,12 +50,13 @@ export default function Review() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h1 className="t-large" style={{ flex: 1 }}>
-            {isThisWeek ? 'This week' : formatShort(weekStart)}
+            {view === 'board' ? 'Review' : isThisWeek ? 'This week' : formatShort(weekStart)}
           </h1>
           <button
             className="btn btn-quiet"
             onClick={() => setWeekStart(addDays(weekStart, -7))}
             aria-label="Previous week"
+            hidden={view === 'board'}
           >
             <IconChevron style={{ width: 18, height: 18, transform: 'rotate(180deg)' }} />
           </button>
@@ -59,14 +65,30 @@ export default function Review() {
             onClick={() => setWeekStart(addDays(weekStart, 7))}
             aria-label="Next week"
             disabled={weekStart >= weekStartISO(todayISO())}
+            hidden={view === 'board'}
           >
             <IconChevron style={{ width: 18, height: 18 }} />
           </button>
         </div>
         <p className="t-sub">
-          {formatShort(weekStart)} – {formatShort(addDays(weekStart, 6))}
+          {view === 'board'
+            ? 'Every day since this started, point by point'
+            : `${formatShort(weekStart)} – ${formatShort(addDays(weekStart, 6))}`}
         </p>
       </header>
+
+      <Segmented
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'board', label: 'Board' },
+          { value: 'week', label: 'The week' },
+        ]}
+      />
+
+      {view === 'board' && <Board />}
+      {view === 'week' && (
+        <>
 
       <Card className="card-pad">
         <div
@@ -83,8 +105,7 @@ export default function Review() {
         <Meter pct={weekScore} />
         <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
           {days.map((d) => {
-            const entry = state.days[d]
-            const s = isLogged(entry) ? scoreDay(entry, state.targets, state.checklist).score : 0
+            const s = d >= DAYS_START && d <= todayISO() ? dayProgress(state, d).pct : 0
             return (
               <div key={d} style={{ flex: 1, textAlign: 'center' }}>
                 {/* Absolute fill rather than a flex child: percentage heights
@@ -258,7 +279,117 @@ export default function Review() {
           Everything outside this list waits until day 126. Keep these ones strong.
         </p>
       </Card>
+        </>
+      )}
     </div>
+  )
+}
+
+// -------------------------------------------------------------------- board
+
+const SPANS: { value: string; label: string; days: number }[] = [
+  { value: '7', label: '7 days', days: 7 },
+  { value: '14', label: '2 weeks', days: 14 },
+  { value: '30', label: '30 days', days: 30 },
+]
+
+/**
+ * Every point of the day against every day, since the day this started.
+ *
+ * A single day's score says how today went; this says whether it holds. The
+ * rate on the right of each row is the whole point of the board — one glance
+ * tells you which habit is real and which one is a story you tell yourself.
+ */
+function Board() {
+  const state = useStore()
+  const today = todayISO()
+  const [span, setSpan] = useState('14')
+  const days = SPANS.find((s) => s.value === span)?.days ?? 14
+  // Never earlier than the day the app's history starts — empty columns
+  // before that would read as days you failed rather than days that predate it.
+  const start = addDays(today, -(days - 1))
+  const from = start < DAYS_START ? DAYS_START : start
+  const board = useMemo(() => consistency(state, from, today), [state, from, today])
+  const tone = progressTone(board.average)
+
+  return (
+    <>
+      <div style={{ marginTop: 16 }}>
+        <Segmented value={span} onChange={setSpan} options={SPANS} />
+      </div>
+
+      <div className="day-bar" data-tone={tone} style={{ marginTop: 14 }}>
+        <div className="day-bar-head">
+          <span className="t-cap">
+            {board.dates.length} day{board.dates.length === 1 ? '' : 's'} · average
+          </span>
+          <span className="day-bar-score">{Math.round(board.average)}%</span>
+        </div>
+        <Meter pct={board.average} />
+      </div>
+
+      <SectionTitle title="Every day, point by point" />
+      <Card>
+        <div className="cboard-scroll">
+          <table className="cboard">
+            <thead>
+              <tr>
+                <th className="cboard-label cboard-corner" scope="col">
+                  <span className="t-cap">Point</span>
+                </th>
+                {board.dates.map((date) => (
+                  <th key={date} scope="col">
+                    <span className="cboard-dow">
+                      {['S', 'M', 'T', 'W', 'T', 'F', 'S'][fromISO(date).getDay()]}
+                    </span>
+                    <span className="cboard-day">{Number(date.slice(8))}</span>
+                  </th>
+                ))}
+                <th className="cboard-rate" scope="col">
+                  <span className="t-cap">Rate</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="cboard-score-row">
+                <th className="cboard-label" scope="row">
+                  Score
+                </th>
+                {board.scores.map((score, i) => (
+                  <td key={board.dates[i]}>
+                    <span className="cboard-score" data-tone={progressTone(score)}>
+                      {Math.round(score)}
+                    </span>
+                  </td>
+                ))}
+                <td className="cboard-rate">{Math.round(board.average)}%</td>
+              </tr>
+              {board.rows.map((row) => (
+                <tr key={row.key}>
+                  <th className="cboard-label" scope="row">
+                    {row.label}
+                  </th>
+                  {row.cells.map((cell, i) => (
+                    <td key={board.dates[i]}>
+                      <span className="cboard-cell" data-state={cell}>
+                        {cell === 'missed' ? '✕' : ''}
+                      </span>
+                    </td>
+                  ))}
+                  <td className="cboard-rate" data-tone={progressTone(row.rate)}>
+                    {Math.round(row.rate)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
+        A filled dot is done, a cross is one you marked missed, an empty circle is
+        nothing logged.
+      </p>
+    </>
   )
 }
 

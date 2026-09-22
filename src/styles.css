@@ -1506,11 +1506,6 @@ kbd {
    The life map, as a board
    ========================================================================= */
 
-.board-shell {
-  display: flex;
-  flex-direction: column;
-}
-
 .board-bar {
   display: flex;
   align-items: center;
@@ -1528,134 +1523,10 @@ kbd {
   text-align: center;
 }
 
-.board {
-  position: relative;
-  overflow: hidden;
-  height: min(72vh, 720px);
-  border: 1px solid var(--hairline);
-  border-radius: var(--r-md);
-  background: var(--surface-1);
-  /* A faint grid reads as a canvas rather than an empty card. */
-  background-image: radial-gradient(var(--hairline) 1px, transparent 1px);
-  background-size: 26px 26px;
-  touch-action: none;
-  cursor: grab;
-  user-select: none;
-}
-
-.board:active {
-  cursor: grabbing;
-}
-
-.board-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  transform-origin: 0 0;
-}
-
-.board-edges {
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  overflow: visible;
-}
-
-.board-node {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  padding: 7px 11px;
-  border-radius: var(--r-sm);
-  background: var(--surface-3);
-  border: 1px solid var(--hairline-strong);
-  cursor: grab;
-  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
-}
-
-.board-node:active {
-  cursor: grabbing;
-}
-
-.board-node[data-selected='true'] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.board-node[data-root='true'] {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-color: transparent;
-}
-
-.board-node-label {
-  font-size: 14px;
-  font-weight: 550;
-  letter-spacing: -0.011em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.board-node-meta {
-  display: flex;
-  gap: 8px;
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.board-node[data-root='true'] .board-node-meta {
-  color: rgba(0, 0, 0, 0.55);
-}
-
-:root[data-theme='light'] .board-node[data-root='true'] .board-node-meta {
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.board-node-bar {
-  height: 3px;
-  border-radius: 2px;
-  background: var(--seq-track);
-  overflow: hidden;
-}
-
-.board-node-bar i {
-  display: block;
-  height: 100%;
-  background: var(--text-primary);
-  border-radius: 2px;
-}
-
-.board-node[data-root='true'] .board-node-bar {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.board-node[data-root='true'] .board-node-bar i {
-  background: var(--on-accent);
-}
-
 /* The briefing's lead finding — the one thing worth reading first */
 .brief-headline {
   border-color: var(--hairline-strong);
   background: var(--surface-2);
-}
-
-.board-node-spark {
-  width: 100%;
-  height: 16px;
-  display: block;
-  color: var(--text-primary);
-  overflow: visible;
-}
-
-.board-node[data-root='true'] .board-node-spark {
-  color: var(--on-accent);
 }
 
 /* The two forms the whole system runs on */
@@ -2905,13 +2776,46 @@ button.edge:hover {
   color: var(--text-primary);
 }
 
-/* One bar over the whole day, above everything it counts. */
+/* One bar over the whole day, above everything it counts. The three tones
+   are the only place the app uses red and amber: a day is the one thing
+   worth shouting about before it is over. */
 .day-bar {
+  --tone: var(--text-muted);
   margin-top: 16px;
   padding: 14px 16px 15px;
   border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
   background: var(--fill-soft);
+}
+
+.day-bar[data-tone='bad'] {
+  --tone: #ff4d4f;
+}
+
+.day-bar[data-tone='mid'] {
+  --tone: #ffa53d;
+}
+
+.day-bar[data-tone='good'] {
+  --tone: var(--won);
+}
+
+.day-bar .meter-fill {
+  background: var(--tone);
+}
+
+.day-bar-score {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tone);
+}
+
+/* What is left, named. A habit or session already marked missed reads as
+   settled rather than pending — it is not coming back today. */
+.day-left[data-missed='true'] {
+  opacity: 0.55;
+  text-decoration: line-through;
 }
 
 .day-bar-head {
@@ -2953,5 +2857,134 @@ button.edge:hover {
 .identity-voice {
   display: grid;
   gap: 6px;
+}
+
+/* =========================================================================
+   The consistency board
+   ========================================================================= */
+
+/* Days run across, points run down. The label column stays put while the
+   days scroll, because a row of dots means nothing without its name. */
+.cboard-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cboard {
+  /* Separate, not collapsed: a sticky cell inside a collapsed-border table
+     is ignored by both Chrome and Safari, which loses the row labels the
+     moment the days scroll — the one thing the board cannot do without. */
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+}
+
+.cboard th,
+.cboard td {
+  padding: 7px 6px;
+  text-align: center;
+  font-weight: 400;
+}
+
+.cboard thead th {
+  padding-top: 13px;
+  line-height: 1.2;
+}
+
+.cboard-dow,
+.cboard-day {
+  display: block;
+  font-variant-numeric: tabular-nums;
+}
+
+.cboard-dow {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.cboard-day {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.cboard-label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 128px;
+  max-width: 128px;
+  padding-left: 15px !important;
+  text-align: left !important;
+  font-size: 13.5px;
+  /* The card is translucent, so a sticky column needs its own opaque ground
+     — otherwise the days scroll visibly underneath their own labels. */
+  background: var(--surface-1);
+  box-shadow: 1px 0 0 var(--hairline);
+}
+
+.cboard-corner {
+  z-index: 2;
+}
+
+.cboard-rate {
+  min-width: 52px;
+  padding-right: 15px !important;
+  text-align: right !important;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.cboard-rate[data-tone='good'] {
+  color: var(--won);
+}
+
+.cboard-score-row th,
+.cboard-score-row td {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.cboard-score {
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cboard-score[data-tone='bad'] {
+  color: #ff4d4f;
+}
+
+.cboard-score[data-tone='mid'] {
+  color: #ffa53d;
+}
+
+.cboard-score[data-tone='good'] {
+  color: var(--won);
+}
+
+/* Done, missed, or nothing logged — three states you can tell apart at a
+   glance and across a whole month of columns. */
+.cboard-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  border: 1.5px solid var(--hairline-strong, var(--hairline));
+}
+
+.cboard-cell[data-state='done'] {
+  background: var(--won);
+  border-color: var(--won);
+}
+
+.cboard-cell[data-state='missed'] {
+  color: #ff4d4f;
+  border-color: #ff4d4f;
+  border-style: dashed;
 }
 
