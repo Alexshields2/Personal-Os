@@ -53,6 +53,8 @@ export function day(date: string, over: Partial<DayEntry> = {}): DayEntry {
     gym: {},
     gymMissed: false,
     gymMissedWhy: '',
+    habitMissed: {},
+    endJournal: '',
     food: [],
     // Closed is what makes `isLogged` true without inventing metric values.
     closed: true,
@@ -218,6 +220,7 @@ export function makeState(over: Partial<AppState> = {}): AppState {
     outreach: [],
     marketing: { startDate: '2026-09-09', days: {} },
     workout: [],
+    identity: { title: 'Alex 4.0', text: '', image: '' },
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
     ...over,
   }

@@ -2,7 +2,7 @@ import type { MarketingDay } from './marketing'
 
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 20
+export const STATE_VERSION = 21
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -185,6 +185,11 @@ export interface DayEntry {
   gymMissed: boolean
   /** Why it was missed, in a line. Optional. */
   gymMissedWhy: string
+  /** Habit id -> marked as not done. Separate from `checks`, so "missed" and
+   *  "not filled in yet" are different answers rather than the same blank. */
+  habitMissed: Record<string, boolean>
+  /** The night's journal, written at the end of the day. */
+  endJournal: string
   /** What was eaten. Calories and protein for the day are its totals. */
   food: FoodEntry[]
   /** Set when the nightly scorecard is signed off. */
@@ -203,6 +208,17 @@ export interface FoodEntry {
   what: string
   kcal: number
   protein: number
+}
+
+/**
+ * The person this is all for, in their own words, with a picture. Read at the
+ * top of every day — the reason the rest of the page gets filled in.
+ */
+export interface Identity {
+  title: string
+  text: string
+  /** A downscaled data URI, or empty. The whole state syncs as one document. */
+  image: string
 }
 
 /** An exercise in the gym list, and how many sets it gets. */
@@ -770,4 +786,6 @@ export interface AppState {
   checklist: ChecklistItem[]
   /** The gym list: each exercise and its number of sets. Edited on Today. */
   workout: Exercise[]
+  /** What sits at the top of Today: who you are becoming, and the picture of it. */
+  identity: Identity
 }

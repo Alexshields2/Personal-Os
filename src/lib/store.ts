@@ -16,6 +16,7 @@ import {
   DEFAULT_TARGETS,
   DEFAULT_UPKEEP,
   CORE_QUESTIONS,
+  DEFAULT_IDENTITY,
   DEFAULT_WORKOUT,
   HABITS,
   MAX_PRIORITIES,
@@ -40,6 +41,7 @@ import type {
   DomainNode,
   Exercise,
   FoodEntry,
+  Identity,
   Goal,
   GymSet,
   Holding,
@@ -108,6 +110,7 @@ function initialState(): AppState {
     outreach: [],
     marketing: { startDate: nextWorkingDay(todayISO()), days: {} },
     workout: DEFAULT_WORKOUT.map((e) => ({ ...e })),
+    identity: { ...DEFAULT_IDENTITY },
   }
 }
 
@@ -316,6 +319,17 @@ export function hydrate(raw: string): AppState {
       ),
     }
   }
+  // Everything logged before the one-page day is noise from older versions
+  // and sample data, and it was asked for gone. Days only — weeks, tasks,
+  // money and the gym list are untouched.
+  if ((parsed.version ?? 1) < 21) {
+    parsed = {
+      ...parsed,
+      days: Object.fromEntries(
+        Object.entries(parsed.days ?? {}).filter(([k]) => k >= DAYS_START),
+      ),
+    }
+  }
   const days: Record<string, DayEntry> = {}
   for (const [k, v] of Object.entries(parsed.days ?? {})) {
     days[k] = {
@@ -341,6 +355,8 @@ export function hydrate(raw: string): AppState {
       gym: v?.gym ?? {},
       gymMissed: v?.gymMissed ?? false,
       gymMissedWhy: v?.gymMissedWhy ?? '',
+      habitMissed: v?.habitMissed ?? {},
+      endJournal: v?.endJournal ?? '',
       food: v?.food ?? [],
     }
   }
@@ -436,6 +452,7 @@ export function hydrate(raw: string): AppState {
       days: parsed.marketing?.days ?? {},
     },
     workout: parsed.workout ?? base.workout,
+    identity: { ...base.identity, ...(parsed.identity ?? {}) },
   }
 }
 
@@ -479,6 +496,8 @@ export function emptyDay(date: string): DayEntry {
     gym: {},
     gymMissed: false,
     gymMissedWhy: '',
+    habitMissed: {},
+    endJournal: '',
     food: [],
     closed: false,
   }
@@ -506,6 +525,9 @@ export function newTask(title: string, over: Partial<Task> = {}): Task {
     ...over,
   }
 }
+
+/** The first day kept: everything logged before this was cleared at v21. */
+export const DAYS_START = '2026-09-22'
 
 /** The shipped nightly-sheet trackers that no longer belong to the day. */
 export const RETIRED_TRACKERS = new Set([
@@ -655,6 +677,19 @@ export const actions = {
       // A logged set means it wasn't missed after all.
       gymMissed: trained ? false : prev.gymMissed,
     })
+  },
+
+  /** A habit is done, missed, or not answered yet — three states, one tap each. */
+  markHabit(date: string, id: string, value: 'done' | 'missed' | null) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, {
+      checks: { ...prev.checks, [id]: value === 'done' },
+      habitMissed: { ...prev.habitMissed, [id]: value === 'missed' },
+    })
+  },
+
+  setIdentity(patch: Partial<Identity>) {
+    set({ ...state, identity: { ...state.identity, ...patch } })
   },
 
   /** A missed session goes on the record; it is not a rest day and not a blank. */

@@ -1,8 +1,24 @@
-import { useMemo, useState } from 'react'
-import { Card, Check, Empty, GrowText, SectionTitle, Segmented, Stepper } from '../components/ui'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Card,
+  Check,
+  Empty,
+  GrowText,
+  Meter,
+  SectionTitle,
+  Segmented,
+  Stepper,
+} from '../components/ui'
 import TimeLog from '../components/TimeLog'
 import { IconChevron, IconPlus, IconTrash } from '../components/icons'
-import { ACCOUNT_LABEL, PURSE_LABEL } from '../lib/config'
+import {
+  ACCOUNT_LABEL,
+  CLOTHES_CHECK,
+  PURSE_LABEL,
+  READ_CHECK,
+  VISION_IMAGE_MAX_PX,
+  VISION_IMAGE_QUALITY,
+} from '../lib/config'
 import {
   addDays,
   formatLong,
@@ -14,7 +30,8 @@ import {
 } from '../lib/date'
 import { euro, num, uid } from '../lib/format'
 import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
-import { lastGymSets, missedGymCount, todoFor } from '../lib/selectors'
+import { dayProgress, lastGymSets, missedGymCount, todoFor } from '../lib/selectors'
+import { downscaleImage } from '../lib/image'
 import { ACCOUNT_OWNER, BANK_ACCOUNTS } from '../lib/types'
 import type { AccountId, DayEntry, Exercise, Purse, Targets } from '../lib/types'
 
@@ -26,8 +43,6 @@ import type { AccountId, DayEntry, Exercise, Purse, Targets } from '../lib/types
  * actually log.
  */
 type View = 'day' | 'time'
-
-const CLOTHES = 'lay_out_clothes'
 
 export default function Today({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const state = useStore()
@@ -94,6 +109,8 @@ export default function Today({ onNavigate }: { onNavigate?: (tab: string) => vo
         <TimeLog date={date} day={day} />
       ) : (
         <>
+          {!future && <DayBar date={date} />}
+          <IdentityCard date={date} day={day} readable={!future} />
           <Notes date={date} day={day} />
           {!future && <Sleep date={date} day={day} targets={state.targets} />}
           <Todo date={date} onOpenWork={() => onNavigate?.('work')} />
@@ -108,6 +125,37 @@ export default function Today({ onNavigate }: { onNavigate?: (tab: string) => vo
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ----------------------------------------------------------------- the day
+
+/**
+ * One bar over everything the day asks for. It names what is left rather
+ * than only counting it, so the answer to "what now" is on the same line.
+ */
+function DayBar({ date }: { date: string }) {
+  const state = useStore()
+  const progress = dayProgress(state, date)
+  const left = progress.parts.filter((p) => !p.done)
+
+  return (
+    <div className="day-bar">
+      <div className="day-bar-head">
+        <span className="t-cap">The day</span>
+        <span className="t-foot muted">
+          {progress.done} of {progress.total} · {Math.round(progress.pct)}%
+        </span>
+      </div>
+      <Meter pct={progress.pct} />
+      <p className="t-foot muted" style={{ marginTop: 8 }}>
+        {left.length === 0
+          ? 'Everything done.'
+          : `Left: ${left.slice(0, 3).map((p) => p.label).join(', ')}${
+              left.length > 3 ? ` and ${left.length - 3} more` : ''
+            }`}
+      </p>
     </div>
   )
 }
@@ -170,6 +218,151 @@ function EditToggle({ editing, onToggle }: { editing: boolean; onToggle: () => v
     <button className="btn btn-quiet btn-sm" onClick={onToggle}>
       {editing ? 'Done' : 'Edit'}
     </button>
+  )
+}
+
+// ----------------------------------------------------------------- identity
+
+/**
+ * Who this is all for, at the top of every day: your own words, a picture,
+ * and a tick for having actually read it. The play button reads it aloud
+ * with the browser's own voice — no account, no network, nothing leaves the
+ * device.
+ */
+function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; readable: boolean }) {
+  const state = useStore()
+  const { title, text, image } = state.identity
+  const [editing, setEditing] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
+  const [note, setNote] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const read = Boolean(day.checks[READ_CHECK])
+  const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window
+
+  // A voice that keeps reading after you have moved on is a bug you can hear.
+  useEffect(() => {
+    return () => {
+      if (canSpeak) window.speechSynthesis.cancel()
+    }
+  }, [canSpeak])
+
+  const play = () => {
+    if (!canSpeak || !text.trim()) return
+    window.speechSynthesis.cancel()
+    const said = new SpeechSynthesisUtterance(`${title}. ${text}`)
+    said.onend = () => setSpeaking(false)
+    said.onerror = () => setSpeaking(false)
+    setSpeaking(true)
+    window.speechSynthesis.speak(said)
+  }
+
+  const stop = () => {
+    if (canSpeak) window.speechSynthesis.cancel()
+    setSpeaking(false)
+  }
+
+  const attach = async (file: File | undefined) => {
+    if (!file) return
+    try {
+      // Downscaled before it is stored: the whole app is one document that
+      // syncs as a blob, and a full-size photo would dwarf everything else.
+      const data = await downscaleImage(file, VISION_IMAGE_MAX_PX, VISION_IMAGE_QUALITY)
+      actions.setIdentity({ image: data })
+      setNote('')
+    } catch {
+      setNote("That file couldn't be read as an image.")
+    }
+  }
+
+  return (
+    <>
+      <SectionTitle
+        title={title || 'The top of the day'}
+        action={
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {canSpeak && text.trim() !== '' && (
+              <button className="btn btn-quiet btn-sm" onClick={speaking ? stop : play}>
+                {speaking ? 'Stop' : 'Play'}
+              </button>
+            )}
+            <EditToggle editing={editing} onToggle={() => setEditing(!editing)} />
+          </span>
+        }
+      />
+      <Card className="identity">
+        {image !== '' && <img className="identity-img" src={image} alt="" />}
+        <div className="card-pad">
+          {editing ? (
+            <div style={{ display: 'grid', gap: 10 }}>
+              <input
+                className="input"
+                value={title}
+                aria-label="Title"
+                placeholder="Alex 4.0"
+                onChange={(e) => actions.setIdentity({ title: e.target.value })}
+              />
+              <textarea
+                className="input"
+                style={{ minHeight: 160 }}
+                value={text}
+                aria-label="What it says"
+                placeholder="Who you are becoming, in your own words. Read it every morning."
+                onChange={(e) => actions.setIdentity({ text: e.target.value })}
+              />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-sm" onClick={() => fileRef.current?.click()}>
+                  {image ? 'Change photo' : 'Add photo'}
+                </button>
+                {image !== '' && (
+                  <button
+                    className="btn btn-sm btn-danger"
+                    onClick={() => actions.setIdentity({ image: '' })}
+                  >
+                    Remove photo
+                  </button>
+                )}
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                hidden
+                aria-label="Photo"
+                onChange={(e) => {
+                  void attach(e.target.files?.[0])
+                  e.target.value = ''
+                }}
+              />
+              {note !== '' && (
+                <p className="t-foot" style={{ color: 'var(--warning)' }} role="status">
+                  {note}
+                </p>
+              )}
+            </div>
+          ) : text.trim() === '' ? (
+            <Empty>Nothing written yet. Tap Edit and put it in your own words.</Empty>
+          ) : (
+            <p className="identity-text">{text}</p>
+          )}
+        </div>
+        {readable && !editing && (
+          <button
+            className="row"
+            style={{ borderTop: '1px solid var(--hairline)' }}
+            role="checkbox"
+            aria-checked={read}
+            onClick={() => actions.toggleCheck(date, READ_CHECK)}
+          >
+            <Check on={read} />
+            <span className="row-main">
+              <span className="row-title" style={{ opacity: read ? 0.55 : 1 }}>
+                Read it today
+              </span>
+            </span>
+          </button>
+        )}
+      </Card>
+    </>
   )
 }
 
@@ -342,11 +535,16 @@ function Habits({ date, day }: { date: string; day: DayEntry }) {
   const list = state.morningRitual
   const [editing, setEditing] = useState(false)
   const done = list.filter((h) => day.checks[h.id]).length
+  const missedCount = list.filter((h) => day.habitMissed[h.id]).length
 
   return (
     <>
       <SectionTitle
-        title={list.length ? `Habits · ${done}/${list.length}` : 'Habits'}
+        title={
+          list.length
+            ? `Habits · ${done}/${list.length}${missedCount ? ` · ${missedCount} missed` : ''}`
+            : 'Habits'
+        }
         action={<EditToggle editing={editing} onToggle={() => setEditing(!editing)} />}
       />
       <Card>
@@ -376,21 +574,39 @@ function Habits({ date, day }: { date: string; day: DayEntry }) {
                   </div>
                 )
               }
+              const missed = Boolean(day.habitMissed[h.id])
               return (
-                <button
-                  className="row"
-                  key={h.id}
-                  role="checkbox"
-                  aria-checked={on}
-                  onClick={() => actions.toggleCheck(date, h.id)}
-                >
-                  <Check on={on} />
-                  <span className="row-main">
-                    <span className="row-title" style={{ opacity: on ? 0.55 : 1 }}>
-                      {h.label}
+                <div className="row" key={h.id}>
+                  <button
+                    className="habit-main"
+                    role="checkbox"
+                    aria-checked={on}
+                    aria-label={h.label}
+                    onClick={() => actions.markHabit(date, h.id, on ? null : 'done')}
+                  >
+                    <Check on={on} />
+                    <span className="row-main">
+                      <span
+                        className="row-title"
+                        style={{
+                          opacity: on || missed ? 0.55 : 1,
+                          textDecoration: missed ? 'line-through' : undefined,
+                        }}
+                      >
+                        {h.label}
+                      </span>
+                      {missed && <span className="row-sub">Missed — noted</span>}
                     </span>
-                  </span>
-                </button>
+                  </button>
+                  <button
+                    className="btn btn-quiet btn-sm habit-x"
+                    aria-pressed={missed}
+                    aria-label={`Missed ${h.label}`}
+                    onClick={() => actions.markHabit(date, h.id, missed ? null : 'missed')}
+                  >
+                    ✕
+                  </button>
+                </div>
               )
             })}
           </div>
@@ -730,7 +946,7 @@ function EndOfDay({ date, day, targets }: { date: string; day: DayEntry; targets
   const state = useStore()
   const tomorrow = addDays(date, 1)
   const planned = state.tasks.filter((t) => t.scheduled === tomorrow)
-  const clothes = Boolean(day.checks[CLOTHES])
+  const clothes = Boolean(day.checks[CLOTHES_CHECK])
 
   return (
     <>
@@ -770,7 +986,7 @@ function EndOfDay({ date, day, targets }: { date: string; day: DayEntry; targets
             className="row"
             role="checkbox"
             aria-checked={clothes}
-            onClick={() => actions.toggleCheck(date, CLOTHES)}
+            onClick={() => actions.toggleCheck(date, CLOTHES_CHECK)}
           >
             <Check on={clothes} />
             <span className="row-main">
@@ -792,6 +1008,19 @@ function EndOfDay({ date, day, targets }: { date: string; day: DayEntry; targets
               onChange={(v) => actions.setMetric(date, 'consultingHours', v)}
             />
           </div>
+        </div>
+        <div className="card-pad" style={{ borderTop: '1px solid var(--hairline)' }}>
+          <div className="t-cap" style={{ marginBottom: 8 }}>
+            Journal
+          </div>
+          <textarea
+            className="input"
+            style={{ minHeight: 120 }}
+            value={day.endJournal}
+            aria-label="End of day journal"
+            placeholder="How the day actually went. Written at the end, not planned at the start."
+            onChange={(e) => actions.updateDay(date, { endJournal: e.target.value })}
+          />
         </div>
       </Card>
     </>

@@ -1,7 +1,9 @@
 import {
   CLEAN_IDS,
+  CLOTHES_CHECK,
   COMPOUNDING,
   CADENCE_PER_MONTH,
+  READ_CHECK,
   DEAL_STAGES,
   GOAL_HORIZONS,
   METRIC_BY_KEY,
@@ -1317,6 +1319,41 @@ export function lastGymSets(
     }
   }
   return out
+}
+
+export interface DayProgress {
+  done: number
+  total: number
+  pct: number
+  /** Every item the day asks for, so what's left can be named rather than guessed. */
+  parts: { label: string; done: boolean }[]
+}
+
+/**
+ * One bar over the whole day: the read, sleep, each habit, the gym, each
+ * to-do, water, food, hours in the office, tomorrow's list and the clothes.
+ * A missed habit or a missed session counts as not done — that is the point
+ * of marking it — and nothing here is weighted, because a day is only the
+ * sum of the things in it.
+ */
+export function dayProgress(state: AppState, date: string, today = todayISO()): DayProgress {
+  const day = state.days[date]
+  const parts: { label: string; done: boolean }[] = []
+  const add = (label: string, done: boolean) => parts.push({ label, done })
+
+  add('Read', Boolean(day?.checks[READ_CHECK]))
+  add('Sleep', Boolean(day?.bedtime && day?.wakeTime))
+  for (const h of state.morningRitual) add(h.label, Boolean(day?.checks[h.id]))
+  add('Gym', Boolean(day?.trained))
+  for (const t of todoFor(state, date, today)) add(t.title, t.done)
+  add('Water', (day?.metrics.waterL ?? 0) >= state.targets.waterL)
+  add('Food', (day?.food.length ?? 0) > 0)
+  add('Hours in office', (day?.metrics.consultingHours ?? 0) > 0)
+  add("Tomorrow's to-do", state.tasks.some((t) => t.scheduled === addDays(date, 1)))
+  add('Clothes', Boolean(day?.checks[CLOTHES_CHECK]))
+
+  const done = parts.filter((p) => p.done).length
+  return { done, total: parts.length, pct: parts.length ? (done / parts.length) * 100 : 0, parts }
 }
 
 /** Gym days marked missed in the `window` days ending on `date`, inclusive. */

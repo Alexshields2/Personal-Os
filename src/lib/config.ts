@@ -13,6 +13,7 @@ import type {
   DomainLink,
   DomainNode,
   Exercise,
+  Identity,
   LearnItem,
   Loop,
   MetricKey,
@@ -101,6 +102,17 @@ export const HABITS: { id: string; label: string }[] = [
   { id: 'm_journal', label: 'Morning journal' },
   { id: 'm_read', label: 'Read 10 pages' },
 ]
+
+/** Day checks that aren't habits: reading the top of the page, and the clothes. */
+export const READ_CHECK = 'read_identity'
+export const CLOTHES_CHECK = 'lay_out_clothes'
+
+/** What the top of Today starts as. Every word of it is yours to replace. */
+export const DEFAULT_IDENTITY: Identity = {
+  title: 'Alex 4.0',
+  text: '',
+  image: '',
+}
 
 /** The gym list a fresh install starts with. Edited on Today. */
 export const DEFAULT_WORKOUT: Exercise[] = [

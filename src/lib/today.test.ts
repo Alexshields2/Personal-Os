@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { HABITS } from './config'
 import { hoursMinutes, sleepMinutes } from './date'
 import { day, daysMap, makeState, task } from './fixtures'
-import { lastGymSets, missedGymCount, todoFor } from './selectors'
+import { EMPTY_METRICS } from './types'
+import { dayProgress, lastGymSets, missedGymCount, todoFor } from './selectors'
 import { actions, getState, hydrate } from './store'
 
 /**
@@ -69,6 +70,44 @@ describe('missed gym days', () => {
   })
 })
 
+describe('the day bar', () => {
+  const D = '2026-09-22'
+
+  it('counts every part of the day, and names what is left', () => {
+    const state = makeState({
+      morningRitual: HABITS.map((h) => ({ ...h })),
+      days: daysMap([
+        day(D, {
+          checks: { read_identity: true, m_cold: true, lay_out_clothes: true },
+          habitMissed: { m_journal: true },
+          bedtime: '23:30',
+          wakeTime: '06:00',
+          trained: true,
+          metrics: { ...EMPTY_METRICS, waterL: 3.5, consultingHours: 8 },
+          food: [{ id: 'f', what: 'Eggs', kcal: 300, protein: 20 }],
+        }),
+      ]),
+      tasks: [task('t1', { title: 'Call John', scheduled: D, done: true })],
+    })
+    const p = dayProgress(state, D, D)
+    // Read, sleep, 3 habits, gym, 1 to-do, water, food, office, tomorrow, clothes.
+    expect(p.total).toBe(12)
+    // Everything above except the two habits not done and tomorrow's list.
+    expect(p.done).toBe(9)
+    expect(p.parts.filter((x) => !x.done).map((x) => x.label)).toEqual([
+      'Morning journal',
+      'Read 10 pages',
+      "Tomorrow's to-do",
+    ])
+  })
+
+  it('is empty on a day with nothing logged', () => {
+    const p = dayProgress(makeState(), D, D)
+    expect(p.done).toBe(0)
+    expect(p.pct).toBe(0)
+  })
+})
+
 describe('last session', () => {
   it('is the most recent earlier day that logged the exercise', () => {
     const state = makeState({
@@ -129,6 +168,18 @@ describe('what the page works out for you', () => {
     expect(saved.trained).toBe(true)
   })
 
+  it('marks a habit done, missed, or neither', () => {
+    actions.markHabit(D, 'm_cold', 'missed')
+    expect(getState().days[D].habitMissed.m_cold).toBe(true)
+    expect(getState().days[D].checks.m_cold).toBe(false)
+    actions.markHabit(D, 'm_cold', 'done')
+    expect(getState().days[D].habitMissed.m_cold).toBe(false)
+    expect(getState().days[D].checks.m_cold).toBe(true)
+    actions.markHabit(D, 'm_cold', null)
+    expect(getState().days[D].checks.m_cold).toBe(false)
+    expect(getState().days[D].habitMissed.m_cold).toBe(false)
+  })
+
   it('totals the food log into calories and protein', () => {
     actions.setFood(D, [
       { id: 'a', what: 'Eggs', kcal: 300, protein: 20 },
@@ -155,8 +206,8 @@ describe('v20 — one page', () => {
         { id: 'my_step', label: 'MY OWN HABIT' },
       ],
       days: {
-        '2026-09-20': { date: '2026-09-20', trackers: { tk_bed: 23 * 60 + 15 }, notes: 'old note', journal: '' },
-        '2026-09-21': { date: '2026-09-21', trackers: { tk_wake: 6 * 60 + 5 }, notes: '', journal: 'kept' },
+        '2026-09-22': { date: '2026-09-22', trackers: { tk_bed: 23 * 60 + 15 }, notes: 'old note', journal: '' },
+        '2026-09-23': { date: '2026-09-23', trackers: { tk_wake: 6 * 60 + 5 }, notes: '', journal: 'kept' },
       },
     }),
   )
@@ -172,13 +223,13 @@ describe('v20 — one page', () => {
   })
 
   it("carries the wake time over, and last night's bedtime onto the morning", () => {
-    expect(out.days['2026-09-21'].wakeTime).toBe('06:05')
-    expect(out.days['2026-09-21'].bedtime).toBe('23:15')
+    expect(out.days['2026-09-23'].wakeTime).toBe('06:05')
+    expect(out.days['2026-09-23'].bedtime).toBe('23:15')
   })
 
   it('folds old day notes into the notes the page shows', () => {
-    expect(out.days['2026-09-20'].journal).toBe('old note')
-    expect(out.days['2026-09-21'].journal).toBe('kept')
+    expect(out.days['2026-09-22'].journal).toBe('old note')
+    expect(out.days['2026-09-23'].journal).toBe('kept')
   })
 
   it('starts the gym list', () => {
@@ -191,5 +242,40 @@ describe('v20 — one page', () => {
       JSON.stringify({ version: 16, morningRitual: [{ id: 'm_alarm', label: 'Alarm off' }], days: {} }),
     )
     expect(old.morningRitual.map((m) => m.id)).toEqual(HABITS.map((h) => h.id))
+  })
+})
+
+/**
+ * v21 cleared the days logged before the one-page version, which were sample
+ * data and older shapes. Only days: the week's notes, tasks, money and the
+ * gym list are not touched.
+ */
+describe('v21 — days before 22 Sep are cleared', () => {
+  const out = hydrate(
+    JSON.stringify({
+      version: 20,
+      days: {
+        '2026-09-10': { date: '2026-09-10', journal: 'old' },
+        '2026-09-21': { date: '2026-09-21', journal: 'also old' },
+        '2026-09-22': { date: '2026-09-22', journal: 'kept' },
+        '2026-09-23': { date: '2026-09-23', journal: 'kept too' },
+      },
+      weeks: { '2026-09-14': { weekStart: '2026-09-14', plan: 'week notes stay' } },
+      tasks: [{ id: 't', title: 'Task stays', scheduled: '2026-09-01' }],
+    }),
+  )
+
+  it('drops the days before, and keeps the rest', () => {
+    expect(Object.keys(out.days).sort()).toEqual(['2026-09-22', '2026-09-23'])
+  })
+
+  it('leaves weeks and tasks alone', () => {
+    expect(out.weeks['2026-09-14'].plan).toBe('week notes stay')
+    expect(out.tasks).toHaveLength(1)
+  })
+
+  it('starts the top of the day off', () => {
+    expect(out.identity.title).toBe('Alex 4.0')
+    expect(out.identity.text).toBe('')
   })
 })

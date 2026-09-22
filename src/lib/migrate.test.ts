@@ -82,7 +82,7 @@ const V18 = JSON.stringify({
     { id: 'tk_meals', label: 'Meals', kind: 'text', unit: '', target: 0, direction: 'atLeast', group: 'Body', archived: false },
     { id: 'tk_mine', label: 'MY OWN TRACKER', kind: 'check', unit: '', target: 1, direction: 'atLeast', group: 'Mind', archived: false },
   ],
-  days: { '2026-09-01': { date: '2026-09-01', trackers: { tk_focus: 8 }, closed: true } },
+  days: { '2026-09-23': { date: '2026-09-23', trackers: { tk_focus: 8 }, closed: true } },
 })
 
 describe('v19 — clearing the nightly sheet', () => {
@@ -107,7 +107,7 @@ describe('v19 — clearing the nightly sheet', () => {
   })
 
   it('keeps the values already logged against an archived tracker', () => {
-    expect(out.days['2026-09-01'].trackers.tk_focus).toBe(8)
+    expect(out.days['2026-09-23'].trackers.tk_focus).toBe(8)
   })
 })
 

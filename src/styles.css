@@ -2884,3 +2884,64 @@ button.edge:hover {
   flex-wrap: wrap;
 }
 
+/* The top of the day: the picture, the words, and the tick for having read
+   them. Sized to be read, not skimmed past. */
+.identity {
+  overflow: hidden;
+}
+
+.identity-img {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.identity-text {
+  font-size: 16px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+}
+
+/* One bar over the whole day, above everything it counts. */
+.day-bar {
+  margin-top: 16px;
+  padding: 14px 16px 15px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  background: var(--fill-soft);
+}
+
+.day-bar-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+/* A habit row has two answers: the tick, and the cross for a day it did not
+   happen — so "missed" and "not filled in" never look the same. */
+.habit-main {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.habit-x {
+  flex: none;
+  font-size: 14px;
+  line-height: 1;
+  padding: 7px 10px;
+}
+
+.habit-x[aria-pressed='true'] {
+  color: var(--warning);
+  background: var(--fill-strong);
+}
+
