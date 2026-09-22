@@ -178,6 +178,13 @@ export interface DayEntry {
   wakeTime: string
   /** Exercise id -> the sets done that day, in order. */
   gym: Record<string, GymSet[]>
+  /**
+   * Marked as a missed gym day. Deliberate, so a miss is on the record rather
+   * than indistinguishable from a day nobody logged.
+   */
+  gymMissed: boolean
+  /** Why it was missed, in a line. Optional. */
+  gymMissedWhy: string
   /** What was eaten. Calories and protein for the day are its totals. */
   food: FoodEntry[]
   /** Set when the nightly scorecard is signed off. */

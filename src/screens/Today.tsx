@@ -14,7 +14,7 @@ import {
 } from '../lib/date'
 import { euro, num, uid } from '../lib/format'
 import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
-import { lastGymSets, todoFor } from '../lib/selectors'
+import { lastGymSets, missedGymCount, todoFor } from '../lib/selectors'
 import { ACCOUNT_OWNER, BANK_ACCOUNTS } from '../lib/types'
 import type { AccountId, DayEntry, Exercise, Purse, Targets } from '../lib/types'
 
@@ -463,13 +463,31 @@ function Gym({ date, day }: { date: string; day: DayEntry }) {
   return (
     <>
       <SectionTitle
-        title={logged ? `Gym · ${logged}/${list.length} logged` : 'Gym'}
-        action={<EditToggle editing={editing} onToggle={() => setEditing(!editing)} />}
+        title={
+          day.gymMissed ? 'Gym · missed' : logged ? `Gym · ${logged}/${list.length} logged` : 'Gym'
+        }
+        action={
+          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {!editing && !logged && !day.gymMissed && (
+              <button
+                className="btn btn-quiet btn-sm"
+                onClick={() => actions.setGymMissed(date, true)}
+              >
+                Missed gym
+              </button>
+            )}
+            <EditToggle editing={editing} onToggle={() => setEditing(!editing)} />
+          </span>
+        }
       />
       <Card>
-        {list.length === 0 && !editing && <Empty>No exercises yet. Tap Edit to add one.</Empty>}
+        {list.length === 0 && !editing && !day.gymMissed && (
+          <Empty>No exercises yet. Tap Edit to add one.</Empty>
+        )}
 
-        {editing ? (
+        {!editing && day.gymMissed ? (
+          <MissedGym date={date} day={day} />
+        ) : editing ? (
           <>
             {list.length > 0 && (
               <div className="rows">
@@ -554,12 +572,46 @@ function Gym({ date, day }: { date: string; day: DayEntry }) {
           })
         )}
       </Card>
-      {!editing && list.length > 0 && (
+      {!editing && !day.gymMissed && list.length > 0 && (
         <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
           Faint numbers are last session's — the ones to beat.
         </p>
       )}
     </>
+  )
+}
+
+/**
+ * A missed session, on the record: marked on purpose, with a line for why
+ * and the running count, so a miss reads as a miss rather than a blank day.
+ */
+function MissedGym({ date, day }: { date: string; day: DayEntry }) {
+  const state = useStore()
+  const count = missedGymCount(state, date)
+
+  return (
+    <div className="rows">
+      <div className="row">
+        <span className="row-main">
+          <span className="row-title">Missed gym — noted</span>
+          <span className="row-sub">
+            {count <= 1 ? 'The only miss in the last 30 days' : `${count} missed in the last 30 days`}
+          </span>
+        </span>
+        <button className="btn btn-sm" onClick={() => actions.setGymMissed(date, false)}>
+          Undo
+        </button>
+      </div>
+      <div style={{ padding: 13 }}>
+        <input
+          className="input"
+          placeholder="Why? (optional)"
+          aria-label="Why the gym was missed"
+          value={day.gymMissedWhy}
+          onChange={(e) => actions.updateDay(date, { gymMissedWhy: e.target.value })}
+        />
+      </div>
+    </div>
   )
 }
 

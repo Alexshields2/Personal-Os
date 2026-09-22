@@ -339,6 +339,8 @@ export function hydrate(raw: string): AppState {
       bedtime: v?.bedtime ?? '',
       wakeTime: v?.wakeTime ?? '',
       gym: v?.gym ?? {},
+      gymMissed: v?.gymMissed ?? false,
+      gymMissedWhy: v?.gymMissedWhy ?? '',
       food: v?.food ?? [],
     }
   }
@@ -475,6 +477,8 @@ export function emptyDay(date: string): DayEntry {
     bedtime: '',
     wakeTime: '',
     gym: {},
+    gymMissed: false,
+    gymMissedWhy: '',
     food: [],
     closed: false,
   }
@@ -644,7 +648,23 @@ export const actions = {
     const trained = Object.values(gym).some((list) =>
       list.some((s) => s.kg !== null || s.reps !== null),
     )
-    actions.updateDay(date, { gym, trained, restDay: trained ? false : prev.restDay })
+    actions.updateDay(date, {
+      gym,
+      trained,
+      restDay: trained ? false : prev.restDay,
+      // A logged set means it wasn't missed after all.
+      gymMissed: trained ? false : prev.gymMissed,
+    })
+  },
+
+  /** A missed session goes on the record; it is not a rest day and not a blank. */
+  setGymMissed(date: string, missed: boolean) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, {
+      gymMissed: missed,
+      trained: missed ? false : prev.trained,
+      restDay: missed ? false : prev.restDay,
+    })
   },
 
   setWorkout(workout: Exercise[]) {

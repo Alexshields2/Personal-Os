@@ -1319,6 +1319,13 @@ export function lastGymSets(
   return out
 }
 
+/** Gym days marked missed in the `window` days ending on `date`, inclusive. */
+export function missedGymCount(state: AppState, date: string, window = 30): number {
+  let n = 0
+  for (let i = 0; i < window; i++) if (state.days[addDays(date, -i)]?.gymMissed) n++
+  return n
+}
+
 export function tasksTouchedOn(state: AppState, date: string): Task[] {
   return state.tasks.filter((t) => t.scheduled === date || t.doneDate === date)
 }

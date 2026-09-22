@@ -51,6 +51,8 @@ export function day(date: string, over: Partial<DayEntry> = {}): DayEntry {
     bedtime: '',
     wakeTime: '',
     gym: {},
+    gymMissed: false,
+    gymMissedWhy: '',
     food: [],
     // Closed is what makes `isLogged` true without inventing metric values.
     closed: true,

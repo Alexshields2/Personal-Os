@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { HABITS } from './config'
 import { hoursMinutes, sleepMinutes } from './date'
 import { day, daysMap, makeState, task } from './fixtures'
-import { lastGymSets, todoFor } from './selectors'
+import { lastGymSets, missedGymCount, todoFor } from './selectors'
 import { actions, getState, hydrate } from './store'
 
 /**
@@ -55,6 +55,20 @@ describe('the to-do list comes from Work', () => {
   })
 })
 
+describe('missed gym days', () => {
+  it('counts the misses in the last 30 days, and only those', () => {
+    const state = makeState({
+      days: daysMap([
+        day('2026-08-01', { gymMissed: true }), // too long ago
+        day('2026-09-01', { gymMissed: true }),
+        day('2026-09-20', { gymMissed: true }),
+        day('2026-09-21', { trained: true }),
+      ]),
+    })
+    expect(missedGymCount(state, '2026-09-22')).toBe(2)
+  })
+})
+
 describe('last session', () => {
   it('is the most recent earlier day that logged the exercise', () => {
     const state = makeState({
@@ -102,6 +116,17 @@ describe('what the page works out for you', () => {
     actions.setGymSet(D, 'ex_incline', 1, { kg: null })
     saved = getState().days[D]
     expect(saved.trained).toBe(false)
+  })
+
+  it('puts a missed session on the record, and a logged set takes it back off', () => {
+    actions.setGymMissed(D, true)
+    let saved = getState().days[D]
+    expect(saved.gymMissed).toBe(true)
+    expect(saved.trained).toBe(false)
+    actions.setGymSet(D, 'ex_squat', 0, { reps: 5 })
+    saved = getState().days[D]
+    expect(saved.gymMissed).toBe(false)
+    expect(saved.trained).toBe(true)
   })
 
   it('totals the food log into calories and protein', () => {
