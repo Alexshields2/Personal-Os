@@ -33,6 +33,8 @@ import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
 import { dayProgress, lastGymSets, missedGymCount, progressTone, todoFor } from '../lib/selectors'
 import { downscaleImage } from '../lib/image'
 import { loadVoices, pickVoice, scoreVoice, speak } from '../lib/speech'
+import { elevenVoices, playEleven, stopEleven } from '../lib/eleven'
+import type { ElevenVoice } from '../lib/eleven'
 import { ACCOUNT_OWNER, BANK_ACCOUNTS } from '../lib/types'
 import type { AccountId, DayEntry, Exercise, Purse, Targets } from '../lib/types'
 
@@ -255,6 +257,7 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
   const [speaking, setSpeaking] = useState(false)
   const [note, setNote] = useState('')
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [real, setReal] = useState<ElevenVoice[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const read = Boolean(day.checks[READ_CHECK])
   const canSpeak = typeof window !== 'undefined' && 'speechSynthesis' in window
@@ -263,21 +266,57 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
   // usually empty, with a "voiceschanged" event along shortly after.
   useEffect(() => loadVoices(setVoices), [])
 
+  // The real voices, if this deployment has a key for them. Asked once: with
+  // no key the answer never changes within a session.
+  useEffect(() => {
+    let live = true
+    void elevenVoices().then((result) => {
+      if (live) setReal(result.voices)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
   // A voice that keeps reading after you have moved on is a bug you can hear.
   useEffect(() => {
     return () => {
       if (canSpeak) window.speechSynthesis.cancel()
+      stopEleven()
     }
   }, [canSpeak])
 
-  const play = () => {
-    if (speak(`${title}. ${text}`, voices, state.identity.voice, () => setSpeaking(false))) {
+  /**
+   * Say something, in the best voice available for the choice made. A real
+   * voice that fails for any reason — no key, no session, no credits — falls
+   * straight back to the device's own rather than leaving a dead button.
+   */
+  const say = async (words: string) => {
+    const chosen = state.identity.voice
+    setNote('')
+    if (chosen.startsWith('el:')) {
       setSpeaking(true)
+      const result = await playEleven(words, chosen.slice(3), () => setSpeaking(false))
+      if (result === 'played') return
+      setNote(
+        result === 'no-key'
+          ? 'No ElevenLabs key on this deployment — reading it in the device voice.'
+          : result === 'not-signed-in'
+            ? 'Sign in again to use the real voices — reading it in the device voice.'
+            : "Couldn't reach ElevenLabs — reading it in the device voice.",
+      )
     }
+    if (!speak(words, voices, chosen, () => setSpeaking(false))) setSpeaking(false)
+    else setSpeaking(true)
+  }
+
+  const play = () => {
+    void say(`${title}. ${text}`)
   }
 
   const stop = () => {
     if (canSpeak) window.speechSynthesis.cancel()
+    stopEleven()
     setSpeaking(false)
   }
 
@@ -328,7 +367,7 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
                 placeholder="Who you are becoming, in your own words. Read it every morning."
                 onChange={(e) => actions.setIdentity({ text: e.target.value })}
               />
-              {canSpeak && choices.length > 0 && (
+              {(canSpeak || real.length > 0) && (
                 <label className="identity-voice">
                   <span className="t-cap">Voice</span>
                   <select
@@ -336,20 +375,50 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
                     value={state.identity.voice}
                     aria-label="Voice"
                     onChange={(e) => {
-                      const name = e.target.value
-                      actions.setIdentity({ voice: name })
-                      // Say a line in it, because a voice name tells you nothing.
-                      speak('This is how it sounds.', voices, name, () => setSpeaking(false))
+                      const picked = e.target.value
+                      actions.setIdentity({ voice: picked })
+                      // Say a line in it: a voice name tells you nothing. This
+                      // reads the new choice rather than the saved one, which
+                      // has not reached this render yet.
+                      setNote('')
+                      if (picked.startsWith('el:')) {
+                        setSpeaking(true)
+                        void playEleven('This is how it sounds.', picked.slice(3), () =>
+                          setSpeaking(false),
+                        ).then((result) => {
+                          if (result === 'played') return
+                          setSpeaking(false)
+                          setNote(
+                            result === 'no-key'
+                              ? 'No ElevenLabs key on this deployment yet.'
+                              : "Couldn't reach ElevenLabs just now.",
+                          )
+                        })
+                      } else {
+                        speak('This is how it sounds.', voices, picked, () => setSpeaking(false))
+                      }
                     }}
                   >
-                    <option value="">
-                      Automatic{chosen ? ` — ${chosen.name}` : ''}
-                    </option>
-                    {choices.map(({ voice }) => (
-                      <option key={voice.name} value={voice.name}>
-                        {voice.name} ({voice.lang})
-                      </option>
-                    ))}
+                    <option value="">Automatic{chosen ? ` — ${chosen.name}` : ''}</option>
+                    {real.length > 0 && (
+                      <optgroup label="ElevenLabs">
+                        {real.map((voice) => (
+                          <option key={voice.id} value={`el:${voice.id}`}>
+                            {voice.name}
+                            {voice.description ? ` — ${voice.description}` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {choices.length > 0 && (
+                      <optgroup label="On this device">
+                        {choices.map(({ voice }) => (
+                          <option key={voice.name} value={voice.name}>
+                            {voice.name} ({voice.lang})
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </label>
               )}
@@ -389,7 +458,7 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
             <p className="identity-text">{text}</p>
           )}
         </div>
-        {canSpeak && !editing && text.trim() !== '' && (
+        {(canSpeak || real.length > 0) && !editing && text.trim() !== '' && (
           <div className="identity-play">
             <button className="btn btn-block" onClick={speaking ? stop : play}>
               {speaking ? (
@@ -400,6 +469,11 @@ function IdentityCard({ date, day, readable }: { date: string; day: DayEntry; re
               {speaking ? 'Stop' : 'Listen'}
             </button>
           </div>
+        )}
+        {note !== '' && !editing && (
+          <p className="t-foot muted" style={{ padding: '0 16px 12px' }} role="status">
+            {note}
+          </p>
         )}
         {readable && !editing && (
           <button
