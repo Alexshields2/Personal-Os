@@ -2701,6 +2701,15 @@ button.edge:hover {
   margin-bottom: 8px;
 }
 
+/* A home exercise names itself, so its name is a field rather than a label. */
+textarea.home-name {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: 16px;
+  letter-spacing: -0.012em;
+}
+
 .gym-grid {
   display: grid;
   gap: 6px 8px;
@@ -2824,6 +2833,20 @@ button.edge:hover {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+}
+
+/* The words of a task open it; the tick beside them finishes it. */
+.task-open {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+/* Started but not finished, in the one place it can be seen without opening
+   anything: a line down the edge of the row. */
+.row[data-doing='true'] {
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 /* A habit row has two answers: the tick, and the cross for a day it did not

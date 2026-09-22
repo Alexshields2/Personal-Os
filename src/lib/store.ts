@@ -44,6 +44,7 @@ import type {
   Identity,
   Goal,
   GymSet,
+  HomeExercise,
   Holding,
   Invoice,
   Project,
@@ -353,6 +354,8 @@ export function hydrate(raw: string): AppState {
       bedtime: v?.bedtime ?? '',
       wakeTime: v?.wakeTime ?? '',
       gym: v?.gym ?? {},
+      trainedAt: v?.trainedAt ?? '',
+      homeGym: v?.homeGym ?? [],
       gymMissed: v?.gymMissed ?? false,
       gymMissedWhy: v?.gymMissedWhy ?? '',
       habitMissed: v?.habitMissed ?? {},
@@ -429,6 +432,8 @@ export function hydrate(raw: string): AppState {
       return {
         scheduled: '',
         estimateMin: 0,
+        doing: false,
+        notes: '',
         priority: 2,
         kindHint: '',
         goalId: '',
@@ -494,6 +499,8 @@ export function emptyDay(date: string): DayEntry {
     bedtime: '',
     wakeTime: '',
     gym: {},
+    trainedAt: '',
+    homeGym: [],
     gymMissed: false,
     gymMissedWhy: '',
     habitMissed: {},
@@ -517,6 +524,8 @@ export function newTask(title: string, over: Partial<Task> = {}): Task {
     due: '',
     scheduled: '',
     estimateMin: 0,
+    doing: false,
+    notes: '',
     priority: 2,
     kindHint: '',
     created: todayISO(),
@@ -534,6 +543,12 @@ export const RETIRED_TRACKERS = new Set([
   'tk_tech', 'tk_diet', 'tk_sugar', 'tk_cold', 'tk_workout', 'tk_meditation', 'tk_focus',
   'tk_wellbeing', 'tk_workdone', 'tk_schedule', 'tk_cash', 'tk_con_biz', 'tk_con_life',
 ])
+
+/** A day counts as trained once a set is logged, at the gym or at home. */
+export function trainedFrom(gym: Record<string, GymSet[]>, home: HomeExercise[]): boolean {
+  const logged = (sets: GymSet[]) => sets.some((s) => s.kg !== null || s.reps !== null)
+  return Object.values(gym).some(logged) || home.some((e) => logged(e.sets))
+}
 
 /** Steps in clock order. Ties keep the order they were written in; untimed steps go last. */
 export function byTime<T extends { at?: string }>(items: T[]): T[] {
@@ -660,21 +675,77 @@ export const actions = {
     })
   },
 
-  /** Logging a set is what makes it a gym day — there is no separate box to tick. */
+  /** Logging a set is what makes it a training day — there is no box to tick. */
   setGymSet(date: string, exerciseId: string, index: number, patch: Partial<GymSet>) {
     const prev = state.days[date] ?? emptyDay(date)
     const sets = [...(prev.gym[exerciseId] ?? [])]
     while (sets.length <= index) sets.push({ kg: null, reps: null })
     sets[index] = { ...sets[index], ...patch }
     const gym = { ...prev.gym, [exerciseId]: sets }
-    const trained = Object.values(gym).some((list) =>
-      list.some((s) => s.kg !== null || s.reps !== null),
-    )
+    const trained = trainedFrom(gym, prev.homeGym)
     actions.updateDay(date, {
       gym,
       trained,
       restDay: trained ? false : prev.restDay,
       // A logged set means it wasn't missed after all.
+      gymMissed: trained ? false : prev.gymMissed,
+    })
+  },
+
+  /** Gym, home, or missed — one answer, and the card follows it. */
+  setTrainingPlace(date: string, place: 'gym' | 'home' | 'missed') {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, {
+      trainedAt: place === 'missed' ? prev.trainedAt : place,
+      gymMissed: place === 'missed',
+      restDay: false,
+    })
+  },
+
+  /** Add an exercise to the day's home workout. The sets are filled in after. */
+  addHomeExercise(date: string, name: string, sets = 3) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, {
+      trainedAt: 'home',
+      gymMissed: false,
+      homeGym: [
+        ...prev.homeGym,
+        {
+          id: uid(),
+          name,
+          sets: Array.from({ length: Math.max(1, sets) }, () => ({ kg: null, reps: null })),
+        },
+      ],
+    })
+  },
+
+  updateHomeExercise(date: string, id: string, patch: Partial<HomeExercise>) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const homeGym = prev.homeGym.map((e) => (e.id === id ? { ...e, ...patch } : e))
+    actions.updateDay(date, { homeGym, trained: trainedFrom(prev.gym, homeGym) })
+  },
+
+  removeHomeExercise(date: string, id: string) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const homeGym = prev.homeGym.filter((e) => e.id !== id)
+    actions.updateDay(date, { homeGym, trained: trainedFrom(prev.gym, homeGym) })
+  },
+
+  setHomeSet(date: string, id: string, index: number, patch: Partial<GymSet>) {
+    const prev = state.days[date] ?? emptyDay(date)
+    const homeGym = prev.homeGym.map((exercise) => {
+      if (exercise.id !== id) return exercise
+      const sets = [...exercise.sets]
+      while (sets.length <= index) sets.push({ kg: null, reps: null })
+      sets[index] = { ...sets[index], ...patch }
+      return { ...exercise, sets }
+    })
+    const trained = trainedFrom(prev.gym, homeGym)
+    actions.updateDay(date, {
+      homeGym,
+      trained,
+      trainedAt: 'home',
+      restDay: trained ? false : prev.restDay,
       gymMissed: trained ? false : prev.gymMissed,
     })
   },
@@ -1305,6 +1376,15 @@ export const actions = {
     actions.updateTask(id, { scheduled: date })
   },
 
+  /** To do, in progress, done — one control, and the dates follow it. */
+  setTaskStatus(id: string, status: 'todo' | 'doing' | 'done') {
+    actions.updateTask(id, {
+      done: status === 'done',
+      doing: status === 'doing',
+      doneDate: status === 'done' ? todayISO() : '',
+    })
+  },
+
   toggleTask(id: string) {
     const task = state.tasks.find((t) => t.id === id)
     if (!task) return
@@ -1489,11 +1569,11 @@ export const actions = {
         { id: 'sp1', entity: 'consulting', name: 'Sales page rebuild', clientId: '', status: 'active', due: addDays(today, 10), notes: '' },
       ],
       tasks: [
-        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, due: at(2), scheduled: at(3), estimateMin: 45, priority: 2, kindHint: '', created: at(6), doneDate: at(3), goalId: '' },
-        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, due: at(1), scheduled: today, estimateMin: 120, priority: 1, kindHint: '', created: at(6), doneDate: '', goalId: '' },
-        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, due: today, scheduled: today, estimateMin: 180, priority: 2, kindHint: '', created: at(2), doneDate: '', goalId: '' },
-        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, due: '', scheduled: '', estimateMin: 15, priority: 3, kindHint: '', created: at(9), doneDate: '', goalId: '' },
-        { id: 'st5', projectId: '', entity: 'consulting', title: 'Call Kavanagh re: renewal', done: false, due: '', scheduled: today, estimateMin: 15, priority: 1, kindHint: 'calls', created: at(1), doneDate: '', goalId: '' },
+        { id: 'st1', projectId: 'sp1', entity: 'consulting', title: 'Write the new headline', done: true, doing: false, notes: '', due: at(2), scheduled: at(3), estimateMin: 45, priority: 2, kindHint: '', created: at(6), doneDate: at(3), goalId: '' },
+        { id: 'st2', projectId: 'sp1', entity: 'consulting', title: 'Rebuild the pricing table', done: false, doing: true, notes: 'New tiers agreed with Cian — three columns, annual toggle.', due: at(1), scheduled: today, estimateMin: 120, priority: 1, kindHint: '', created: at(6), doneDate: '', goalId: '' },
+        { id: 'st3', projectId: '', entity: 'onemedia', title: 'Batch four videos', done: false, doing: false, notes: '', due: today, scheduled: today, estimateMin: 180, priority: 2, kindHint: '', created: at(2), doneDate: '', goalId: '' },
+        { id: 'st4', projectId: '', entity: 'life', title: 'Book the dentist', done: false, doing: false, notes: '', due: '', scheduled: '', estimateMin: 15, priority: 3, kindHint: '', created: at(9), doneDate: '', goalId: '' },
+        { id: 'st5', projectId: '', entity: 'consulting', title: 'Call Kavanagh re: renewal', done: false, doing: false, notes: '', due: '', scheduled: today, estimateMin: 15, priority: 1, kindHint: 'calls', created: at(1), doneDate: '', goalId: '' },
       ],
       bills: [
         { id: 'sx1', label: 'Office rent', amount: 4200, cadence: 'monthly', nextDue: addDays(today, 3), purse: 'consulting', category: 'Premises' },

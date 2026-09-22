@@ -10,6 +10,7 @@ import {
   Stepper,
 } from '../components/ui'
 import TimeLog from '../components/TimeLog'
+import TaskSheet from '../components/TaskSheet'
 import { IconChevron, IconPlay, IconPlus, IconStop, IconTrash } from '../components/icons'
 import {
   ACCOUNT_LABEL,
@@ -30,7 +31,14 @@ import {
 } from '../lib/date'
 import { euro, num, uid } from '../lib/format'
 import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
-import { dayProgress, lastGymSets, missedGymCount, progressTone, todoFor } from '../lib/selectors'
+import {
+  dayProgress,
+  lastGymSets,
+  lastHomeSets,
+  missedGymCount,
+  progressTone,
+  todoFor,
+} from '../lib/selectors'
 import { downscaleImage } from '../lib/image'
 import { loadVoices, pickVoice, scoreVoice, speak } from '../lib/speech'
 import { elevenVoices, playEleven, stopEleven } from '../lib/eleven'
@@ -598,6 +606,10 @@ function Todo({ date, onOpenWork }: { date: string; onOpenWork: () => void }) {
   const state = useStore()
   const tasks = todoFor(state, date)
   const done = tasks.filter((t) => t.done).length
+  const [openId, setOpenId] = useState('')
+  // Read from the store rather than held: editing in the sheet has to show
+  // in the sheet, and the row behind it, as it is typed.
+  const open = tasks.find((t) => t.id === openId)
 
   return (
     <>
@@ -615,8 +627,14 @@ function Todo({ date, onOpenWork }: { date: string; onOpenWork: () => void }) {
           <div className="rows">
             {tasks.map((t) => {
               const late = !t.done && t.scheduled !== date
+              const sub = [
+                t.doing && !t.done ? 'In progress' : '',
+                t.estimateMin > 0 ? `${t.estimateMin}m` : '',
+                t.notes.trim() !== '' ? 'Has instructions' : '',
+                late ? (t.scheduled ? `From ${formatShort(t.scheduled)}` : `Due ${formatShort(t.due)}`) : '',
+              ].filter(Boolean)
               return (
-                <div className="row" key={t.id}>
+                <div className="row" key={t.id} data-doing={t.doing && !t.done}>
                   <button
                     onClick={() => actions.toggleTask(t.id)}
                     role="checkbox"
@@ -626,16 +644,18 @@ function Todo({ date, onOpenWork }: { date: string; onOpenWork: () => void }) {
                   >
                     <Check on={t.done} />
                   </button>
-                  <span className="row-main">
+                  {/* The row opens the task: the tick is for finishing it, the
+                      words are for everything else about it. */}
+                  <button
+                    className="row-main task-open"
+                    onClick={() => setOpenId(t.id)}
+                    aria-label={`Open ${t.title}`}
+                  >
                     <span className="row-title" style={{ opacity: t.done ? 0.55 : 1 }}>
                       {t.title}
                     </span>
-                    {late && (
-                      <span className="row-sub">
-                        {t.scheduled ? `From ${formatShort(t.scheduled)}` : `Due ${formatShort(t.due)}`}
-                      </span>
-                    )}
-                  </span>
+                    {sub.length > 0 && <span className="row-sub">{sub.join(' · ')}</span>}
+                  </button>
                   <button
                     className="btn btn-quiet btn-danger"
                     onClick={() => actions.removeTask(t.id)}
@@ -654,6 +674,7 @@ function Todo({ date, onOpenWork }: { date: string; onOpenWork: () => void }) {
           onAdd={(title) => actions.addTask(newTask(title, { scheduled: date }))}
         />
       </Card>
+      {open && <TaskSheet task={open} onClose={() => setOpenId('')} />}
     </>
   )
 }
@@ -802,6 +823,26 @@ function Gym({ date, day }: { date: string; day: DayEntry }) {
   const logged = list.filter((ex) =>
     (day.gym[ex.id] ?? []).some((s) => s.kg !== null || s.reps !== null),
   ).length
+  const homeLogged = day.homeGym.filter((ex) =>
+    ex.sets.some((s) => s.kg !== null || s.reps !== null),
+  ).length
+
+  // Missed wins the view, then wherever the training happened.
+  const place: 'gym' | 'home' | 'missed' = day.gymMissed
+    ? 'missed'
+    : day.trainedAt === 'home'
+      ? 'home'
+      : 'gym'
+
+  const title = day.gymMissed
+    ? 'Gym · missed'
+    : place === 'home'
+      ? homeLogged
+        ? `Home workout · ${homeLogged} logged`
+        : 'Home workout'
+      : logged
+        ? `Gym · ${logged}/${list.length} logged`
+        : 'Gym'
 
   const update = (id: string, patch: Partial<Exercise>) =>
     actions.setWorkout(list.map((ex) => (ex.id === id ? { ...ex, ...patch } : ex)))
@@ -809,30 +850,35 @@ function Gym({ date, day }: { date: string; day: DayEntry }) {
   return (
     <>
       <SectionTitle
-        title={
-          day.gymMissed ? 'Gym · missed' : logged ? `Gym · ${logged}/${list.length} logged` : 'Gym'
-        }
+        title={title}
         action={
-          <span style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {!editing && !logged && !day.gymMissed && (
-              <button
-                className="btn btn-quiet btn-sm"
-                onClick={() => actions.setGymMissed(date, true)}
-              >
-                Missed gym
-              </button>
-            )}
+          place === 'gym' || editing ? (
             <EditToggle editing={editing} onToggle={() => setEditing(!editing)} />
-          </span>
+          ) : undefined
         }
       />
+      {!editing && (
+        <div style={{ marginBottom: 10 }}>
+          <Segmented
+            value={place}
+            onChange={(next: 'gym' | 'home' | 'missed') => actions.setTrainingPlace(date, next)}
+            options={[
+              { value: 'gym', label: 'Gym' },
+              { value: 'home', label: 'Home' },
+              { value: 'missed', label: 'Missed' },
+            ]}
+          />
+        </div>
+      )}
       <Card>
-        {list.length === 0 && !editing && !day.gymMissed && (
+        {list.length === 0 && !editing && place === 'gym' && (
           <Empty>No exercises yet. Tap Edit to add one.</Empty>
         )}
 
-        {!editing && day.gymMissed ? (
+        {!editing && place === 'missed' ? (
           <MissedGym date={date} day={day} />
+        ) : !editing && place === 'home' ? (
+          <HomeGym date={date} day={day} />
         ) : editing ? (
           <>
             {list.length > 0 && (
@@ -918,11 +964,108 @@ function Gym({ date, day }: { date: string; day: DayEntry }) {
           })
         )}
       </Card>
-      {!editing && !day.gymMissed && list.length > 0 && (
+      {!editing && place === 'gym' && list.length > 0 && (
         <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
           Faint numbers are last session's — the ones to beat.
         </p>
       )}
+    </>
+  )
+}
+
+/**
+ * The home workout: the day's own list, because what you can do at home
+ * changes with the room you are in. Sets carry the same kg and reps as the
+ * gym, and last time's numbers show faintly against an exercise of the same
+ * name, however long ago it was.
+ */
+function HomeGym({ date, day }: { date: string; day: DayEntry }) {
+  const state = useStore()
+  const last = useMemo(() => lastHomeSets(state, date), [state, date])
+
+  return (
+    <>
+      {day.homeGym.length === 0 && (
+        <Empty>Nothing logged. Add what you did — press-ups, kettlebell, a run.</Empty>
+      )}
+      {day.homeGym.map((exercise) => {
+        const prev = last[exercise.name.trim().toLowerCase()]
+        const cols = exercise.sets.map((_, i) => i)
+        return (
+          <div className="gym-ex" key={exercise.id}>
+            <div className="gym-head">
+              <GrowText
+                className="home-name"
+                value={exercise.name}
+                ariaLabel="Exercise"
+                onChange={(name) => actions.updateHomeExercise(date, exercise.id, { name })}
+              />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
+                {prev && <span className="t-foot muted">Last: {formatShort(prev.date)}</span>}
+                <Stepper
+                  value={exercise.sets.length}
+                  step={1}
+                  dp={0}
+                  suffix="sets"
+                  onChange={(v) => {
+                    const count = Math.min(10, Math.max(1, Math.round(v)))
+                    const sets = Array.from(
+                      { length: count },
+                      (_, i) => exercise.sets[i] ?? { kg: null, reps: null },
+                    )
+                    actions.updateHomeExercise(date, exercise.id, { sets })
+                  }}
+                />
+                <button
+                  className="btn btn-quiet btn-danger"
+                  onClick={() => actions.removeHomeExercise(date, exercise.id)}
+                  aria-label={`Delete ${exercise.name}`}
+                >
+                  <IconTrash style={{ width: 15, height: 15 }} />
+                </button>
+              </span>
+            </div>
+            <div
+              className="gym-grid"
+              style={{ gridTemplateColumns: `38px repeat(${exercise.sets.length}, minmax(0, 1fr))` }}
+            >
+              <span />
+              {cols.map((i) => (
+                <span className="t-cap gym-col" key={`h${i}`}>
+                  Set {i + 1}
+                </span>
+              ))}
+              <span className="t-foot muted gym-label">kg</span>
+              {cols.map((i) => (
+                <NumCell
+                  key={`kg${i}`}
+                  decimal
+                  label={`${exercise.name} set ${i + 1} kg`}
+                  value={exercise.sets[i]?.kg}
+                  placeholder={prev?.sets[i]?.kg}
+                  onChange={(kg) => actions.setHomeSet(date, exercise.id, i, { kg })}
+                />
+              ))}
+              <span className="t-foot muted gym-label">reps</span>
+              {cols.map((i) => (
+                <NumCell
+                  key={`r${i}`}
+                  decimal={false}
+                  label={`${exercise.name} set ${i + 1} reps`}
+                  value={exercise.sets[i]?.reps}
+                  placeholder={prev?.sets[i]?.reps}
+                  onChange={(reps) => actions.setHomeSet(date, exercise.id, i, { reps })}
+                />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+      <AddRow
+        placeholder="Add an exercise"
+        divider={day.homeGym.length > 0}
+        onAdd={(name) => actions.addHomeExercise(date, name)}
+      />
     </>
   )
 }

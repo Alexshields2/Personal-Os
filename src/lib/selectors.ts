@@ -1300,6 +1300,33 @@ export function todoFor(state: AppState, date: string, today = todayISO()): Task
 }
 
 /**
+ * The last home workout before `date`, matched by exercise name rather than
+ * id — a home list is written fresh each day, so the name is the only thing
+ * that carries across. Lower-cased, because "Press ups" on Monday and "press
+ * ups" on Thursday are the same exercise.
+ */
+export function lastHomeSets(
+  state: AppState,
+  date: string,
+): Record<string, { date: string; sets: GymSet[] }> {
+  const out: Record<string, { date: string; sets: GymSet[] }> = {}
+  const earlier = Object.keys(state.days)
+    .filter((d) => d < date)
+    .sort()
+    .reverse()
+  for (const d of earlier) {
+    for (const exercise of state.days[d]?.homeGym ?? []) {
+      const key = exercise.name.trim().toLowerCase()
+      if (!key || out[key]) continue
+      if (exercise.sets.some((x) => x.kg !== null || x.reps !== null)) {
+        out[key] = { date: d, sets: exercise.sets }
+      }
+    }
+  }
+  return out
+}
+
+/**
  * For each exercise, the most recent session before `date` that logged it.
  * The empty fields show these faintly — the number to beat, right where the
  * new one gets typed.

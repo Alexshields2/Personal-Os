@@ -3,8 +3,16 @@ import { HABITS } from './config'
 import { hoursMinutes, sleepMinutes } from './date'
 import { day, daysMap, makeState, task } from './fixtures'
 import { EMPTY_METRICS } from './types'
-import { consistency, dayProgress, lastGymSets, missedGymCount, progressTone, todoFor } from './selectors'
-import { actions, getState, hydrate } from './store'
+import {
+  consistency,
+  dayProgress,
+  lastGymSets,
+  lastHomeSets,
+  missedGymCount,
+  progressTone,
+  todoFor,
+} from './selectors'
+import { actions, getState, hydrate, newTask } from './store'
 
 /**
  * The one-page day. The arithmetic worth pinning down is the part the page
@@ -151,6 +159,24 @@ describe('the board', () => {
   })
 })
 
+describe('last home session', () => {
+  it('matches by name, however it was capitalised', () => {
+    const state = makeState({
+      days: daysMap([
+        day('2026-09-22', {
+          homeGym: [{ id: 'a', name: 'Press ups', sets: [{ kg: null, reps: 30 }] }],
+        }),
+        day('2026-09-23', {
+          homeGym: [{ id: 'b', name: 'PRESS UPS', sets: [{ kg: null, reps: 35 }] }],
+        }),
+      ]),
+    })
+    const last = lastHomeSets(state, '2026-09-24')
+    expect(last['press ups'].date).toBe('2026-09-23')
+    expect(last['press ups'].sets[0].reps).toBe(35)
+  })
+})
+
 describe('last session', () => {
   it('is the most recent earlier day that logged the exercise', () => {
     const state = makeState({
@@ -172,6 +198,7 @@ describe('last session', () => {
 
 describe('what the page works out for you', () => {
   const D = '2026-09-22'
+  const state0 = () => getState()
 
   beforeEach(() => {
     actions.replaceAll(makeState())
@@ -221,6 +248,65 @@ describe('what the page works out for you', () => {
     actions.markHabit(D, 'm_cold', null)
     expect(getState().days[D].checks.m_cold).toBe(false)
     expect(getState().days[D].habitMissed.m_cold).toBe(false)
+  })
+
+  it('counts a home workout as training, gym or not', () => {
+    actions.setTrainingPlace(D, 'home')
+    expect(getState().days[D].trainedAt).toBe('home')
+    actions.addHomeExercise(D, 'Press-ups')
+    let saved = getState().days[D]
+    expect(saved.homeGym[0].sets).toHaveLength(3)
+    // Named but not done yet is not training.
+    expect(saved.trained).toBe(false)
+    actions.setHomeSet(D, saved.homeGym[0].id, 0, { reps: 25 })
+    saved = getState().days[D]
+    expect(saved.trained).toBe(true)
+    expect(saved.gymMissed).toBe(false)
+    // And the day's gym point counts it.
+    expect(dayProgress(state0(), D, D)).toBeDefined()
+    actions.removeHomeExercise(D, saved.homeGym[0].id)
+    expect(getState().days[D].trained).toBe(false)
+  })
+
+  it('swaps a missed session for a home one when the sets go in', () => {
+    actions.setTrainingPlace(D, 'missed')
+    expect(getState().days[D].gymMissed).toBe(true)
+    actions.addHomeExercise(D, 'Kettlebell swings', 2)
+    const id = getState().days[D].homeGym[0].id
+    actions.setHomeSet(D, id, 1, { kg: 24, reps: 15 })
+    const saved = getState().days[D]
+    expect(saved.gymMissed).toBe(false)
+    expect(saved.trainedAt).toBe('home')
+    expect(saved.homeGym[0].sets[1]).toEqual({ kg: 24, reps: 15 })
+  })
+
+  it('moves a task between to do, in progress and done', () => {
+    actions.addTask(newTask('Call John', { scheduled: D }))
+    const id = getState().tasks[0].id
+    const task = () => getState().tasks.find((t) => t.id === id)!
+
+    actions.setTaskStatus(id, 'doing')
+    expect(task().doing).toBe(true)
+    expect(task().done).toBe(false)
+
+    actions.setTaskStatus(id, 'done')
+    expect(task().done).toBe(true)
+    expect(task().doing).toBe(false)
+    expect(task().doneDate).not.toBe('')
+
+    actions.setTaskStatus(id, 'todo')
+    expect(task().done).toBe(false)
+    expect(task().doing).toBe(false)
+    expect(task().doneDate).toBe('')
+  })
+
+  it('keeps instructions and an estimate on the task', () => {
+    actions.addTask(newTask('Rebuild the pricing table', { scheduled: D }))
+    const id = getState().tasks[0].id
+    actions.updateTask(id, { notes: 'Three columns, annual toggle.', estimateMin: 90 })
+    const saved = getState().tasks.find((t) => t.id === id)!
+    expect(saved.notes).toBe('Three columns, annual toggle.')
+    expect(saved.estimateMin).toBe(90)
   })
 
   it('totals the food log into calories and protein', () => {

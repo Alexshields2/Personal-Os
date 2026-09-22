@@ -14,6 +14,7 @@ import {
   TextField,
 } from '../components/ui'
 import WeekBoard from '../components/WeekBoard'
+import TaskSheet from '../components/TaskSheet'
 import { DueOverview } from './Finance'
 import { IconChevron, IconPlus, IconTrash, IconWarn } from '../components/icons'
 import {
@@ -216,11 +217,12 @@ function Tasks() {
 
 function TaskRow({ task }: { task: Task }) {
   const state = useStore()
+  const [open, setOpen] = useState(false)
   const project = state.projects.find((p) => p.id === task.projectId)
   const late = task.due && !task.done ? daysBetween(todayISO(), task.due) < 0 : false
 
   return (
-    <div className="row">
+    <div className="row" data-doing={task.doing && !task.done}>
       <button
         onClick={() => actions.toggleTask(task.id)}
         aria-label="Toggle task"
@@ -228,16 +230,22 @@ function TaskRow({ task }: { task: Task }) {
       >
         <Check on={task.done} />
       </button>
-      <span className="row-main">
+      <button
+        className="row-main task-open"
+        onClick={() => setOpen(true)}
+        aria-label={`Open ${task.title}`}
+      >
         <span className="row-title" style={{ opacity: task.done ? 0.55 : 1 }}>
           {task.title}
         </span>
         <span className="row-sub" style={late ? { color: 'var(--warning)' } : undefined}>
+          {task.doing && !task.done && 'In progress · '}
           {task.entity === 'consulting' ? 'Consulting.ie' : task.entity === 'onemedia' ? '1Media' : 'Life'}
           {project && ` · ${project.name}`}
+          {task.estimateMin > 0 && ` · ${task.estimateMin}m`}
           {task.due && ` · ${late ? 'was due' : 'due'} ${formatShort(task.due)}`}
         </span>
-      </span>
+      </button>
       <input
         className="input input-time"
         type="date"
@@ -252,6 +260,7 @@ function TaskRow({ task }: { task: Task }) {
       >
         <IconTrash style={{ width: 15, height: 15 }} />
       </button>
+      {open && <TaskSheet task={task} onClose={() => setOpen(false)} />}
     </div>
   )
 }

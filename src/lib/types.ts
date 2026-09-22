@@ -179,6 +179,13 @@ export interface DayEntry {
   /** Exercise id -> the sets done that day, in order. */
   gym: Record<string, GymSet[]>
   /**
+   * Where the training happened. Empty means the gym, which is the default
+   * view; 'home' switches the card to the day's own list of exercises.
+   */
+  trainedAt: '' | 'gym' | 'home'
+  /** The home workout: whatever was done, with the sets it was done in. */
+  homeGym: HomeExercise[]
+  /**
    * Marked as a missed gym day. Deliberate, so a miss is on the record rather
    * than indistinguishable from a day nobody logged.
    */
@@ -221,6 +228,13 @@ export interface Identity {
   image: string
   /** Which installed voice reads it. Empty means pick the best one on the device. */
   voice: string
+}
+
+/** An exercise done at home: named on the day, with its own sets. */
+export interface HomeExercise {
+  id: string
+  name: string
+  sets: GymSet[]
 }
 
 /** An exercise in the gym list, and how many sets it gets. */
@@ -537,6 +551,10 @@ export interface Task {
   scheduled: string
   /** How long you think it takes, in minutes. 0 means unestimated. */
   estimateMin: number
+  /** Started but not finished. Distinct from done, and from never touched. */
+  doing: boolean
+  /** What doing it actually involves — the instructions to yourself. */
+  notes: string
   priority: TaskPriority
   /** Loose hint for what kind of work this is — currently only 'calls' is read anywhere. */
   kindHint: string
