@@ -11,6 +11,7 @@ import {
 } from '../components/ui'
 import TimeLog from '../components/TimeLog'
 import TaskSheet from '../components/TaskSheet'
+import DoneDay from '../components/DoneDay'
 import { IconChevron, IconPlay, IconPlus, IconStop, IconTrash } from '../components/icons'
 import {
   ACCOUNT_LABEL,
@@ -50,11 +51,14 @@ import type { AccountId, DayEntry, Exercise, Purse, Targets } from '../lib/types
 /**
  * The whole day on one page, top to bottom in the order it happens: the
  * week's notes and today's, how you slept, the to-do, habits, the gym, food
- * and water, the close-out, and what was spent. The quarter-hour log is the
- * only other tab. Nothing is scored here — every section is something you
- * actually log.
+ * and water, the close-out, and what was spent. Nothing is scored here —
+ * every section is something you actually log.
+ *
+ * Ticking something off takes it off this page and puts it under Done, which
+ * is also the record of any day you walk back to. The quarter-hour log is
+ * the third tab.
  */
-type View = 'day' | 'time'
+type View = 'day' | 'done' | 'time'
 
 export default function Today({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const state = useStore()
@@ -66,6 +70,7 @@ export default function Today({ onNavigate }: { onNavigate?: (tab: string) => vo
   const day = state.days[date] ?? emptyDay(date)
   // Tomorrow can be planned — notes and to-dos — but not logged.
   const future = date > today
+  const done = dayProgress(state, date).done
 
   const title =
     date === today
@@ -114,12 +119,15 @@ export default function Today({ onNavigate }: { onNavigate?: (tab: string) => vo
         onChange={setView}
         options={[
           { value: 'day', label: 'Today' },
-          { value: 'time', label: 'Every 15 min' },
+          { value: 'done', label: done > 0 ? `Done · ${done}` : 'Done' },
+          { value: 'time', label: '15 min' },
         ]}
       />
 
       {view === 'time' ? (
         <TimeLog date={date} day={day} />
+      ) : view === 'done' ? (
+        <DoneDay date={date} day={day} />
       ) : (
         <>
           {!future && <DayBar date={date} />}
@@ -608,6 +616,8 @@ function Todo({ date, onOpenWork }: { date: string; onOpenWork: () => void }) {
   const state = useStore()
   const tasks = todoFor(state, date)
   const done = tasks.filter((t) => t.done).length
+  // Finished ones move to Done rather than piling up under the live list.
+  const live = tasks.filter((t) => !t.done)
   const [openId, setOpenId] = useState('')
   // Read from the store rather than held: editing in the sheet has to show
   // in the sheet, and the row behind it, as it is typed.
@@ -625,9 +635,9 @@ function Todo({ date, onOpenWork }: { date: string; onOpenWork: () => void }) {
         }
       />
       <Card>
-        {tasks.length > 0 && (
+        {live.length > 0 && (
           <div className="rows">
-            {tasks.map((t) => {
+            {live.map((t) => {
               const late = !t.done && t.scheduled !== date
               const sub = [
                 t.doing && !t.done ? 'In progress' : '',
@@ -670,6 +680,9 @@ function Todo({ date, onOpenWork }: { date: string; onOpenWork: () => void }) {
             })}
           </div>
         )}
+        {tasks.length > 0 && live.length === 0 && (
+          <Empty>All {tasks.length} cleared. They're under Done.</Empty>
+        )}
         <AddRow
           placeholder="Add a to-do"
           divider={tasks.length > 0}
@@ -689,6 +702,9 @@ function Habits({ date, day }: { date: string; day: DayEntry }) {
   const [editing, setEditing] = useState(false)
   const done = list.filter((h) => day.checks[h.id]).length
   const missedCount = list.filter((h) => day.habitMissed[h.id]).length
+  // A ticked habit moves to Done; while editing, the whole list is there to
+  // be edited, ticked or not.
+  const shown = editing ? list : list.filter((h) => !day.checks[h.id])
 
   return (
     <>
@@ -702,9 +718,12 @@ function Habits({ date, day }: { date: string; day: DayEntry }) {
       />
       <Card>
         {list.length === 0 && !editing && <Empty>No habits yet. Tap Edit to add one.</Empty>}
-        {list.length > 0 && (
+        {list.length > 0 && shown.length === 0 && !editing && (
+          <Empty>All {list.length} done. They're under Done.</Empty>
+        )}
+        {shown.length > 0 && (
           <div className="rows">
-            {list.map((h) => {
+            {shown.map((h) => {
               const on = Boolean(day.checks[h.id])
               if (editing) {
                 return (
