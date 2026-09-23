@@ -43,6 +43,7 @@ import type {
   DomainNode,
   Goal,
   GymSet,
+  SessionExercise,
   Invoice,
   KeyResult,
   LearnItem,
@@ -1297,23 +1298,28 @@ export function todoFor(state: AppState, date: string, today = todayISO()): Task
     .sort((a, b) => Number(a.done) - Number(b.done) || when(a).localeCompare(when(b)))
 }
 
+/** Logged days before `date`, newest first. */
+function earlierDays(state: AppState, date: string): string[] {
+  return Object.keys(state.days)
+    .filter((d) => d < date)
+    .sort()
+    .reverse()
+}
+
 /**
- * The last home workout before `date`, matched by exercise name rather than
- * id — a home list is written fresh each day, so the name is the only thing
- * that carries across. Lower-cased, because "Press ups" on Monday and "press
- * ups" on Thursday are the same exercise.
+ * The last time each exercise was done before `date`, by name. The session
+ * is typed fresh every day, so the name is the only thing that carries
+ * across — lower-cased, because "Press ups" on Monday and "press ups" on
+ * Thursday are the same exercise. These show faintly in the empty boxes:
+ * the number to beat, right where the new one gets typed.
  */
-export function lastHomeSets(
+export function lastSetsByName(
   state: AppState,
   date: string,
 ): Record<string, { date: string; sets: GymSet[] }> {
   const out: Record<string, { date: string; sets: GymSet[] }> = {}
-  const earlier = Object.keys(state.days)
-    .filter((d) => d < date)
-    .sort()
-    .reverse()
-  for (const d of earlier) {
-    for (const exercise of state.days[d]?.homeGym ?? []) {
+  for (const d of earlierDays(state, date)) {
+    for (const exercise of state.days[d]?.session ?? []) {
       const key = exercise.name.trim().toLowerCase()
       if (!key || out[key]) continue
       if (exercise.sets.some((x) => x.kg !== null || x.reps !== null)) {
@@ -1324,26 +1330,34 @@ export function lastHomeSets(
   return out
 }
 
-/**
- * For each exercise, the most recent session before `date` that logged it.
- * The empty fields show these faintly — the number to beat, right where the
- * new one gets typed.
- */
-export function lastGymSets(
+/** The whole of the last session before `date`, for repeating it in one tap. */
+export function lastSession(
   state: AppState,
   date: string,
-): Record<string, { date: string; sets: GymSet[] }> {
-  const out: Record<string, { date: string; sets: GymSet[] }> = {}
-  const earlier = Object.keys(state.days)
-    .filter((d) => d < date)
-    .sort()
-    .reverse()
-  for (const d of earlier) {
-    for (const [id, sets] of Object.entries(state.days[d]?.gym ?? {})) {
-      if (!out[id] && sets.some((x) => x.kg !== null || x.reps !== null)) out[id] = { date: d, sets }
+): { date: string; exercises: SessionExercise[] } | null {
+  for (const d of earlierDays(state, date)) {
+    const session = state.days[d]?.session ?? []
+    if (session.some((e) => e.sets.some((x) => x.kg !== null || x.reps !== null))) {
+      return { date: d, exercises: session }
     }
   }
-  return out
+  return null
+}
+
+/** Every exercise name used before, newest first — what the typing suggests. */
+export function exerciseNames(state: AppState): string[] {
+  const seen = new Set<string>()
+  const names: string[] = []
+  for (const d of Object.keys(state.days).sort().reverse()) {
+    for (const exercise of state.days[d]?.session ?? []) {
+      const name = exercise.name.trim()
+      const key = name.toLowerCase()
+      if (!name || seen.has(key)) continue
+      seen.add(key)
+      names.push(name)
+    }
+  }
+  return names
 }
 
 /** Done, deliberately marked as not done, or not answered yet. */

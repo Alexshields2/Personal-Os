@@ -17,7 +17,7 @@ import {
   DEFAULT_UPKEEP,
   CORE_QUESTIONS,
   DEFAULT_IDENTITY,
-  DEFAULT_WORKOUT,
+  LEGACY_WORKOUT_NAMES,
   HABITS,
   MAX_PRIORITIES,
   MORNING,
@@ -39,12 +39,11 @@ import type {
   Deal,
   DomainLink,
   DomainNode,
-  Exercise,
   FoodEntry,
   Identity,
   Goal,
   GymSet,
-  HomeExercise,
+  SessionExercise,
   Holding,
   Invoice,
   Project,
@@ -110,7 +109,6 @@ function initialState(): AppState {
     checklist: DEFAULT_CHECKLIST.map((c) => ({ ...c })),
     outreach: [],
     marketing: { startDate: nextWorkingDay(todayISO()), days: {} },
-    workout: DEFAULT_WORKOUT.map((e) => ({ ...e })),
     identity: { ...DEFAULT_IDENTITY },
   }
 }
@@ -320,6 +318,35 @@ export function hydrate(raw: string): AppState {
       ),
     }
   }
+  // The fixed exercise list is gone: a workout changes, so it is typed on
+  // the day like everything else. Whatever was logged against the old list
+  // keeps its numbers and takes the name that list gave it, and a home
+  // workout is the same shape already — the two become one session.
+  if ((parsed.version ?? 1) < 23) {
+    const template = (parsed as { workout?: { id: string; name: string }[] }).workout ?? []
+    const named = (id: string) =>
+      template.find((e) => e.id === id)?.name ?? LEGACY_WORKOUT_NAMES[id] ?? id
+    const anyLogged = (sets: GymSet[]) => sets.some((x) => x.kg !== null || x.reps !== null)
+    parsed = {
+      ...parsed,
+      days: Object.fromEntries(
+        Object.entries(parsed.days ?? {}).map(([k, v]) => {
+          if (!v) return [k, v]
+          const old = v as typeof v & {
+            gym?: Record<string, GymSet[]>
+            homeGym?: SessionExercise[]
+          }
+          const session: SessionExercise[] = [
+            ...Object.entries(old.gym ?? {})
+              .filter(([, sets]) => anyLogged(sets))
+              .map(([id, sets]) => ({ id, name: named(id), sets })),
+            ...(old.homeGym ?? []),
+          ]
+          return [k, { ...v, session: v.session ?? session }]
+        }),
+      ),
+    }
+  }
   // The shipped goals were someone else's ambitions — a €10M bank, a €1M
   // payout, 95kg — and the money targets existed only to chart them. Both
   // go. Anything written since is left exactly as it is, and a target that
@@ -370,9 +397,8 @@ export function hydrate(raw: string): AppState {
       timeLog: v?.timeLog ?? {},
       bedtime: v?.bedtime ?? '',
       wakeTime: v?.wakeTime ?? '',
-      gym: v?.gym ?? {},
       trainedAt: v?.trainedAt ?? '',
-      homeGym: v?.homeGym ?? [],
+      session: v?.session ?? [],
       gymMissed: v?.gymMissed ?? false,
       gymMissedWhy: v?.gymMissedWhy ?? '',
       habitMissed: v?.habitMissed ?? {},
@@ -476,7 +502,6 @@ export function hydrate(raw: string): AppState {
       startDate: parsed.marketing?.startDate ?? base.marketing.startDate,
       days: parsed.marketing?.days ?? {},
     },
-    workout: parsed.workout ?? base.workout,
     identity: { ...base.identity, ...(parsed.identity ?? {}) },
   }
 }
@@ -518,9 +543,8 @@ export function emptyDay(date: string): DayEntry {
     timeLog: {},
     bedtime: '',
     wakeTime: '',
-    gym: {},
     trainedAt: '',
-    homeGym: [],
+    session: [],
     gymMissed: false,
     gymMissedWhy: '',
     habitMissed: {},
@@ -564,10 +588,9 @@ export const RETIRED_TRACKERS = new Set([
   'tk_wellbeing', 'tk_workdone', 'tk_schedule', 'tk_cash', 'tk_con_biz', 'tk_con_life',
 ])
 
-/** A day counts as trained once a set is logged, at the gym or at home. */
-export function trainedFrom(gym: Record<string, GymSet[]>, home: HomeExercise[]): boolean {
-  const logged = (sets: GymSet[]) => sets.some((s) => s.kg !== null || s.reps !== null)
-  return Object.values(gym).some(logged) || home.some((e) => logged(e.sets))
+/** A day counts as trained once a set is logged, wherever it was done. */
+export function trainedFrom(session: SessionExercise[]): boolean {
+  return session.some((e) => e.sets.some((s) => s.kg !== null || s.reps !== null))
 }
 
 /** Steps in clock order. Ties keep the order they were written in; untimed steps go last. */
@@ -695,23 +718,6 @@ export const actions = {
     })
   },
 
-  /** Logging a set is what makes it a training day — there is no box to tick. */
-  setGymSet(date: string, exerciseId: string, index: number, patch: Partial<GymSet>) {
-    const prev = state.days[date] ?? emptyDay(date)
-    const sets = [...(prev.gym[exerciseId] ?? [])]
-    while (sets.length <= index) sets.push({ kg: null, reps: null })
-    sets[index] = { ...sets[index], ...patch }
-    const gym = { ...prev.gym, [exerciseId]: sets }
-    const trained = trainedFrom(gym, prev.homeGym)
-    actions.updateDay(date, {
-      gym,
-      trained,
-      restDay: trained ? false : prev.restDay,
-      // A logged set means it wasn't missed after all.
-      gymMissed: trained ? false : prev.gymMissed,
-    })
-  },
-
   /** Gym, home, or missed — one answer, and the card follows it. */
   setTrainingPlace(date: string, place: 'gym' | 'home' | 'missed') {
     const prev = state.days[date] ?? emptyDay(date)
@@ -722,14 +728,14 @@ export const actions = {
     })
   },
 
-  /** Add an exercise to the day's home workout. The sets are filled in after. */
-  addHomeExercise(date: string, name: string, sets = 3) {
+  /** Type what you did. Three sets unless you say otherwise. */
+  addSessionExercise(date: string, name: string, sets = 3) {
     const prev = state.days[date] ?? emptyDay(date)
     actions.updateDay(date, {
-      trainedAt: 'home',
       gymMissed: false,
-      homeGym: [
-        ...prev.homeGym,
+      trainedAt: prev.trainedAt === '' ? 'gym' : prev.trainedAt,
+      session: [
+        ...prev.session,
         {
           id: uid(),
           name,
@@ -739,34 +745,56 @@ export const actions = {
     })
   },
 
-  updateHomeExercise(date: string, id: string, patch: Partial<HomeExercise>) {
+  updateSessionExercise(date: string, id: string, patch: Partial<SessionExercise>) {
     const prev = state.days[date] ?? emptyDay(date)
-    const homeGym = prev.homeGym.map((e) => (e.id === id ? { ...e, ...patch } : e))
-    actions.updateDay(date, { homeGym, trained: trainedFrom(prev.gym, homeGym) })
+    const session = prev.session.map((e) => (e.id === id ? { ...e, ...patch } : e))
+    actions.updateDay(date, { session, trained: trainedFrom(session) })
   },
 
-  removeHomeExercise(date: string, id: string) {
+  removeSessionExercise(date: string, id: string) {
     const prev = state.days[date] ?? emptyDay(date)
-    const homeGym = prev.homeGym.filter((e) => e.id !== id)
-    actions.updateDay(date, { homeGym, trained: trainedFrom(prev.gym, homeGym) })
+    const session = prev.session.filter((e) => e.id !== id)
+    actions.updateDay(date, { session, trained: trainedFrom(session) })
   },
 
-  setHomeSet(date: string, id: string, index: number, patch: Partial<GymSet>) {
+  /** Logging a set is what makes it a training day — there is no box to tick. */
+  setSessionSet(date: string, id: string, index: number, patch: Partial<GymSet>) {
     const prev = state.days[date] ?? emptyDay(date)
-    const homeGym = prev.homeGym.map((exercise) => {
+    const session = prev.session.map((exercise) => {
       if (exercise.id !== id) return exercise
       const sets = [...exercise.sets]
       while (sets.length <= index) sets.push({ kg: null, reps: null })
       sets[index] = { ...sets[index], ...patch }
       return { ...exercise, sets }
     })
-    const trained = trainedFrom(prev.gym, homeGym)
+    const trained = trainedFrom(session)
     actions.updateDay(date, {
-      homeGym,
+      session,
       trained,
-      trainedAt: 'home',
       restDay: trained ? false : prev.restDay,
+      // A logged set means it wasn't missed after all.
       gymMissed: trained ? false : prev.gymMissed,
+    })
+  },
+
+  /**
+   * The same exercises as a session already typed, with the numbers left
+   * blank — most days repeat one you have done before, and the weights are
+   * the part that is meant to change.
+   */
+  repeatSession(date: string, exercises: SessionExercise[]) {
+    const prev = state.days[date] ?? emptyDay(date)
+    actions.updateDay(date, {
+      gymMissed: false,
+      trainedAt: prev.trainedAt === '' ? 'gym' : prev.trainedAt,
+      session: [
+        ...prev.session,
+        ...exercises.map((e) => ({
+          id: uid(),
+          name: e.name,
+          sets: e.sets.map(() => ({ kg: null, reps: null })),
+        })),
+      ],
     })
   },
 
@@ -791,10 +819,6 @@ export const actions = {
       trained: missed ? false : prev.trained,
       restDay: missed ? false : prev.restDay,
     })
-  },
-
-  setWorkout(workout: Exercise[]) {
-    set({ ...state, workout })
   },
 
   /** The food log is the record; the day's calories and protein are its totals. */

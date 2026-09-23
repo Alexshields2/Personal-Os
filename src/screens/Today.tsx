@@ -35,8 +35,9 @@ import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
 import { useTopOnChange } from '../lib/scroll'
 import {
   dayProgress,
-  lastGymSets,
-  lastHomeSets,
+  exerciseNames,
+  lastSession,
+  lastSetsByName,
   missedGymCount,
   progressTone,
   todoFor,
@@ -46,7 +47,7 @@ import { loadVoices, pickVoice, scoreVoice, speak } from '../lib/speech'
 import { elevenVoices, playEleven, stopEleven } from '../lib/eleven'
 import type { ElevenVoice } from '../lib/eleven'
 import { ACCOUNT_OWNER, BANK_ACCOUNTS } from '../lib/types'
-import type { AccountId, DayEntry, Exercise, Purse, Targets } from '../lib/types'
+import type { AccountId, DayEntry, Purse, Targets } from '../lib/types'
 
 /**
  * The whole day on one page, top to bottom in the order it happens: the
@@ -836,19 +837,26 @@ function NumCell({
   )
 }
 
+/**
+ * The session, typed on the day.
+ *
+ * There is no list of exercises to keep up to date: a workout changes, so
+ * you write what you did and the numbers go beside it. Names you have used
+ * before are offered as you type, last time's numbers sit faintly in the
+ * empty boxes, and a session you have done before can be pulled in whole
+ * with one tap — which covers the days that are a repeat without pretending
+ * every day is.
+ */
 function Gym({ date, day }: { date: string; day: DayEntry }) {
   const state = useStore()
-  const list = state.workout
-  const [editing, setEditing] = useState(false)
-  const last = useMemo(() => lastGymSets(state, date), [state, date])
-  const logged = list.filter((ex) =>
-    (day.gym[ex.id] ?? []).some((s) => s.kg !== null || s.reps !== null),
-  ).length
-  const homeLogged = day.homeGym.filter((ex) =>
+  const last = useMemo(() => lastSetsByName(state, date), [state, date])
+  const previous = useMemo(() => lastSession(state, date), [state, date])
+  const names = useMemo(() => exerciseNames(state), [state])
+  const loggedCount = day.session.filter((ex) =>
     ex.sets.some((s) => s.kg !== null || s.reps !== null),
   ).length
 
-  // Missed wins the view, then wherever the training happened.
+  // Missed wins the view; otherwise it is wherever it happened.
   const place: 'gym' | 'home' | 'missed' = day.gymMissed
     ? 'missed'
     : day.trainedAt === 'home'
@@ -857,237 +865,177 @@ function Gym({ date, day }: { date: string; day: DayEntry }) {
 
   const title = day.gymMissed
     ? 'Gym · missed'
-    : place === 'home'
-      ? homeLogged
-        ? `Home workout · ${homeLogged} logged`
-        : 'Home workout'
-      : logged
-        ? `Gym · ${logged}/${list.length} logged`
-        : 'Gym'
-
-  const update = (id: string, patch: Partial<Exercise>) =>
-    actions.setWorkout(list.map((ex) => (ex.id === id ? { ...ex, ...patch } : ex)))
+    : `${place === 'home' ? 'Home workout' : 'Gym'}${loggedCount ? ` · ${loggedCount} logged` : ''}`
 
   return (
     <>
-      <SectionTitle
-        title={title}
-        action={
-          place === 'gym' || editing ? (
-            <EditToggle editing={editing} onToggle={() => setEditing(!editing)} />
-          ) : undefined
-        }
-      />
-      {!editing && (
-        <div style={{ marginBottom: 10 }}>
-          <Segmented
-            value={place}
-            onChange={(next: 'gym' | 'home' | 'missed') => actions.setTrainingPlace(date, next)}
-            options={[
-              { value: 'gym', label: 'Gym' },
-              { value: 'home', label: 'Home' },
-              { value: 'missed', label: 'Missed' },
-            ]}
-          />
-        </div>
-      )}
+      <SectionTitle title={title} />
+      <div style={{ marginBottom: 10 }}>
+        <Segmented
+          value={place}
+          onChange={(next: 'gym' | 'home' | 'missed') => actions.setTrainingPlace(date, next)}
+          options={[
+            { value: 'gym', label: 'Gym' },
+            { value: 'home', label: 'Home' },
+            { value: 'missed', label: 'Missed' },
+          ]}
+        />
+      </div>
       <Card>
-        {list.length === 0 && !editing && place === 'gym' && (
-          <Empty>No exercises yet. Tap Edit to add one.</Empty>
-        )}
-
-        {!editing && place === 'missed' ? (
+        {place === 'missed' ? (
           <MissedGym date={date} day={day} />
-        ) : !editing && place === 'home' ? (
-          <HomeGym date={date} day={day} />
-        ) : editing ? (
+        ) : (
           <>
-            {list.length > 0 && (
-              <div className="rows">
-                {list.map((ex) => (
-                  <div className="row" key={ex.id} style={{ flexWrap: 'wrap' }}>
+            {day.session.length === 0 && (
+              <Empty>Nothing yet. Type what you did — it can be different every day.</Empty>
+            )}
+            {day.session.map((exercise) => {
+              const prev = last[exercise.name.trim().toLowerCase()]
+              const cols = exercise.sets.map((_, i) => i)
+              return (
+                <div className="gym-ex" key={exercise.id}>
+                  <div className="gym-head">
                     <GrowText
-                      className="row-main"
-                      value={ex.name}
+                      className="home-name"
+                      value={exercise.name}
                       ariaLabel="Exercise"
-                      onChange={(name) => update(ex.id, { name })}
+                      onChange={(name) => actions.updateSessionExercise(date, exercise.id, { name })}
                     />
-                    <Stepper
-                      value={ex.sets}
-                      step={1}
-                      dp={0}
-                      suffix="sets"
-                      onChange={(v) => update(ex.id, { sets: Math.min(10, Math.max(1, Math.round(v))) })}
-                    />
-                    <button
-                      className="btn btn-quiet btn-danger"
-                      onClick={() => actions.setWorkout(list.filter((x) => x.id !== ex.id))}
-                      aria-label={`Delete ${ex.name}`}
-                    >
-                      <IconTrash style={{ width: 15, height: 15 }} />
-                    </button>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
+                      {prev && <span className="t-foot muted">Last: {formatShort(prev.date)}</span>}
+                      <Stepper
+                        value={exercise.sets.length}
+                        step={1}
+                        dp={0}
+                        suffix="sets"
+                        onChange={(v) => {
+                          const count = Math.min(10, Math.max(1, Math.round(v)))
+                          actions.updateSessionExercise(date, exercise.id, {
+                            sets: Array.from(
+                              { length: count },
+                              (_, i) => exercise.sets[i] ?? { kg: null, reps: null },
+                            ),
+                          })
+                        }}
+                      />
+                      <button
+                        className="btn btn-quiet btn-danger"
+                        onClick={() => actions.removeSessionExercise(date, exercise.id)}
+                        aria-label={`Delete ${exercise.name}`}
+                      >
+                        <IconTrash style={{ width: 15, height: 15 }} />
+                      </button>
+                    </span>
                   </div>
-                ))}
+                  <div
+                    className="gym-grid"
+                    style={{
+                      gridTemplateColumns: `38px repeat(${exercise.sets.length}, minmax(0, 1fr))`,
+                    }}
+                  >
+                    <span />
+                    {cols.map((i) => (
+                      <span className="t-cap gym-col" key={`h${i}`}>
+                        Set {i + 1}
+                      </span>
+                    ))}
+                    <span className="t-foot muted gym-label">kg</span>
+                    {cols.map((i) => (
+                      <NumCell
+                        key={`kg${i}`}
+                        decimal
+                        label={`${exercise.name} set ${i + 1} kg`}
+                        value={exercise.sets[i]?.kg}
+                        placeholder={prev?.sets[i]?.kg}
+                        onChange={(kg) => actions.setSessionSet(date, exercise.id, i, { kg })}
+                      />
+                    ))}
+                    <span className="t-foot muted gym-label">reps</span>
+                    {cols.map((i) => (
+                      <NumCell
+                        key={`r${i}`}
+                        decimal={false}
+                        label={`${exercise.name} set ${i + 1} reps`}
+                        value={exercise.sets[i]?.reps}
+                        placeholder={prev?.sets[i]?.reps}
+                        onChange={(reps) => actions.setSessionSet(date, exercise.id, i, { reps })}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+            <AddExercise
+              names={names}
+              divider={day.session.length > 0}
+              onAdd={(name) => actions.addSessionExercise(date, name)}
+            />
+            {day.session.length === 0 && previous && (
+              <div style={{ padding: '0 13px 13px' }}>
+                <button
+                  className="btn btn-block"
+                  onClick={() => actions.repeatSession(date, previous.exercises)}
+                >
+                  Same as {formatShort(previous.date)} ·{' '}
+                  {previous.exercises.map((e) => e.name).join(', ')}
+                </button>
               </div>
             )}
-            <AddRow
-              placeholder="Add an exercise"
-              divider={list.length > 0}
-              onAdd={(name) => actions.setWorkout([...list, { id: uid(), name, sets: 3 }])}
-            />
           </>
-        ) : (
-          list.map((ex) => {
-            const sets = day.gym[ex.id] ?? []
-            const prev = last[ex.id]
-            const cols = Array.from({ length: ex.sets }, (_, i) => i)
-            return (
-              <div className="gym-ex" key={ex.id}>
-                <div className="gym-head">
-                  <span className="row-title">{ex.name}</span>
-                  {prev && <span className="t-foot muted">Last: {formatShort(prev.date)}</span>}
-                </div>
-                <div
-                  className="gym-grid"
-                  style={{ gridTemplateColumns: `38px repeat(${ex.sets}, minmax(0, 1fr))` }}
-                >
-                  <span />
-                  {cols.map((i) => (
-                    <span className="t-cap gym-col" key={`h${i}`}>
-                      Set {i + 1}
-                    </span>
-                  ))}
-                  <span className="t-foot muted gym-label">kg</span>
-                  {cols.map((i) => (
-                    <NumCell
-                      key={`kg${i}`}
-                      decimal
-                      label={`${ex.name} set ${i + 1} kg`}
-                      value={sets[i]?.kg}
-                      placeholder={prev?.sets[i]?.kg}
-                      onChange={(kg) => actions.setGymSet(date, ex.id, i, { kg })}
-                    />
-                  ))}
-                  <span className="t-foot muted gym-label">reps</span>
-                  {cols.map((i) => (
-                    <NumCell
-                      key={`r${i}`}
-                      decimal={false}
-                      label={`${ex.name} set ${i + 1} reps`}
-                      value={sets[i]?.reps}
-                      placeholder={prev?.sets[i]?.reps}
-                      onChange={(reps) => actions.setGymSet(date, ex.id, i, { reps })}
-                    />
-                  ))}
-                </div>
-              </div>
-            )
-          })
         )}
       </Card>
-      {!editing && place === 'gym' && list.length > 0 && (
+      {place !== 'missed' && day.session.length > 0 && (
         <p className="t-foot muted" style={{ padding: '10px 4px 0' }}>
-          Faint numbers are last session's — the ones to beat.
+          Faint numbers are last time's — the ones to beat.
         </p>
       )}
     </>
   )
 }
 
-/**
- * The home workout: the day's own list, because what you can do at home
- * changes with the room you are in. Sets carry the same kg and reps as the
- * gym, and last time's numbers show faintly against an exercise of the same
- * name, however long ago it was.
- */
-function HomeGym({ date, day }: { date: string; day: DayEntry }) {
-  const state = useStore()
-  const last = useMemo(() => lastHomeSets(state, date), [state, date])
-
+/** Type the exercise. What you have written before is offered as you go. */
+function AddExercise({
+  names,
+  divider,
+  onAdd,
+}: {
+  names: string[]
+  divider: boolean
+  onAdd: (name: string) => void
+}) {
+  const [text, setText] = useState('')
+  const add = () => {
+    if (!text.trim()) return
+    onAdd(text.trim())
+    setText('')
+  }
   return (
-    <>
-      {day.homeGym.length === 0 && (
-        <Empty>Nothing logged. Add what you did — press-ups, kettlebell, a run.</Empty>
-      )}
-      {day.homeGym.map((exercise) => {
-        const prev = last[exercise.name.trim().toLowerCase()]
-        const cols = exercise.sets.map((_, i) => i)
-        return (
-          <div className="gym-ex" key={exercise.id}>
-            <div className="gym-head">
-              <GrowText
-                className="home-name"
-                value={exercise.name}
-                ariaLabel="Exercise"
-                onChange={(name) => actions.updateHomeExercise(date, exercise.id, { name })}
-              />
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 'none' }}>
-                {prev && <span className="t-foot muted">Last: {formatShort(prev.date)}</span>}
-                <Stepper
-                  value={exercise.sets.length}
-                  step={1}
-                  dp={0}
-                  suffix="sets"
-                  onChange={(v) => {
-                    const count = Math.min(10, Math.max(1, Math.round(v)))
-                    const sets = Array.from(
-                      { length: count },
-                      (_, i) => exercise.sets[i] ?? { kg: null, reps: null },
-                    )
-                    actions.updateHomeExercise(date, exercise.id, { sets })
-                  }}
-                />
-                <button
-                  className="btn btn-quiet btn-danger"
-                  onClick={() => actions.removeHomeExercise(date, exercise.id)}
-                  aria-label={`Delete ${exercise.name}`}
-                >
-                  <IconTrash style={{ width: 15, height: 15 }} />
-                </button>
-              </span>
-            </div>
-            <div
-              className="gym-grid"
-              style={{ gridTemplateColumns: `38px repeat(${exercise.sets.length}, minmax(0, 1fr))` }}
-            >
-              <span />
-              {cols.map((i) => (
-                <span className="t-cap gym-col" key={`h${i}`}>
-                  Set {i + 1}
-                </span>
-              ))}
-              <span className="t-foot muted gym-label">kg</span>
-              {cols.map((i) => (
-                <NumCell
-                  key={`kg${i}`}
-                  decimal
-                  label={`${exercise.name} set ${i + 1} kg`}
-                  value={exercise.sets[i]?.kg}
-                  placeholder={prev?.sets[i]?.kg}
-                  onChange={(kg) => actions.setHomeSet(date, exercise.id, i, { kg })}
-                />
-              ))}
-              <span className="t-foot muted gym-label">reps</span>
-              {cols.map((i) => (
-                <NumCell
-                  key={`r${i}`}
-                  decimal={false}
-                  label={`${exercise.name} set ${i + 1} reps`}
-                  value={exercise.sets[i]?.reps}
-                  placeholder={prev?.sets[i]?.reps}
-                  onChange={(reps) => actions.setHomeSet(date, exercise.id, i, { reps })}
-                />
-              ))}
-            </div>
-          </div>
-        )
-      })}
-      <AddRow
-        placeholder="Add an exercise"
-        divider={day.homeGym.length > 0}
-        onAdd={(name) => actions.addHomeExercise(date, name)}
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        padding: 13,
+        borderTop: divider ? '1px solid var(--hairline)' : 'none',
+      }}
+    >
+      <input
+        className="input"
+        style={{ flex: 1, minWidth: 0 }}
+        list="exercise-names"
+        placeholder="What did you do?"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && add()}
       />
-    </>
+      <datalist id="exercise-names">
+        {names.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
+      <button className="btn" onClick={add} disabled={!text.trim()} aria-label="Add exercise">
+        <IconPlus style={{ width: 16, height: 16 }} />
+      </button>
+    </div>
   )
 }
 

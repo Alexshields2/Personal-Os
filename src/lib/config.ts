@@ -11,7 +11,6 @@ import type {
   Goal,
   DomainLink,
   DomainNode,
-  Exercise,
   Identity,
   LearnItem,
   Loop,
@@ -116,15 +115,18 @@ export const DEFAULT_IDENTITY: Identity = {
   voice: '',
 }
 
-/** The gym list a fresh install starts with. Edited on Today. */
-export const DEFAULT_WORKOUT: Exercise[] = [
-  { id: 'ex_incline', name: 'Incline bench', sets: 3 },
-  { id: 'ex_pullup', name: 'Pull-ups', sets: 3 },
-  { id: 'ex_curl', name: 'Biceps curls', sets: 3 },
-  { id: 'ex_tri_ext', name: 'Triceps extension', sets: 3 },
-  { id: 'ex_tri_oh', name: 'Triceps overhead', sets: 3 },
-  { id: 'ex_squat', name: 'Squats', sets: 3 },
-]
+/**
+ * The exercise list the app used to ship with. Kept only so the move to a
+ * typed session can put names on what was logged against those ids.
+ */
+export const LEGACY_WORKOUT_NAMES: Record<string, string> = {
+  ex_incline: 'Incline bench',
+  ex_pullup: 'Pull-ups',
+  ex_curl: 'Biceps curls',
+  ex_tri_ext: 'Triceps extension',
+  ex_tri_oh: 'Triceps overhead',
+  ex_squat: 'Squats',
+}
 
 /**
  * The old morning SOP, kept only so migrations can recognise its ids. The day

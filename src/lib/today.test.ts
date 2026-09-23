@@ -6,8 +6,9 @@ import { EMPTY_METRICS } from './types'
 import {
   consistency,
   dayProgress,
-  lastGymSets,
-  lastHomeSets,
+  exerciseNames,
+  lastSession,
+  lastSetsByName,
   missedGymCount,
   progressTone,
   todoFor,
@@ -159,46 +160,53 @@ describe('the board', () => {
   })
 })
 
-describe('last home session', () => {
-  it('matches by name, however it was capitalised', () => {
-    const state = makeState({
-      days: daysMap([
-        day('2026-09-22', {
-          homeGym: [{ id: 'a', name: 'Press ups', sets: [{ kg: null, reps: 30 }] }],
-        }),
-        day('2026-09-23', {
-          homeGym: [{ id: 'b', name: 'PRESS UPS', sets: [{ kg: null, reps: 35 }] }],
-        }),
-      ]),
-    })
-    const last = lastHomeSets(state, '2026-09-24')
-    expect(last['press ups'].date).toBe('2026-09-23')
-    expect(last['press ups'].sets[0].reps).toBe(35)
+describe('what was lifted last time', () => {
+  const state = makeState({
+    days: daysMap([
+      day('2026-09-22', {
+        session: [
+          { id: 'a', name: 'Incline bench', sets: [{ kg: 60, reps: 8 }] },
+          { id: 'b', name: 'Press ups', sets: [{ kg: null, reps: 30 }] },
+        ],
+      }),
+      day('2026-09-23', {
+        session: [{ id: 'c', name: 'INCLINE BENCH', sets: [{ kg: 62.5, reps: 8 }] }],
+      }),
+      // Typed but never filled in: not a session.
+      day('2026-09-24', {
+        session: [{ id: 'd', name: 'Squats', sets: [{ kg: null, reps: null }] }],
+      }),
+    ]),
   })
-})
 
-describe('last session', () => {
-  it('is the most recent earlier day that logged the exercise', () => {
-    const state = makeState({
-      days: daysMap([
-        day('2026-09-01', { gym: { ex_incline: [{ kg: 60, reps: 8 }] } }),
-        day('2026-09-03', { gym: { ex_incline: [{ kg: 62.5, reps: 8 }] } }),
-        // A day with only empty sets doesn't count as a session.
-        day('2026-09-04', { gym: { ex_incline: [{ kg: null, reps: null }] } }),
-        day('2026-09-05', { gym: { ex_pullup: [{ kg: 0, reps: 10 }] } }),
-      ]),
-    })
-    const last = lastGymSets(state, '2026-09-05')
-    expect(last.ex_incline.date).toBe('2026-09-03')
-    expect(last.ex_incline.sets[0].kg).toBe(62.5)
-    // Only sessions before the day being logged.
-    expect(last.ex_pullup).toBeUndefined()
+  it('matches by name, however it was capitalised', () => {
+    const last = lastSetsByName(state, '2026-09-25')
+    expect(last['incline bench'].date).toBe('2026-09-23')
+    expect(last['incline bench'].sets[0].kg).toBe(62.5)
+    expect(last['press ups'].date).toBe('2026-09-22')
+  })
+
+  it('only looks at days before the one being logged', () => {
+    const last = lastSetsByName(state, '2026-09-23')
+    expect(last['incline bench'].date).toBe('2026-09-22')
+  })
+
+  it('offers the whole of the last real session to repeat', () => {
+    const previous = lastSession(state, '2026-09-25')
+    expect(previous?.date).toBe('2026-09-23')
+    expect(previous?.exercises.map((e) => e.name)).toEqual(['INCLINE BENCH'])
+    expect(lastSession(makeState(), '2026-09-25')).toBeNull()
+  })
+
+  it('suggests every name typed before, newest first and once each', () => {
+    // "INCLINE BENCH" and "Incline bench" are the same exercise; the most
+    // recent spelling is the one offered.
+    expect(exerciseNames(state)).toEqual(['Squats', 'INCLINE BENCH', 'Press ups'])
   })
 })
 
 describe('what the page works out for you', () => {
   const D = '2026-09-22'
-  const state0 = () => getState()
 
   beforeEach(() => {
     actions.replaceAll(makeState())
@@ -214,16 +222,35 @@ describe('what the page works out for you', () => {
     expect(saved.wakeTime).toBe('06:00')
   })
 
-  it('makes it a gym day once a set is logged, and not before', () => {
-    actions.setGymSet(D, 'ex_incline', 1, { kg: 60 })
+  it('makes it a training day once a set is logged, and not before', () => {
+    actions.addSessionExercise(D, 'Incline bench')
     let saved = getState().days[D]
-    expect(saved.gym.ex_incline).toEqual([
-      { kg: null, reps: null },
-      { kg: 60, reps: null },
-    ])
-    expect(saved.trained).toBe(true)
-    actions.setGymSet(D, 'ex_incline', 1, { kg: null })
+    expect(saved.session[0].sets).toHaveLength(3)
+    // Typed but not filled in is not training.
+    expect(saved.trained).toBe(false)
+
+    actions.setSessionSet(D, saved.session[0].id, 1, { kg: 60 })
     saved = getState().days[D]
+    expect(saved.session[0].sets[1]).toEqual({ kg: 60, reps: null })
+    expect(saved.trained).toBe(true)
+
+    actions.setSessionSet(D, saved.session[0].id, 1, { kg: null })
+    expect(getState().days[D].trained).toBe(false)
+  })
+
+  it('repeats a session by name, leaving the numbers to be beaten', () => {
+    actions.repeatSession(D, [
+      { id: 'x', name: 'Incline bench', sets: [{ kg: 60, reps: 8 }, { kg: 60, reps: 8 }] },
+      { id: 'y', name: 'Pull-ups', sets: [{ kg: null, reps: 10 }] },
+    ])
+    const saved = getState().days[D]
+    expect(saved.session.map((e) => e.name)).toEqual(['Incline bench', 'Pull-ups'])
+    expect(saved.session[0].sets).toEqual([
+      { kg: null, reps: null },
+      { kg: null, reps: null },
+    ])
+    // Copied, not moved: the ids are its own.
+    expect(saved.session[0].id).not.toBe('x')
     expect(saved.trained).toBe(false)
   })
 
@@ -232,7 +259,8 @@ describe('what the page works out for you', () => {
     let saved = getState().days[D]
     expect(saved.gymMissed).toBe(true)
     expect(saved.trained).toBe(false)
-    actions.setGymSet(D, 'ex_squat', 0, { reps: 5 })
+    actions.addSessionExercise(D, 'Squats')
+    actions.setSessionSet(D, getState().days[D].session[0].id, 0, { reps: 5 })
     saved = getState().days[D]
     expect(saved.gymMissed).toBe(false)
     expect(saved.trained).toBe(true)
@@ -250,34 +278,23 @@ describe('what the page works out for you', () => {
     expect(getState().days[D].habitMissed.m_cold).toBe(false)
   })
 
-  it('counts a home workout as training, gym or not', () => {
-    actions.setTrainingPlace(D, 'home')
-    expect(getState().days[D].trainedAt).toBe('home')
-    actions.addHomeExercise(D, 'Press-ups')
-    let saved = getState().days[D]
-    expect(saved.homeGym[0].sets).toHaveLength(3)
-    // Named but not done yet is not training.
-    expect(saved.trained).toBe(false)
-    actions.setHomeSet(D, saved.homeGym[0].id, 0, { reps: 25 })
-    saved = getState().days[D]
-    expect(saved.trained).toBe(true)
-    expect(saved.gymMissed).toBe(false)
-    // And the day's gym point counts it.
-    expect(dayProgress(state0(), D, D)).toBeDefined()
-    actions.removeHomeExercise(D, saved.homeGym[0].id)
-    expect(getState().days[D].trained).toBe(false)
-  })
-
-  it('swaps a missed session for a home one when the sets go in', () => {
+  it('counts a home session as training, and takes a miss back off', () => {
     actions.setTrainingPlace(D, 'missed')
     expect(getState().days[D].gymMissed).toBe(true)
-    actions.addHomeExercise(D, 'Kettlebell swings', 2)
-    const id = getState().days[D].homeGym[0].id
-    actions.setHomeSet(D, id, 1, { kg: 24, reps: 15 })
+
+    actions.setTrainingPlace(D, 'home')
+    actions.addSessionExercise(D, 'Kettlebell swings', 2)
+    const id = getState().days[D].session[0].id
+    actions.setSessionSet(D, id, 1, { kg: 24, reps: 15 })
+
     const saved = getState().days[D]
-    expect(saved.gymMissed).toBe(false)
     expect(saved.trainedAt).toBe('home')
-    expect(saved.homeGym[0].sets[1]).toEqual({ kg: 24, reps: 15 })
+    expect(saved.trained).toBe(true)
+    expect(saved.gymMissed).toBe(false)
+    expect(saved.session[0].sets[1]).toEqual({ kg: 24, reps: 15 })
+
+    actions.removeSessionExercise(D, id)
+    expect(getState().days[D].trained).toBe(false)
   })
 
   it('moves a task between to do, in progress and done', () => {
@@ -359,11 +376,6 @@ describe('v20 — one page', () => {
   it('folds old day notes into the notes the page shows', () => {
     expect(out.days['2026-09-22'].journal).toBe('old note')
     expect(out.days['2026-09-23'].journal).toBe('kept')
-  })
-
-  it('starts the gym list', () => {
-    expect(out.workout.map((e) => e.name)).toContain('Incline bench')
-    expect(out.workout.every((e) => e.sets === 3)).toBe(true)
   })
 
   it('does not let an older migration put the SOP back', () => {

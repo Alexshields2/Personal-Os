@@ -23,10 +23,7 @@ export default function DoneDay({ date, day }: { date: string; day: DayEntry }) 
 
   const habits = state.morningRitual.filter((h) => day.checks[h.id])
   const tasks = todoFor(state, date).filter((t) => t.done)
-  const gym = state.workout
-    .map((ex) => ({ name: ex.name, sets: day.gym[ex.id] ?? [] }))
-    .filter((ex) => ex.sets.some(logged))
-  const home = day.homeGym.filter((ex) => ex.sets.some(logged))
+  const session = day.session.filter((ex) => ex.sets.some(logged))
   const spent = state.ledger.filter((e) => e.date === date && e.kind === 'expense')
   const slept = sleepMinutes(day.bedtime, day.wakeTime)
   const tomorrow = state.tasks.filter((t) => t.scheduled === addDays(date, 1)).length
@@ -35,8 +32,7 @@ export default function DoneDay({ date, day }: { date: string; day: DayEntry }) 
   const nothing =
     habits.length === 0 &&
     tasks.length === 0 &&
-    gym.length === 0 &&
-    home.length === 0 &&
+    session.length === 0 &&
     spent.length === 0 &&
     slept === null &&
     day.food.length === 0 &&
@@ -114,11 +110,19 @@ export default function DoneDay({ date, day }: { date: string; day: DayEntry }) 
         </>
       )}
 
-      {(gym.length > 0 || home.length > 0 || day.gymMissed) && (
+      {(session.length > 0 || day.gymMissed) && (
         <>
-          <SectionTitle title={day.gymMissed ? 'Gym · missed' : home.length > 0 ? 'Home workout' : 'Gym'} />
+          <SectionTitle
+            title={
+              day.gymMissed
+                ? 'Gym · missed'
+                : day.trainedAt === 'home'
+                  ? 'Home workout'
+                  : 'Gym'
+            }
+          />
           <Card>
-            {day.gymMissed && gym.length === 0 && home.length === 0 ? (
+            {day.gymMissed && session.length === 0 ? (
               <div className="row">
                 <span className="row-main">
                   <span className="row-title">Missed — noted</span>
@@ -129,8 +133,8 @@ export default function DoneDay({ date, day }: { date: string; day: DayEntry }) 
               </div>
             ) : (
               <div className="rows">
-                {[...gym, ...home].map((exercise) => (
-                  <div className="row" key={exercise.name}>
+                {session.map((exercise) => (
+                  <div className="row" key={exercise.id}>
                     <span className="row-main">
                       <span className="row-title">{exercise.name}</span>
                       <span className="row-sub">{setsLine(exercise.sets)}</span>

@@ -444,15 +444,33 @@ export function GrowText({
   const ref = useRef<HTMLTextAreaElement>(null)
 
   // Measured after layout, before paint, so the field never flashes at the
-  // wrong height on first render or after an edit.
+  // wrong height on first render or after an edit — and again whenever it is
+  // given a different width, because a height worked out at one width is
+  // wrong at another. A field briefly squeezed by its neighbours would
+  // otherwise keep the tall height it needed while it was narrow.
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
-    el.style.height = 'auto'
-    // scrollHeight covers content and padding; the border is on top of that,
-    // and the box is border-box — without it the last line loses its tails.
-    const border = el.offsetHeight - el.clientHeight
-    el.style.height = `${el.scrollHeight + border}px`
+    const fit = () => {
+      el.style.height = 'auto'
+      // scrollHeight covers content and padding; the border sits on top of
+      // that, and the box is border-box — without it the last line loses
+      // its tails.
+      const border = el.offsetHeight - el.clientHeight
+      el.style.height = `${el.scrollHeight + border}px`
+    }
+    fit()
+    if (typeof ResizeObserver === 'undefined') return
+    // Width only: re-fitting on the height change this makes would loop.
+    let width = el.clientWidth
+    const observer = new ResizeObserver((entries) => {
+      const next = entries[0]?.contentRect.width ?? width
+      if (Math.abs(next - width) < 1) return
+      width = next
+      fit()
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [value])
 
   return (

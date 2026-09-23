@@ -2,7 +2,7 @@ import type { MarketingDay } from './marketing'
 
 /** Every persisted shape lives here. Bump STATE_VERSION on breaking changes. */
 
-export const STATE_VERSION = 22
+export const STATE_VERSION = 23
 
 /** Numeric things logged once a day. Keys double as metric ids everywhere. */
 export interface DayMetrics {
@@ -176,15 +176,10 @@ export interface DayEntry {
   bedtime: string
   /** "HH:MM" you woke up on this date. Hours slept are worked out from the two. */
   wakeTime: string
-  /** Exercise id -> the sets done that day, in order. */
-  gym: Record<string, GymSet[]>
-  /**
-   * Where the training happened. Empty means the gym, which is the default
-   * view; 'home' switches the card to the day's own list of exercises.
-   */
+  /** Where the training happened. Empty reads as the gym. */
   trainedAt: '' | 'gym' | 'home'
-  /** The home workout: whatever was done, with the sets it was done in. */
-  homeGym: HomeExercise[]
+  /** The session: what was done that day, in the order it was written down. */
+  session: SessionExercise[]
   /**
    * Marked as a missed gym day. Deliberate, so a miss is on the record rather
    * than indistinguishable from a day nobody logged.
@@ -230,18 +225,15 @@ export interface Identity {
   voice: string
 }
 
-/** An exercise done at home: named on the day, with its own sets. */
-export interface HomeExercise {
+/**
+ * One exercise in a session: typed on the day it was done, with its sets.
+ * There is no template to keep up to date — a workout changes, and the log
+ * is whatever was actually lifted.
+ */
+export interface SessionExercise {
   id: string
   name: string
   sets: GymSet[]
-}
-
-/** An exercise in the gym list, and how many sets it gets. */
-export interface Exercise {
-  id: string
-  name: string
-  sets: number
 }
 
 export type MoneyEntity = 'consulting' | 'onemedia'
@@ -807,8 +799,6 @@ export interface AppState {
   }
   /** The standards the day is scored against. Editable — add, reweight, remove. */
   checklist: ChecklistItem[]
-  /** The gym list: each exercise and its number of sets. Edited on Today. */
-  workout: Exercise[]
   /** What sits at the top of Today: who you are becoming, and the picture of it. */
   identity: Identity
 }

@@ -2710,14 +2710,18 @@ button.edge:hover {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   margin-bottom: 8px;
+  /* The name wins the row; the date, the set count and the bin wrap under it
+     rather than squeezing it. A name field squeezed to nothing renders as a
+     tall empty column with the words hidden one letter per line. */
+  flex-wrap: wrap;
 }
 
-/* A home exercise names itself, so its name is a field rather than a label. */
+/* An exercise names itself, so its name is a field rather than a label. */
 textarea.home-name {
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 130px;
+  min-width: 130px;
   padding: 0;
   font-size: 16px;
   letter-spacing: -0.012em;
