@@ -245,7 +245,11 @@ button {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: calc(var(--safe-top) + 8px) 0 calc(var(--tabbar-h) + var(--safe-bottom) + 28px);
+  /* Nothing chains out of here: the page behind is not meant to move. */
+  overscroll-behavior-y: contain;
+  /* The tail clears the tab bar and the floating button, so the last control
+     on a page is never sitting underneath either of them. */
+  padding: calc(var(--safe-top) + 8px) 0 calc(var(--tabbar-h) + var(--safe-bottom) + 96px);
 }
 
 .wrap {
@@ -372,7 +376,9 @@ button {
   }
   .scroll {
     padding-top: 10px;
-    padding-bottom: 60px;
+    /* No tab bar at this width, but the floating button is still there: the
+       tail has to clear it or the last control on a page sits underneath. */
+    padding-bottom: 96px;
   }
   .wrap {
     max-width: 860px;
@@ -878,6 +884,8 @@ textarea.input {
   max-width: 520px;
   max-height: 88vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--surface-2);
   border: 1px solid var(--hairline);
   border-bottom: none;
@@ -928,9 +936,14 @@ textarea.input {
   }
 }
 
-/* Screen transition */
+/* Screen transition.
+
+   `backwards`, not `both`: a filled animation that touches transform leaves
+   the element with an identity matrix rather than none, and a transformed
+   element is the containing block for anything fixed inside it. That is
+   enough to drop an overlay below the fold. */
 .screen {
-  animation: screen-in 0.4s var(--ease) both;
+  animation: screen-in 0.4s var(--ease) backwards;
 }
 
 /* Login wall — rendered instead of the app shell, so it can't assume any of
@@ -2891,6 +2904,8 @@ textarea.home-name {
 .cboard-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* Swiping the days sideways should not drag the page with it. */
+  overscroll-behavior-x: contain;
 }
 
 .cboard {

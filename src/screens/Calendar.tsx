@@ -15,6 +15,7 @@ import { AGENDA_DAYS, MONTH_LABEL, PRIORITY_TAGS, REPEAT_LABEL } from '../lib/co
 import { formatLong, formatShort, fromISO, todayISO, toISO } from '../lib/date'
 import { euro, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
+import { useTopOnChange } from '../lib/scroll'
 import { agenda, monthGrid, upcomingEvents } from '../lib/selectors'
 import { durationLabel } from '../lib/selectors'
 import type { EventRepeat, Priority } from '../lib/types'
@@ -30,6 +31,7 @@ export default function Calendar() {
   const state = useStore()
   const today = todayISO()
   const [view, setView] = useState<'agenda' | 'month'>('agenda')
+  useTopOnChange(view)
   const [anchor, setAnchor] = useState(today)
   const [editing, setEditing] = useState<string | null>(null)
   const [adding, setAdding] = useState<string | null>(null)

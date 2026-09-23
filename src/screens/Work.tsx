@@ -30,6 +30,7 @@ import {
 import { daysBetween, formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, uid } from '../lib/format'
 import { actions, newTask, useStore } from '../lib/store'
+import { useTopOnChange } from '../lib/scroll'
 import { clientBook, pipeline, projectProgress, taskQueue } from '../lib/selectors'
 import type {
   ClientStatus,
@@ -45,6 +46,7 @@ type View = 'week' | 'tasks' | 'projects' | 'clients' | 'pipeline' | 'due'
 export default function Work() {
   const state = useStore()
   const [view, setView] = useState<View>('week')
+  useTopOnChange(view)
   const queue = useMemo(() => taskQueue(state), [state])
   const pipe = useMemo(() => pipeline(state), [state])
 

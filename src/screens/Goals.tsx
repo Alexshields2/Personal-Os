@@ -24,6 +24,7 @@ import {
 import { addDays, formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, num, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
+import { useTopOnChange } from '../lib/scroll'
 import { goalBoard, goalContribution, goalProgress, upkeepStatus } from '../lib/selectors'
 import { downscaleImage } from '../lib/image'
 import type { Goal, KeyResult, KeyResultSource } from '../lib/types'
@@ -39,6 +40,7 @@ type View = 'goals' | 'upkeep'
 export default function Goals() {
   const state = useStore()
   const [view, setView] = useState<View>('goals')
+  useTopOnChange(view)
   const board = useMemo(() => goalBoard(state), [state])
   const dueNow = state.upkeep.filter((u) => upkeepStatus(u).overdue).length
 

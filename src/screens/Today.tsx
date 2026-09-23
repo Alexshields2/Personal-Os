@@ -31,6 +31,7 @@ import {
 } from '../lib/date'
 import { euro, num, uid } from '../lib/format'
 import { actions, emptyDay, emptyWeek, newTask, useStore } from '../lib/store'
+import { useTopOnChange } from '../lib/scroll'
 import {
   dayProgress,
   lastGymSets,
@@ -60,6 +61,7 @@ export default function Today({ onNavigate }: { onNavigate?: (tab: string) => vo
   const today = todayISO()
   const [date, setDate] = useState(today)
   const [view, setView] = useState<View>('day')
+  useTopOnChange(view)
 
   const day = state.days[date] ?? emptyDay(date)
   // Tomorrow can be planned — notes and to-dos — but not logged.

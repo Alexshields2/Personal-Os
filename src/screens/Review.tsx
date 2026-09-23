@@ -14,6 +14,7 @@ import { INNER_CIRCLE } from '../lib/config'
 import { addDays, formatShort, fromISO, todayISO, weekStartISO } from '../lib/date'
 import { euro } from '../lib/format'
 import { DAYS_START, actions, emptyWeek, useStore } from '../lib/store'
+import { useTopOnChange } from '../lib/scroll'
 import { consistency, dayProgress, progressTone, weekRevenue } from '../lib/selectors'
 
 type View = 'board' | 'week'
@@ -21,6 +22,7 @@ type View = 'board' | 'week'
 export default function Review() {
   const state = useStore()
   const [view, setView] = useState<View>('board')
+  useTopOnChange(view)
   const [weekStart, setWeekStart] = useState(weekStartISO(todayISO()))
   const week = state.weeks[weekStart] ?? emptyWeek(weekStart)
   const money = weekRevenue(state, weekStart)

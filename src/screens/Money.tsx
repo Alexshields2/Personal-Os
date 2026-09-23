@@ -20,6 +20,7 @@ import { ACCOUNT_LABEL, KIND_LABEL, MONTH_LABEL, PURSE_LABEL } from '../lib/conf
 import { formatShort, todayISO } from '../lib/date'
 import { euro, euroCompact, pct, uid } from '../lib/format'
 import { actions, useStore } from '../lib/store'
+import { useTopOnChange } from '../lib/scroll'
 import {
   accountBalance,
   accountHistory,
@@ -57,6 +58,7 @@ const SERIES_STYLE: Record<string, { color: string; dash?: string }> = {
 
 export default function Money() {
   const [section, setSection] = useState<'accounts' | 'depth' | 'transactions'>('accounts')
+  useTopOnChange(section)
   return (
     <div className="screen wrap">
       <header className="page-head">

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
 import { IconCheck } from './icons'
 
@@ -236,6 +237,38 @@ export function NumberField({
 
 // --------------------------------------------------------------------- sheet
 
+/**
+ * Hold the page still while something is open over it.
+ *
+ * `body { overflow: hidden }` does nothing here: the page scrolls inside a
+ * div, not the document, so the background slid around under every sheet and
+ * you came back somewhere else. This freezes the real scroller and puts it
+ * back exactly where it was. Counted, so two things open at once don't
+ * unfreeze it early.
+ */
+let locks = 0
+let lockedAt = 0
+
+export function lockScroll(): () => void {
+  const scroller = document.querySelector<HTMLElement>('.scroll')
+  if (!scroller) return () => {}
+  if (locks === 0) {
+    lockedAt = scroller.scrollTop
+    scroller.style.overflowY = 'hidden'
+  }
+  locks += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    locks = Math.max(0, locks - 1)
+    if (locks === 0) {
+      scroller.style.overflowY = ''
+      scroller.scrollTop = lockedAt
+    }
+  }
+}
+
 export function Sheet({
   title,
   onClose,
@@ -252,15 +285,19 @@ export function Sheet({
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     return () => {
       document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = prev
+      unlock()
     }
   }, [onClose])
 
-  return (
+  // Rendered at the end of the document, not where it was written. A sheet
+  // is opened from inside a screen, and any transformed ancestor — a screen
+  // mid-animation, a card with a backdrop filter — becomes the containing
+  // block for `position: fixed`, which put the whole thing below the fold
+  // where it could not be seen at all.
+  return createPortal(
     <div
       className="scrim"
       onMouseDown={(e) => {
@@ -279,7 +316,8 @@ export function Sheet({
         </div>
         <div className="stack">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

@@ -18,6 +18,8 @@ import {
   IconWork,
 } from './components/icons'
 import ErrorBoundary from './components/ErrorBoundary'
+import { lockScroll } from './components/ui'
+import { scrollToTop } from './lib/scroll'
 import Palette from './components/Palette'
 import QuickAdd from './components/QuickAdd'
 import { SECTIONS } from './lib/config'
@@ -112,7 +114,7 @@ export default function App() {
 
   // Jumping tabs should land at the top, the way a native push does.
   useEffect(() => {
-    document.querySelector('.scroll')?.scrollTo({ top: 0 })
+    scrollToTop()
     // Fifteen sections don't fit a phone's tab bar, so keep the current one in
     // view — otherwise the selected tab sits off-screen with no way to tell.
     // Deferred a frame: on the tab that is being selected, aria-selected is
@@ -129,6 +131,12 @@ export default function App() {
     })
     return () => cancelAnimationFrame(raf)
   }, [tab])
+
+  // Anything covering the page holds it still while it is open.
+  useEffect(() => {
+    if (!sheetOpen && !paletteOpen) return
+    return lockScroll()
+  }, [sheetOpen, paletteOpen])
 
   // Cmd/Ctrl-K anywhere. Ignored while typing so it can't hijack a keystroke
   // meant for a field, except in the palette's own input, which handles it.
